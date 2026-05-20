@@ -1,0 +1,82 @@
+# ─────────────────────────────────────────────
+# Claude Code
+# ─────────────────────────────────────────────
+.claude/settings.local.json
+.claude/worktrees/
+
+# ─────────────────────────────────────────────
+# Dependencias (raíz del monorepo)
+# ─────────────────────────────────────────────
+node_modules/
+
+# ─────────────────────────────────────────────
+# Variables de entorno
+# ─────────────────────────────────────────────
+.env
+.env.local
+.env.*.local
+
+# ─────────────────────────────────────────────
+# Logs
+# ─────────────────────────────────────────────
+*.log
+logs/
+npm-debug.log*
+pnpm-debug.log*
+yarn-debug.log*
+yarn-error.log*
+
+# ─────────────────────────────────────────────
+# Sistema operativo
+# ─────────────────────────────────────────────
+# macOS
+.DS_Store
+.AppleDouble
+.LSOverride
+
+# Windows
+Thumbs.db
+Thumbs.db:encryptable
+ehthumbs.db
+Desktop.ini
+$RECYCLE.BIN/
+
+# ─────────────────────────────────────────────
+# IDEs y editores
+# ─────────────────────────────────────────────
+.idea/
+*.suo
+*.ntvs*
+*.njsproj
+*.sln
+*.sw?
+
+# VSCode — se permite compartir configuración del proyecto
+.vscode/*
+!.vscode/settings.json
+!.vscode/tasks.json
+!.vscode/launch.json
+!.vscode/extensions.json
+
+# ─────────────────────────────────────────────
+# Builds y compilados
+# ─────────────────────────────────────────────
+dist/
+build/
+out/
+.next/
+
+# ─────────────────────────────────────────────
+# Tests y cobertura
+# ─────────────────────────────────────────────
+coverage/
+.nyc_output/
+
+# ─────────────────────────────────────────────
+# Archivos temporales
+# ─────────────────────────────────────────────
+.tmp/
+.temp/
+*.pid
+*.seed
+*.pid.lock
