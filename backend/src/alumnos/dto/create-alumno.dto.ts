@@ -40,8 +40,13 @@ export class CreateAlumnoDto {
   @IsString()
   telefono?: string;
 
-  @ApiPropertyOptional()
+  @ApiPropertyOptional({ description: 'UUID del aula asignada' })
   @IsOptional()
   @IsUUID()
-  seccion_id?: string;
+  aula_id?: string;
+
+  @ApiPropertyOptional({ description: 'UUID de la carrera profesional del alumno' })
+  @IsOptional()
+  @IsUUID()
+  carrera_id?: string;
 }

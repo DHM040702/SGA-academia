@@ -26,7 +26,7 @@ export default function AsistenciaPage() {
   const { data: page, isLoading } = useAsistencia({
     fecha: TODAY,
     tipo: tipoFilter || undefined,
-    seccion_id: seccionFilter || undefined,
+    aula_id: seccionFilter || undefined,
     limit: 50,
   })
 

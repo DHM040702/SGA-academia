@@ -9,7 +9,7 @@ import { Avatar } from '@/components/ui/avatar'
 import { Input } from '@/components/ui/input'
 import { ImportExcelModal } from '@/components/alumnos/import-excel-modal'
 import { useAlumnos, useDeleteAlumno, type EstadoAlumno, type FilterAlumnos } from '@/hooks/use-alumnos'
-import { useCiclos, useSecciones } from '@/hooks/use-ciclos'
+import { useCiclos, useAulas } from '@/hooks/use-ciclos'
 import { cn } from '@/lib/utils'
 import { Search, Plus, Upload, Scan, Filter, ChevR, ChevL, More, Eye, Edit, Trash } from '@/components/icons'
 
@@ -121,7 +121,7 @@ export default function AlumnosPage() {
   const [q, setQ] = React.useState('')
   const [estado, setEstado] = React.useState('')
   const [cicloId, setCicloId] = React.useState('')
-  const [seccionId, setSeccionId] = React.useState('')
+  const [aulaId, setAulaId] = React.useState('')
   const [openMenu, setOpenMenu] = React.useState<string | null>(null)
   const [showImport, setShowImport] = React.useState(false)
 
@@ -147,17 +147,17 @@ export default function AlumnosPage() {
       ...f,
       estado: (estado || undefined) as EstadoAlumno | undefined,
       ciclo_id: cicloId || undefined,
-      seccion_id: seccionId || undefined,
+      aula_id: aulaId || undefined,
       page: 1,
     }))
-  }, [estado, cicloId, seccionId])
+  }, [estado, cicloId, aulaId])
 
   /* ── Limpiar sección al cambiar ciclo ── */
-  React.useEffect(() => { setSeccionId('') }, [cicloId])
+  React.useEffect(() => { setAulaId('') }, [cicloId])
 
   const { data, isLoading, isFetching } = useAlumnos(filters)
   const { data: ciclos = [] } = useCiclos()
-  const { data: secciones = [] } = useSecciones(cicloId || undefined)
+  const { data: secciones = [] } = useAulas(cicloId || undefined)
 
   const total = data?.total ?? 0
   const totalPages = data?.totalPages ?? 1
@@ -205,9 +205,9 @@ export default function AlumnosPage() {
           ]}
         />
         <FilterSelect
-          label="Sección"
-          value={seccionId}
-          onChange={setSeccionId}
+          label="Aula"
+          value={aulaId}
+          onChange={setAulaId}
           disabled={!cicloId}
           options={[
             { label: cicloId ? 'Todas' : 'Elige ciclo', value: '' },
@@ -278,8 +278,8 @@ export default function AlumnosPage() {
                     <td className="px-3.5 py-3 font-mono text-[12.5px] tracking-[0.05em]">{a.codigo_barra}</td>
                     <td className="px-3.5 py-3 font-mono text-[12px] text-text-mute">{a.dni}</td>
                     <td className="px-3.5 py-3">
-                      {a.seccion ? (
-                        <Pill tone="neutral">{a.seccion.nombre}</Pill>
+                      {a.aula ? (
+                        <Pill tone="neutral">{a.aula.nombre}</Pill>
                       ) : (
                         <span className="text-text-mute text-[12px]">—</span>
                       )}

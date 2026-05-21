@@ -65,13 +65,13 @@ function horarioInSlot(horarios: Horario[], dia: number, slot: string): Horario 
 export default function PortalHorarioPage() {
   const { user } = useAuth()
   const alumno = user?.alumno
-  const seccionId: string | undefined = alumno?.seccionId ?? undefined
+  const aulaId: string | undefined = (alumno as any)?.aulaId ?? undefined
 
   const [weekOffset, setWeekOffset] = useState(0)
   const weekDates = getWeekDates(weekOffset)
 
   const { data: horariosRes, isLoading } = useHorarios(
-    seccionId ? { seccion_id: seccionId } : {}
+    aulaId ? { aula_id: aulaId } : {}
   )
 
   const allHorarios: Horario[] = (horariosRes as any)?.data ?? []
@@ -94,7 +94,7 @@ export default function PortalHorarioPage() {
       <div className="flex items-end justify-between mb-5">
         <div>
           <div className="text-[11.5px] text-text-mute mb-1">
-            Sección {alumno?.seccionId ? 'activa' : '—'} · Ciclo 2026-I
+            Aula {aulaId ? 'activa' : '—'} · Ciclo 2026-I
           </div>
           <h1 className="m-0 font-serif font-semibold text-[30px] tracking-[-0.02em] leading-[1.1]">
             Mi horario

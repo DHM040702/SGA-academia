@@ -96,7 +96,7 @@ export class AsistenciaService {
   }
 
   async findAll(dto: FilterAsistenciaDto) {
-    const { page = 1, limit = 20, fecha, seccion_id, alumno_id, docente_id, tipo } = dto;
+    const { page = 1, limit = 20, fecha, aula_id, alumno_id, docente_id, tipo } = dto as any;
     const skip = (page - 1) * limit;
 
     const where: any = {};
@@ -108,8 +108,8 @@ export class AsistenciaService {
     if (tipo) where.tipoPersona = tipo;
     if (alumno_id) where.alumnoId = alumno_id;
     if (docente_id) where.docenteId = docente_id;
-    if (seccion_id) {
-      where.alumno = { seccionId: seccion_id };
+    if (aula_id) {
+      where.alumno = { aulaId: aula_id };
     }
 
     const [items, total] = await Promise.all([

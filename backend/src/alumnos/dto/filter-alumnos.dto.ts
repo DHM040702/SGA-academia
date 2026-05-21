@@ -10,10 +10,10 @@ export class FilterAlumnosDto extends PaginationDto {
   @IsUUID()
   ciclo_id?: string;
 
-  @ApiPropertyOptional({ description: 'UUID de la sección' })
+  @ApiPropertyOptional({ description: 'UUID del aula' })
   @IsOptional()
   @IsUUID()
-  seccion_id?: string;
+  aula_id?: string;
 
   @ApiPropertyOptional({ enum: ['activo', 'observado', 'riesgo', 'inactivo'] })
   @IsOptional()

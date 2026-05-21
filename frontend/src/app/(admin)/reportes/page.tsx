@@ -183,8 +183,8 @@ export default function ReportesPage() {
                   </thead>
                   <tbody>
                     {reporte.secciones.map((s: any, i: number) => (
-                      <tr key={s.seccionId ?? i} className="border-t border-border-s">
-                        <td className="px-3.5 py-2.5 font-semibold">{s.nombre ?? s.seccionId}</td>
+                      <tr key={s.aulaId ?? i} className="border-t border-border-s">
+                        <td className="px-3.5 py-2.5 font-semibold">{s.nombre ?? s.aulaId}</td>
                         <td className="px-3.5 py-2.5 font-mono">{s.total_alumnos ?? '—'}</td>
                         <td className="px-3.5 py-2.5">
                           <div className="flex items-center gap-2">
@@ -233,7 +233,7 @@ export default function ReportesPage() {
                       <tr key={a.alumno_id ?? i} className="border-t border-border-s">
                         <td className="px-3.5 py-2.5 font-medium">{a.nombre ?? '—'} {a.apellidos ?? ''}</td>
                         <td className="px-3.5 py-2.5 font-mono text-[12px]">{a.dni ?? '—'}</td>
-                        <td className="px-3.5 py-2.5">{a.seccion ?? '—'}</td>
+                        <td className="px-3.5 py-2.5">{a.aula ?? '—'}</td>
                         <td className="px-3.5 py-2.5">
                           <Pill tone="danger">{a.asistencia_pct ?? '—'}%</Pill>
                         </td>

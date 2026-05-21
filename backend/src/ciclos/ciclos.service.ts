@@ -11,17 +11,17 @@ export class CiclosService {
     const ciclos = await this.prisma.ciclo.findMany({
       orderBy: { fechaInicio: 'desc' },
       include: {
-        _count: { select: { secciones: true } },
-        secciones: {
+        _count: { select: { aulas: true } },
+        aulas: {
           select: { _count: { select: { alumnos: true } } },
         },
       },
     });
 
     return ciclos.map((c) => {
-      const total_alumnos = c.secciones.reduce((sum, s) => sum + s._count.alumnos, 0);
-      const { secciones, ...rest } = c;
-      return { ...rest, total_secciones: c._count.secciones, total_alumnos };
+      const total_alumnos = c.aulas.reduce((sum, a) => sum + a._count.alumnos, 0);
+      const { aulas, ...rest } = c;
+      return { ...rest, total_secciones: c._count.aulas, total_alumnos };
     });
   }
 
@@ -29,7 +29,7 @@ export class CiclosService {
     const ciclo = await this.prisma.ciclo.findFirst({
       where: { id },
       include: {
-        secciones: {
+        aulas: {
           include: {
             alumnos: {
               where: { deletedAt: null },
@@ -86,9 +86,8 @@ export class CiclosService {
 
   async remove(id: string) {
     await this.findOne(id);
-    // Verificar si hay alumnos activos en las secciones del ciclo
     const totalAlumnos = await this.prisma.alumno.count({
-      where: { seccion: { cicloId: id }, deletedAt: null },
+      where: { aula: { cicloId: id }, deletedAt: null },
     });
     if (totalAlumnos > 0) {
       throw new BadRequestException('No se puede eliminar un ciclo con alumnos matriculados');

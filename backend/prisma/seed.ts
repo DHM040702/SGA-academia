@@ -52,7 +52,8 @@ async function main() {
   await prisma.alumno.deleteMany()
   await prisma.apoderado.deleteMany()
   await prisma.docente.deleteMany()
-  await prisma.seccion.deleteMany()
+  await prisma.carrera.deleteMany()
+  await prisma.aula.deleteMany()
   await prisma.ciclo.deleteMany()
   await prisma.curso.deleteMany()
   await prisma.usuario.deleteMany()
@@ -75,7 +76,7 @@ async function main() {
     prisma.usuario.create({ data: { email: 'vigilante@cepreunasam.edu.pe', passwordHash: hashAdmin, rol: Rol.vigilante } }),
   ])
   console.log('   ✓ Staff: admin, director, vigilante')
-  void admin // referenced below only for type info
+  void admin
 
   // ── 3. Ciclo ─────────────────────────────────────────────────────────────
   const ciclo = await prisma.ciclo.create({
@@ -83,19 +84,39 @@ async function main() {
   })
   console.log(`   ✓ Ciclo: ${ciclo.nombre}`)
 
-  // ── 4. Secciones ──────────────────────────────────────────────────────────
-  // Nomenclatura: [Área]-[Turno inicial]  →  A=Ciencias, B=Letras, C=Médicas
-  const [secAM, secAT, secBM, secBT, secCM, secCT] = await Promise.all([
-    prisma.seccion.create({ data: { cicloId: ciclo.id, nombre: 'A-M', turno: Turno.manana, area: Area.ciencias, carrera: 'Ing. Civil, Sistemas, Agronómica',        cupoMaximo: 40 } }),
-    prisma.seccion.create({ data: { cicloId: ciclo.id, nombre: 'A-T', turno: Turno.tarde,  area: Area.ciencias, carrera: 'Ing. Civil, Sistemas, Agronómica',        cupoMaximo: 40 } }),
-    prisma.seccion.create({ data: { cicloId: ciclo.id, nombre: 'B-M', turno: Turno.manana, area: Area.letras,   carrera: 'Derecho, Ciencias Políticas, Economía',   cupoMaximo: 40 } }),
-    prisma.seccion.create({ data: { cicloId: ciclo.id, nombre: 'B-T', turno: Turno.tarde,  area: Area.letras,   carrera: 'Derecho, Ciencias Políticas, Economía',   cupoMaximo: 40 } }),
-    prisma.seccion.create({ data: { cicloId: ciclo.id, nombre: 'C-M', turno: Turno.manana, area: Area.medicas,  carrera: 'Enfermería, Obstetricia, Farmacia',        cupoMaximo: 35 } }),
-    prisma.seccion.create({ data: { cicloId: ciclo.id, nombre: 'C-T', turno: Turno.tarde,  area: Area.medicas,  carrera: 'Enfermería, Obstetricia, Farmacia',        cupoMaximo: 35 } }),
+  // ── 4. Aulas ──────────────────────────────────────────────────────────────
+  // Nomenclatura: [Área]-[Número]  →  C=Ciencias, L=Letras, M=Médicas
+  const [aulaAM, aulaAT, aulaBM, aulaBT, aulaCM, aulaCT] = await Promise.all([
+    prisma.aula.create({ data: { cicloId: ciclo.id, nombre: 'C-001', turno: Turno.manana, area: Area.ciencias, cupoMaximo: 40 } }),
+    prisma.aula.create({ data: { cicloId: ciclo.id, nombre: 'C-002', turno: Turno.tarde,  area: Area.ciencias, cupoMaximo: 40 } }),
+    prisma.aula.create({ data: { cicloId: ciclo.id, nombre: 'L-001', turno: Turno.manana, area: Area.letras,   cupoMaximo: 40 } }),
+    prisma.aula.create({ data: { cicloId: ciclo.id, nombre: 'L-002', turno: Turno.tarde,  area: Area.letras,   cupoMaximo: 40 } }),
+    prisma.aula.create({ data: { cicloId: ciclo.id, nombre: 'M-001', turno: Turno.manana, area: Area.medicas,  cupoMaximo: 35 } }),
+    prisma.aula.create({ data: { cicloId: ciclo.id, nombre: 'M-002', turno: Turno.tarde,  area: Area.medicas,  cupoMaximo: 35 } }),
   ])
-  console.log('   ✓ Secciones: A-M, A-T (Ciencias) | B-M, B-T (Letras) | C-M, C-T (Médicas)')
+  console.log('   ✓ Aulas: C-001/C-002 (Ciencias) | L-001/L-002 (Letras) | M-001/M-002 (Médicas)')
 
-  // ── 5. Cursos ─────────────────────────────────────────────────────────────
+  // ── 5. Carreras ───────────────────────────────────────────────────────────
+  const [carCivil, carSistemas, carAgro, carDerecho, carEconomia, carPoliticas, carEnfermeria, carObstetricia, carFarmacia] = await Promise.all([
+    prisma.carrera.create({ data: { nombre: 'Ing. Civil',            area: Area.ciencias } }),
+    prisma.carrera.create({ data: { nombre: 'Ing. de Sistemas',      area: Area.ciencias } }),
+    prisma.carrera.create({ data: { nombre: 'Ing. Agronómica',       area: Area.ciencias } }),
+    prisma.carrera.create({ data: { nombre: 'Derecho',               area: Area.letras   } }),
+    prisma.carrera.create({ data: { nombre: 'Economía',              area: Area.letras   } }),
+    prisma.carrera.create({ data: { nombre: 'Ciencias Políticas',    area: Area.letras   } }),
+    prisma.carrera.create({ data: { nombre: 'Enfermería',            area: Area.medicas  } }),
+    prisma.carrera.create({ data: { nombre: 'Obstetricia',           area: Area.medicas  } }),
+    prisma.carrera.create({ data: { nombre: 'Farmacia',              area: Area.medicas  } }),
+  ])
+  console.log('   ✓ Carreras (9): 3 × área')
+
+  const carrerasPorArea = {
+    [Area.ciencias]: [carCivil, carSistemas, carAgro],
+    [Area.letras]:   [carDerecho, carEconomia, carPoliticas],
+    [Area.medicas]:  [carEnfermeria, carObstetricia, carFarmacia],
+  }
+
+  // ── 6. Cursos ─────────────────────────────────────────────────────────────
   const [cMat, cFis, cQui, cBio, cLen, cLit] = await Promise.all([
     prisma.curso.create({ data: { nombre: 'Matemática', codigo: 'MAT001' } }),
     prisma.curso.create({ data: { nombre: 'Física',     codigo: 'FIS001' } }),
@@ -106,7 +127,7 @@ async function main() {
   ])
   console.log('   ✓ Cursos (6)')
 
-  // ── 6. Docentes ───────────────────────────────────────────────────────────
+  // ── 7. Docentes ───────────────────────────────────────────────────────────
   const docentesDef = [
     { nombre: 'Juan',   apellidos: 'García Pérez',   dni: '12345678', email: 'juan.garcia@cepreunasam.edu.pe',    especialidad: 'Matemática', tel: '+51987001001', cursoId: cMat.id },
     { nombre: 'María',  apellidos: 'López Torres',   dni: '23456789', email: 'maria.lopez@cepreunasam.edu.pe',    especialidad: 'Física',     tel: '+51987001002', cursoId: cFis.id },
@@ -129,54 +150,58 @@ async function main() {
   )
   console.log('   ✓ Docentes (6)')
 
-  // ── 7. Alumnos ───────────────────────────────────────────────────────────
-  // 30 alumnos, 5 por sección
+  // ── 8. Alumnos ───────────────────────────────────────────────────────────
+  // 30 alumnos, 5 por aula
   const alumnosDef = [
-    // ── A-M: Ciencias mañana ──────────────────────────────────
-    { nombre: 'Ana Sofía',       apellidos: 'Torres García',    dni: '70100001', cod: '100001', seccion: secAM },
-    { nombre: 'Diego Alejandro', apellidos: 'Ramírez Cruz',     dni: '70100002', cod: '100002', seccion: secAM },
-    { nombre: 'Camila Beatriz',  apellidos: 'Mendoza Espinoza', dni: '70100003', cod: '100003', seccion: secAM },
-    { nombre: 'Sebastián Omar',  apellidos: 'Huanca Soto',      dni: '70100004', cod: '100004', seccion: secAM },
-    { nombre: 'Valeria Paola',   apellidos: 'Ruiz Chávez',      dni: '70100005', cod: '100005', seccion: secAM },
-    // ── A-T: Ciencias tarde ───────────────────────────────────
-    { nombre: 'Andrés Felipe',   apellidos: 'López Flores',     dni: '70100006', cod: '100006', seccion: secAT },
-    { nombre: 'Luciana Isabel',  apellidos: 'Mamani Paredes',   dni: '70100007', cod: '100007', seccion: secAT },
-    { nombre: 'Rodrigo Manuel',  apellidos: 'Quispe Vargas',    dni: '70100008', cod: '100008', seccion: secAT },
-    { nombre: 'Isabella',        apellidos: 'Salazar Medina',   dni: '70100009', cod: '100009', seccion: secAT },
-    { nombre: 'Mateo José',      apellidos: 'Pizarro Castillo', dni: '70100010', cod: '100010', seccion: secAT },
-    // ── B-M: Letras mañana ────────────────────────────────────
-    { nombre: 'Valentina',       apellidos: 'Cruz Herrera',     dni: '70100011', cod: '100011', seccion: secBM },
-    { nombre: 'Javier Eduardo',  apellidos: 'Morales Díaz',     dni: '70100012', cod: '100012', seccion: secBM },
-    { nombre: 'Daniela',         apellidos: 'Vega Romero',      dni: '70100013', cod: '100013', seccion: secBM },
-    { nombre: 'Óscar Renato',    apellidos: 'Cano Peña',        dni: '70100014', cod: '100014', seccion: secBM },
-    { nombre: 'Fabiola',         apellidos: 'Espinoza Ríos',    dni: '70100015', cod: '100015', seccion: secBM },
-    // ── B-T: Letras tarde ─────────────────────────────────────
-    { nombre: 'Gonzalo',         apellidos: 'Reyes Aguirre',    dni: '70100016', cod: '100016', seccion: secBT },
-    { nombre: 'Milagros',        apellidos: 'Sánchez Lara',     dni: '70100017', cod: '100017', seccion: secBT },
-    { nombre: 'Emilio',          apellidos: 'Peña Ortega',      dni: '70100018', cod: '100018', seccion: secBT },
-    { nombre: 'Claudia Renata',  apellidos: 'Aguilar Nieto',    dni: '70100019', cod: '100019', seccion: secBT },
-    { nombre: 'Erick Iván',      apellidos: 'Fuentes Palma',    dni: '70100020', cod: '100020', seccion: secBT },
-    // ── C-M: Médicas mañana ───────────────────────────────────
-    { nombre: 'Paula Jimena',    apellidos: 'Torres Díaz',      dni: '70100021', cod: '100021', seccion: secCM },
-    { nombre: 'Kevin André',     apellidos: 'Navarro Castro',   dni: '70100022', cod: '100022', seccion: secCM },
-    { nombre: 'Natalia',         apellidos: 'Campos Vera',      dni: '70100023', cod: '100023', seccion: secCM },
-    { nombre: 'Renzo',           apellidos: 'Villanueva Meza',  dni: '70100024', cod: '100024', seccion: secCM },
-    { nombre: 'Fiorella',        apellidos: 'Contreras Quispe', dni: '70100025', cod: '100025', seccion: secCM },
-    // ── C-T: Médicas tarde ────────────────────────────────────
-    { nombre: 'Bryan Stiven',    apellidos: 'Tapia Luna',       dni: '70100026', cod: '100026', seccion: secCT },
-    { nombre: 'Xiomara',         apellidos: 'Montoya Pacheco',  dni: '70100027', cod: '100027', seccion: secCT },
-    { nombre: 'Jesús Alberto',   apellidos: 'Portillo Benites', dni: '70100028', cod: '100028', seccion: secCT },
-    { nombre: 'Cinthya',         apellidos: 'Atahuaman Rojas',  dni: '70100029', cod: '100029', seccion: secCT },
-    { nombre: 'Víctor Hugo',     apellidos: 'Llanos Guerrero',  dni: '70100030', cod: '100030', seccion: secCT },
+    // ── C-001: Ciencias mañana ──────────────────────────────────
+    { nombre: 'Ana Sofía',       apellidos: 'Torres García',    dni: '70100001', cod: '100001', aula: aulaAM },
+    { nombre: 'Diego Alejandro', apellidos: 'Ramírez Cruz',     dni: '70100002', cod: '100002', aula: aulaAM },
+    { nombre: 'Camila Beatriz',  apellidos: 'Mendoza Espinoza', dni: '70100003', cod: '100003', aula: aulaAM },
+    { nombre: 'Sebastián Omar',  apellidos: 'Huanca Soto',      dni: '70100004', cod: '100004', aula: aulaAM },
+    { nombre: 'Valeria Paola',   apellidos: 'Ruiz Chávez',      dni: '70100005', cod: '100005', aula: aulaAM },
+    // ── C-002: Ciencias tarde ─────────────────────────────────────
+    { nombre: 'Andrés Felipe',   apellidos: 'López Flores',     dni: '70100006', cod: '100006', aula: aulaAT },
+    { nombre: 'Luciana Isabel',  apellidos: 'Mamani Paredes',   dni: '70100007', cod: '100007', aula: aulaAT },
+    { nombre: 'Rodrigo Manuel',  apellidos: 'Quispe Vargas',    dni: '70100008', cod: '100008', aula: aulaAT },
+    { nombre: 'Isabella',        apellidos: 'Salazar Medina',   dni: '70100009', cod: '100009', aula: aulaAT },
+    { nombre: 'Mateo José',      apellidos: 'Pizarro Castillo', dni: '70100010', cod: '100010', aula: aulaAT },
+    // ── L-001: Letras mañana ──────────────────────────────────────
+    { nombre: 'Valentina',       apellidos: 'Cruz Herrera',     dni: '70100011', cod: '100011', aula: aulaBM },
+    { nombre: 'Javier Eduardo',  apellidos: 'Morales Díaz',     dni: '70100012', cod: '100012', aula: aulaBM },
+    { nombre: 'Daniela',         apellidos: 'Vega Romero',      dni: '70100013', cod: '100013', aula: aulaBM },
+    { nombre: 'Óscar Renato',    apellidos: 'Cano Peña',        dni: '70100014', cod: '100014', aula: aulaBM },
+    { nombre: 'Fabiola',         apellidos: 'Espinoza Ríos',    dni: '70100015', cod: '100015', aula: aulaBM },
+    // ── L-002: Letras tarde ───────────────────────────────────────
+    { nombre: 'Gonzalo',         apellidos: 'Reyes Aguirre',    dni: '70100016', cod: '100016', aula: aulaBT },
+    { nombre: 'Milagros',        apellidos: 'Sánchez Lara',     dni: '70100017', cod: '100017', aula: aulaBT },
+    { nombre: 'Emilio',          apellidos: 'Peña Ortega',      dni: '70100018', cod: '100018', aula: aulaBT },
+    { nombre: 'Claudia Renata',  apellidos: 'Aguilar Nieto',    dni: '70100019', cod: '100019', aula: aulaBT },
+    { nombre: 'Erick Iván',      apellidos: 'Fuentes Palma',    dni: '70100020', cod: '100020', aula: aulaBT },
+    // ── M-001: Médicas mañana ─────────────────────────────────────
+    { nombre: 'Paula Jimena',    apellidos: 'Torres Díaz',      dni: '70100021', cod: '100021', aula: aulaCM },
+    { nombre: 'Kevin André',     apellidos: 'Navarro Castro',   dni: '70100022', cod: '100022', aula: aulaCM },
+    { nombre: 'Natalia',         apellidos: 'Campos Vera',      dni: '70100023', cod: '100023', aula: aulaCM },
+    { nombre: 'Renzo',           apellidos: 'Villanueva Meza',  dni: '70100024', cod: '100024', aula: aulaCM },
+    { nombre: 'Fiorella',        apellidos: 'Contreras Quispe', dni: '70100025', cod: '100025', aula: aulaCM },
+    // ── M-002: Médicas tarde ──────────────────────────────────────
+    { nombre: 'Bryan Stiven',    apellidos: 'Tapia Luna',       dni: '70100026', cod: '100026', aula: aulaCT },
+    { nombre: 'Xiomara',         apellidos: 'Montoya Pacheco',  dni: '70100027', cod: '100027', aula: aulaCT },
+    { nombre: 'Jesús Alberto',   apellidos: 'Portillo Benites', dni: '70100028', cod: '100028', aula: aulaCT },
+    { nombre: 'Cinthya',         apellidos: 'Atahuaman Rojas',  dni: '70100029', cod: '100029', aula: aulaCT },
+    { nombre: 'Víctor Hugo',     apellidos: 'Llanos Guerrero',  dni: '70100030', cod: '100030', aula: aulaCT },
   ]
 
   const alumnos = await Promise.all(
-    alumnosDef.map((a, i) =>
-      prisma.alumno.create({
+    alumnosDef.map((a, i) => {
+      const areaAula = a.aula.area
+      const carrerasArea = carrerasPorArea[areaAula]
+      const carrera = carrerasArea[i % 3]
+      return prisma.alumno.create({
         data: {
           dni: a.dni, nombre: a.nombre, apellidos: a.apellidos,
           codigoBarras: a.cod,
-          seccion: { connect: { id: a.seccion.id } },
+          aula:     { connect: { id: a.aula.id } },
+          carreraId: carrera.id,
           fechaNacimiento: new Date(`200${5 + (i % 4)}-${pad((i % 9) + 1)}-${pad((i % 20) + 1)}`),
           usuario: {
             create: {
@@ -186,12 +211,12 @@ async function main() {
             },
           },
         },
-      }),
-    ),
+      })
+    }),
   )
-  console.log('   ✓ Alumnos (30): 5 por sección')
+  console.log('   ✓ Alumnos (30): 5 por aula, con carrera asignada')
 
-  // ── 8. Apoderados ────────────────────────────────────────────────────────
+  // ── 9. Apoderados ────────────────────────────────────────────────────────
   type ApoderadoDef = { nombre: string; apellidos: string; dni: string; tel: string; email: string; hijoIdxs: number[] }
   const apoderadosDef: ApoderadoDef[] = [
     { nombre: 'Roberto', apellidos: 'Torres Vega',  dni: '40100001', tel: '+51999100001', email: 'roberto.torres@gmail.com', hijoIdxs: [0, 1, 2] },
@@ -222,13 +247,11 @@ async function main() {
   })
   console.log('   ✓ Apoderados (3) vinculados a alumnos')
 
-  // ── 9. Horarios ──────────────────────────────────────────────────────────
+  // ── 10. Horarios ─────────────────────────────────────────────────────────
   // Lun/Jue → MAT 2h + FIS 2h  |  Mar/Vie → QUI 2h + BIO 2h  |  Mié/Sáb → LEN 2h + LIT 2h
-  // Aulas: C-001/C-002 (Ciencias) | L-001/L-002 (Letras) | M-002 (Médicas)
 
   const cursoToDocente = new Map(docentesDef.map((d, i) => [d.cursoId, docentes[i].id]))
 
-  // Slots con offset de horas relativo al inicio del turno (0=inicio, 2=segunda clase)
   type SlotDef = { dia: number; hi: number; hf: number; cursoId: string }
   const slots: SlotDef[] = [
     { dia: 1, hi: 0, hf: 2, cursoId: cMat.id },
@@ -245,33 +268,32 @@ async function main() {
     { dia: 6, hi: 2, hf: 4, cursoId: cLit.id },
   ]
 
-  type SeccionConfig = { sec: { id: string }; baseH: number; aula: string }
-  const seccionConfigs: SeccionConfig[] = [
-    { sec: secAM, baseH: 7,  aula: 'C-001' },
-    { sec: secAT, baseH: 13, aula: 'C-002' },
-    { sec: secBM, baseH: 7,  aula: 'L-001' },
-    { sec: secBT, baseH: 13, aula: 'L-002' },
-    { sec: secCM, baseH: 7,  aula: 'M-002' },
-    { sec: secCT, baseH: 13, aula: 'M-002' },
+  type AulaConfig = { aula: { id: string }; baseH: number }
+  const aulaConfigs: AulaConfig[] = [
+    { aula: aulaAM, baseH: 7  },
+    { aula: aulaAT, baseH: 13 },
+    { aula: aulaBM, baseH: 7  },
+    { aula: aulaBT, baseH: 13 },
+    { aula: aulaCM, baseH: 7  },
+    { aula: aulaCT, baseH: 13 },
   ]
 
-  const horariosData = seccionConfigs.flatMap(({ sec, baseH, aula }) =>
+  const horariosData = aulaConfigs.flatMap(({ aula, baseH }) =>
     slots.map((s) => ({
-      seccionId:  sec.id,
+      aulaId:     aula.id,
       cursoId:    s.cursoId,
       docenteId:  cursoToDocente.get(s.cursoId)!,
       diaSemana:  s.dia,
       horaInicio: new Date(`1970-01-01T${pad(baseH + s.hi)}:00:00.000Z`),
       horaFin:    new Date(`1970-01-01T${pad(baseH + s.hf)}:00:00.000Z`),
-      aula,
       publicado:  true,
     })),
   )
 
   await prisma.horario.createMany({ data: horariosData })
-  console.log(`   ✓ Horarios (${horariosData.length}: 12 × 6 secciones)`)
+  console.log(`   ✓ Horarios (${horariosData.length}: 12 × 6 aulas)`)
 
-  // ── 10. Asistencias ──────────────────────────────────────────────────────
+  // ── 11. Asistencias ──────────────────────────────────────────────────────
   const today = new Date('2026-05-20')
   const schoolDays = lastSchoolDays(today, 25)
 
@@ -282,8 +304,8 @@ async function main() {
   }> = []
 
   for (let ai = 0; ai < alumnos.length; ai++) {
-    const secIdx = Math.floor(ai / 5)            // 0=AM 07h, 1=AT 13h, 2=BM 07h, 3=BT 13h, 4=CM 07h, 5=CT 13h
-    const baseH  = [7, 13, 7, 13, 7, 13][secIdx]
+    const aulaIdx = Math.floor(ai / 5)            // 0=C001 07h, 1=C002 13h, 2=L001 07h, 3=L002 13h, 4=M001 07h, 5=M002 13h
+    const baseH   = [7, 13, 7, 13, 7, 13][aulaIdx]
     for (let di = 0; di < schoolDays.length; di++) {
       const v = det(ai, di)
       if (v < 5) continue                         // 5 % ausencia
@@ -329,14 +351,14 @@ async function main() {
 
   console.log(`   ✓ Asistencias: ${alumnoAsist.length} alumnos + ${docenteAsist.length} docentes`)
 
-  // ── 11. Comunicados ──────────────────────────────────────────────────────
+  // ── 12. Comunicados ──────────────────────────────────────────────────────
   const comunicadosDef = [
     {
       titulo: 'Bienvenida al Ciclo 2026-I',
       cuerpo: 'Estimados estudiantes y familiares:\n\nNos complace dar inicio al Ciclo 2026-I de CEPREUNASAM. Este ciclo académico comprende del 2 de marzo al 31 de julio de 2026.\n\nRecordamos que las clases son de lunes a sábado según el turno asignado. El ingreso se registra automáticamente mediante código de barras en la entrada principal.\n\n¡Mucho éxito a todos!\n\nDirección Académica',
       destinatarioTipo: TipoDestinatario.todos,
       canalWhatsapp: true,
-      seccionId: null as string | null,
+      aulaId: null as string | null,
       daysAgo: 12,
     },
     {
@@ -344,7 +366,7 @@ async function main() {
       cuerpo: 'Se comunica a todos los alumnos que la evaluación parcial del Ciclo 2026-I se realizará durante la semana del 11 al 16 de mayo.\n\nCronograma:\n• Matemática — Lunes 11/05\n• Física — Martes 12/05\n• Química — Miércoles 13/05\n• Biología — Jueves 14/05\n• Lenguaje — Viernes 15/05\n• Literatura — Sábado 16/05\n\nSe recomienda repasar los temas de las primeras cinco semanas.',
       destinatarioTipo: TipoDestinatario.alumnos,
       canalWhatsapp: false,
-      seccionId: null,
+      aulaId: null,
       daysAgo: 9,
     },
     {
@@ -352,7 +374,7 @@ async function main() {
       cuerpo: 'El sábado 24 de mayo se realizará el simulacro de examen de admisión.\n\nHorario: 8:00 am – 12:00 pm\nLugar: Pabellón Central\n\nEs obligatoria la asistencia. Traer: lápiz HB, lapicero azul, borrador y código de barras de estudiante.\n\nResultados disponibles el lunes 27 en el portal del alumno.',
       destinatarioTipo: TipoDestinatario.seccion,
       canalWhatsapp: true,
-      seccionId: secAM.id,
+      aulaId: aulaAM.id,
       daysAgo: 6,
     },
     {
@@ -360,7 +382,7 @@ async function main() {
       cuerpo: 'Se convoca a todos los apoderados a la reunión informativa del mes de mayo.\n\nFecha: Sábado 31 de mayo de 2026\nHora: 10:00 am\nLugar: Auditorio principal\n\nTemas:\n1. Avance académico del ciclo\n2. Informe de asistencia\n3. Preparación para evaluación final\n\nSe agradece su puntual asistencia.',
       destinatarioTipo: TipoDestinatario.apoderados,
       canalWhatsapp: true,
-      seccionId: null,
+      aulaId: null,
       daysAgo: 4,
     },
     {
@@ -368,7 +390,7 @@ async function main() {
       cuerpo: 'Se comunica que el jueves 29 de mayo no habrá clases por feriado nacional.\n\nLas actividades académicas se reanudarán el viernes 30 de mayo con normalidad.\n\nAtentamente,\nDirección Académica — CEPREUNASAM',
       destinatarioTipo: TipoDestinatario.todos,
       canalWhatsapp: false,
-      seccionId: null,
+      aulaId: null,
       daysAgo: 1,
     },
   ]
@@ -382,7 +404,7 @@ async function main() {
           titulo: c.titulo,
           cuerpo: c.cuerpo,
           destinatarioTipo: c.destinatarioTipo,
-          ...(c.seccionId ? { seccion: { connect: { id: c.seccionId } } } : {}),
+          ...(c.aulaId ? { aula: { connect: { id: c.aulaId } } } : {}),
           canalSistema: true,
           canalWhatsapp: c.canalWhatsapp,
           publicadoPor: { connect: { id: director.id } },
@@ -393,7 +415,7 @@ async function main() {
   )
   console.log(`   ✓ Comunicados (${comunicadosDef.length})`)
 
-  // ── 12. Biblioteca ───────────────────────────────────────────────────────
+  // ── 13. Biblioteca ───────────────────────────────────────────────────────
   const recursosDef = [
     { titulo: 'Álgebra: Polinomios y factorización',        tipo: TipoRecurso.pdf,    url: 'https://recursos.cepreunasam.edu.pe/mat/algebra-polinomios.pdf',       cursoId: cMat.id, nivel: 'Básico',     desc: 'Compendio de ejercicios de álgebra con factorización y operaciones con polinomios.' },
     { titulo: 'Aritmética: Números enteros y racionales',   tipo: TipoRecurso.pdf,    url: 'https://recursos.cepreunasam.edu.pe/mat/aritmetica-enteros.pdf',        cursoId: cMat.id, nivel: 'Básico',     desc: 'Guía de repaso de aritmética básica con ejercicios resueltos.' },
@@ -429,7 +451,8 @@ async function main() {
   console.log('  roberto.torres@gmail.com        → apoderado123')
   console.log('═══════════════════════════════════════════════════════════════')
   console.log(`  Ciclo 2026-I · Mar–Jul 2026 · ACTIVO`)
-  console.log(`  30 alumnos (5 × sección A-M/A-T/B-M/B-T/C-M/C-T)`)
+  console.log(`  6 aulas: C-001/C-002 (Ciencias) | L-001/L-002 (Letras) | M-001/M-002 (Médicas)`)
+  console.log(`  30 alumnos (5 × aula) con carrera asignada`)
   console.log(`  ${schoolDays.length} días escolares con asistencia registrada`)
 }
 

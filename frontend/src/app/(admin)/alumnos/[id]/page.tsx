@@ -11,7 +11,7 @@ import { Card } from '@/components/ui/card'
 import { Btn } from '@/components/ui/btn'
 import { Barcode } from '@/components/ui/barcode'
 import { PageHeader } from '@/components/layout/page-header'
-import { Download, Edit, Mail, Phone, Calendar, MapPin } from '@/components/icons'
+import { Download, Edit, Mail, Phone, Calendar, MapPin, Book } from '@/components/icons'
 import { useState } from 'react'
 
 const TABS = ['Resumen', 'Asistencia', 'Apoderados', 'Comunicados'] as const
@@ -98,11 +98,11 @@ export default function AlumnoDetallePage() {
                   <Dot tone={tone} size={6} />
                   {alumno.estado ?? (pct >= 90 ? 'Activo' : pct >= 75 ? 'Observado' : 'Riesgo')}
                 </Pill>
-                {alumno.seccion && (
-                  <Pill tone="neutral">{alumno.seccion.nombre}</Pill>
+                {alumno.aula && (
+                  <Pill tone="neutral">{alumno.aula.nombre}</Pill>
                 )}
-                {alumno.seccion?.ciclo && (
-                  <Pill tone="primary">Ciclo {alumno.seccion.ciclo.nombre}</Pill>
+                {alumno.aula?.ciclo && (
+                  <Pill tone="primary">Ciclo {alumno.aula.ciclo.nombre}</Pill>
                 )}
               </div>
             </div>
@@ -110,6 +110,7 @@ export default function AlumnoDetallePage() {
               <InfoRow icon={<Mail size={14} />} value={alumno.usuario?.email ?? '—'} />
               <InfoRow icon={<Phone size={14} />} value={alumno.telefono ?? '—'} />
               <InfoRow icon={<Calendar size={14} />} value={`Nac. ${formatDate(alumno.fecha_nacimiento)}`} />
+              <InfoRow icon={<Book size={14} />} value={alumno.carrera?.nombre ?? 'Sin carrera asignada'} />
               <InfoRow icon={<MapPin size={14} />} value={`Matriculado ${formatDate(alumno.created_at)}`} />
             </div>
           </Card>
@@ -131,7 +132,7 @@ export default function AlumnoDetallePage() {
                 {nombre} {apellidos}
               </div>
               <div className="text-[10px] opacity-80 mt-0.5">
-                {alumno.seccion?.nombre ?? '—'} · DNI {alumno.dni}
+                {alumno.aula?.nombre ?? '—'} · DNI {alumno.dni}
               </div>
             </div>
             <div className="flex justify-center py-3 bg-white mx-3.5 mb-3.5 mt-2 rounded-2">

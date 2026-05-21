@@ -1,7 +1,8 @@
 'use client'
 
 import { useState } from 'react'
-import { useCiclos, useSecciones, useCreateCiclo, useCreateSeccion } from '@/hooks/use-ciclos'
+import { useRouter } from 'next/navigation'
+import { useCiclos, useAulas, useCreateCiclo, useCreateAula } from '@/hooks/use-ciclos'
 import { Pill } from '@/components/ui/pill'
 import { Dot } from '@/components/ui/dot'
 import { KPI } from '@/components/ui/kpi'
@@ -33,9 +34,10 @@ function cicloProgress(inicio: string, fin: string) {
 }
 
 export default function CiclosPage() {
+  const router = useRouter()
   const { data: ciclos = [], isLoading } = useCiclos()
   const cicloActivo = ciclos.find((c) => c.activo)
-  const { data: secciones = [] } = useSecciones(cicloActivo?.id)
+  const { data: secciones = [] } = useAulas(cicloActivo?.id)
 
   const progress = cicloActivo
     ? cicloProgress(cicloActivo.fechaInicio, cicloActivo.fechaFin)
@@ -154,10 +156,16 @@ export default function CiclosPage() {
                       <Stat label="Cupo" value={s.cupoMaximo} />
                     </div>
                     <div className="flex gap-1.5 mt-3.5">
-                      <Btn variant="secondary" size="sm" className="flex-1" icon={<Eye size={12} />}>
+                      <Btn
+                        variant="secondary" size="sm" className="flex-1" icon={<Eye size={12} />}
+                        onClick={() => router.push(`/ciclos/aulas/${s.id}`)}
+                      >
                         Detalle
                       </Btn>
-                      <Btn variant="ghost" size="sm" className="flex-1" icon={<Calendar size={12} />}>
+                      <Btn
+                        variant="ghost" size="sm" className="flex-1" icon={<Calendar size={12} />}
+                        onClick={() => router.push(`/ciclos/aulas/${s.id}?tab=horarios`)}
+                      >
                         Horario
                       </Btn>
                     </div>

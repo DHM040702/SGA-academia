@@ -11,7 +11,7 @@ export interface AuthUser {
     nombre: string
     apellidos: string
     codigoBarras?: string | null
-    seccionId?: string | null
+    aulaId?: string | null
   } | null
   docente?: { id: string; nombre: string; apellidos: string } | null
   apoderado?: { id: string; nombre: string; apellidos: string } | null

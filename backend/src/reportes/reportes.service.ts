@@ -4,7 +4,7 @@ import { PrismaService } from '../prisma/prisma.service';
 
 export interface AsistenciaGeneralParams {
   ciclo_id?: string;
-  seccion_id?: string;
+  aula_id?: string;
   desde?: string;
   hasta?: string;
 }
@@ -14,7 +14,7 @@ export class ReportesService {
   constructor(private prisma: PrismaService) {}
 
   async asistenciaGeneral(params: AsistenciaGeneralParams) {
-    const { ciclo_id, seccion_id, desde, hasta } = params;
+    const { ciclo_id, aula_id, desde, hasta } = params;
 
     const ahora = new Date();
     const fechaHasta = hasta
@@ -24,16 +24,16 @@ export class ReportesService {
       ? new Date(desde)
       : new Date(fechaHasta.getTime() - 29 * 24 * 3600 * 1000);
 
-    // ─── Filtro por sección / ciclo ───────────────────────────────
-    let seccionIds: string[] | undefined;
-    if (seccion_id) {
-      seccionIds = [seccion_id];
+    // ─── Filtro por aula / ciclo ───────────────────────────────
+    let aulaIds: string[] | undefined;
+    if (aula_id) {
+      aulaIds = [aula_id];
     } else if (ciclo_id) {
-      const secciones = await this.prisma.seccion.findMany({
+      const aulas = await this.prisma.aula.findMany({
         where: { cicloId: ciclo_id },
         select: { id: true },
       });
-      seccionIds = secciones.map((s) => s.id);
+      aulaIds = aulas.map((a) => a.id);
     }
 
     // ─── KPIs: asistencia alumnos ─────────────────────────────────
@@ -41,8 +41,8 @@ export class ReportesService {
       tipoPersona: TipoPersona.alumno,
       fecha: { gte: fechaDesde, lte: fechaHasta },
     };
-    if (seccionIds?.length) {
-      whereAlumno.alumno = { seccionId: { in: seccionIds } };
+    if (aulaIds?.length) {
+      whereAlumno.alumno = { aulaId: { in: aulaIds } };
     }
 
     const whereDocente: any = {
@@ -66,28 +66,28 @@ export class ReportesService {
     const puntualidad_docentes =
       totalDocente > 0 ? Math.round((puntualDocente / totalDocente) * 100) : 0;
 
-    // ─── Por sección ──────────────────────────────────────────────
-    const secciones = await this.prisma.seccion.findMany({
-      where: seccionIds?.length ? { id: { in: seccionIds } } : undefined,
+    // ─── Por aula ──────────────────────────────────────────────
+    const aulas = await this.prisma.aula.findMany({
+      where: aulaIds?.length ? { id: { in: aulaIds } } : undefined,
       select: { id: true, nombre: true },
     });
 
     const por_seccion = await Promise.all(
-      secciones.map(async (sec) => {
+      aulas.map(async (aula) => {
         const ws = {
           tipoPersona: TipoPersona.alumno,
           fecha: { gte: fechaDesde, lte: fechaHasta },
-          alumno: { seccionId: sec.id },
+          alumno: { aulaId: aula.id },
         };
         const [total, puntuales, tardanzas, total_alumnos] = await Promise.all([
           this.prisma.asistencia.count({ where: ws }),
           this.prisma.asistencia.count({ where: { ...ws, esTardanza: false } }),
           this.prisma.asistencia.count({ where: { ...ws, esTardanza: true } }),
-          this.prisma.alumno.count({ where: { seccionId: sec.id, deletedAt: null } }),
+          this.prisma.alumno.count({ where: { aulaId: aula.id, deletedAt: null } }),
         ]);
         const pct_asistencia = total > 0 ? Math.round(((puntuales + tardanzas) / total) * 100) : 0;
         const pct_tardanza   = total > 0 ? Math.round((tardanzas / total) * 100) : 0;
-        return { seccion_id: sec.id, nombre: sec.nombre, total_alumnos, pct_asistencia, pct_tardanza };
+        return { aulaId: aula.id, nombre: aula.nombre, total_alumnos, pct_asistencia, pct_tardanza };
       }),
     );
 
@@ -125,7 +125,7 @@ export class ReportesService {
       const dia = new Date(fechaHasta.getTime() - i * 24 * 3600 * 1000);
       const diaDate = new Date(dia.getFullYear(), dia.getMonth(), dia.getDate());
       const wDia: any = { tipoPersona: TipoPersona.alumno, fecha: diaDate };
-      if (seccionIds?.length) wDia.alumno = { seccionId: { in: seccionIds } };
+      if (aulaIds?.length) wDia.alumno = { aulaId: { in: aulaIds } };
 
       const [totalDia, presentesDia] = await Promise.all([
         this.prisma.asistencia.count({ where: wDia }),

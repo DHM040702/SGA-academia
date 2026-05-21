@@ -8,17 +8,21 @@ import { Btn } from '@/components/ui/btn'
 import { Field } from '@/components/ui/field'
 import { Input } from '@/components/ui/input'
 import { useAlumno, useUpdateAlumno } from '@/hooks/use-alumnos'
-import { useCiclos, useSecciones } from '@/hooks/use-ciclos'
+import { useCiclos, useAulas } from '@/hooks/use-ciclos'
+import { useCarreras, type AreaCarrera } from '@/hooks/use-carreras'
+
+const SELECT_CLS =
+  'w-full px-3 py-2 text-[13px] border border-border rounded-2 bg-surface text-text focus:outline-none focus:ring-1 focus:ring-primary disabled:opacity-50'
 
 interface FormValues {
   nombres: string
   apellidos: string
   dni: string
-  email: string
   fecha_nacimiento: string
   telefono: string
   ciclo_id: string
-  seccion_id: string
+  aula_id: string
+  carrera_id: string
 }
 
 export default function EditarAlumnoPage() {
@@ -27,44 +31,74 @@ export default function EditarAlumnoPage() {
   const { data: alumno, isLoading } = useAlumno(id)
   const updateAlumno = useUpdateAlumno()
   const { data: ciclos = [] } = useCiclos()
+
   const [cicloId, setCicloId] = React.useState('')
-  const { data: secciones = [] } = useSecciones(cicloId || undefined)
+  const [areaActiva, setAreaActiva] = React.useState<AreaCarrera | undefined>()
 
-  const { register, handleSubmit, watch, setValue, reset, formState: { errors, isSubmitting, isDirty } } = useForm<FormValues>()
+  const { data: secciones = [] } = useAulas(cicloId || undefined)
+  const { data: carreras = [] } = useCarreras(areaActiva)
 
+  const {
+    register,
+    handleSubmit,
+    watch,
+    setValue,
+    reset,
+    formState: { errors, isSubmitting, isDirty },
+  } = useForm<FormValues>()
+
+  // Pre-rellenar con datos existentes
   React.useEffect(() => {
     if (!alumno) return
-    const ciclo = alumno.seccion?.ciclo?.id ?? ''
+    const ciclo = alumno.aula?.ciclo?.id ?? ''
+    const area = alumno.aula?.area as AreaCarrera | undefined
     setCicloId(ciclo)
+    setAreaActiva(area)
     reset({
-      nombres: alumno.nombres,
-      apellidos: alumno.apellidos,
-      dni: alumno.dni,
-      email: alumno.usuario.email,
+      nombres:          alumno.nombres,
+      apellidos:        alumno.apellidos,
+      dni:              alumno.dni,
       fecha_nacimiento: alumno.fecha_nacimiento ?? '',
-      telefono: alumno.telefono ?? '',
-      ciclo_id: ciclo,
-      seccion_id: alumno.seccion?.id ?? '',
+      telefono:         alumno.telefono ?? '',
+      ciclo_id:         ciclo,
+      aula_id:          alumno.aula?.id ?? '',
+      carrera_id:       alumno.carrera?.id ?? '',
     })
   }, [alumno, reset])
 
+  // Cascada ciclo → limpiar sección y carrera
   const watchCiclo = watch('ciclo_id')
   React.useEffect(() => {
     if (watchCiclo !== cicloId) {
       setCicloId(watchCiclo || '')
-      setValue('seccion_id', '')
+      setValue('aula_id', '')
+      setValue('carrera_id', '')
+      setAreaActiva(undefined)
     }
   }, [watchCiclo, cicloId, setValue])
 
+  // Cascada sección → área → carreras
+  const watchSeccion = watch('aula_id')
+  React.useEffect(() => {
+    const sec = secciones.find((s) => s.id === watchSeccion)
+    if (sec) {
+      setAreaActiva(sec.area as AreaCarrera)
+      // Solo limpia carrera si cambió la sección (no en el reset inicial)
+      const currentCarreraArea = alumno?.carrera?.area
+      if (sec.area !== currentCarreraArea) setValue('carrera_id', '')
+    }
+  }, [watchSeccion, secciones, alumno, setValue])
+
   async function onSubmit(values: FormValues) {
-    const { ciclo_id, email, ...dto } = values
+    const { ciclo_id, ...dto } = values
     try {
       await updateAlumno.mutateAsync({
         id,
         ...dto,
         fecha_nacimiento: dto.fecha_nacimiento || undefined,
-        telefono: dto.telefono || undefined,
-        seccion_id: dto.seccion_id || undefined,
+        telefono:         dto.telefono || undefined,
+        aula_id:          dto.aula_id || undefined,
+        carrera_id:       dto.carrera_id || undefined,
       })
       router.push(`/alumnos/${id}`)
     } catch (err: any) {
@@ -146,30 +180,34 @@ export default function EditarAlumnoPage() {
               />
             </Field>
           </div>
+          <p className="text-[11.5px] text-text-mute px-1 pb-1 mt-1">
+            Para cambiar el email o la contraseña, usa la gestión de usuarios.
+          </p>
         </Card>
 
-        <Card title="Sección" className="mt-4">
+        <Card title="Aula y carrera" className="mt-4">
           <div className="grid grid-cols-2 gap-4 p-1">
             <Field label="Ciclo">
-              <select
-                {...register('ciclo_id')}
-                className="w-full px-3 py-2 text-[13px] border border-border rounded-2 bg-surface text-text focus:outline-none focus:ring-1 focus:ring-primary"
-              >
+              <select {...register('ciclo_id')} className={SELECT_CLS}>
                 <option value="">Sin asignar</option>
                 {ciclos.map((c) => (
                   <option key={c.id} value={c.id}>{c.nombre}</option>
                 ))}
               </select>
             </Field>
-            <Field label="Sección">
-              <select
-                {...register('seccion_id')}
-                disabled={!cicloId}
-                className="w-full px-3 py-2 text-[13px] border border-border rounded-2 bg-surface text-text focus:outline-none focus:ring-1 focus:ring-primary disabled:opacity-50"
-              >
+            <Field label="Aula">
+              <select {...register('aula_id')} disabled={!cicloId} className={SELECT_CLS}>
                 <option value="">{cicloId ? 'Sin asignar' : 'Elige ciclo primero'}</option>
                 {secciones.map((s) => (
                   <option key={s.id} value={s.id}>{s.nombre}</option>
+                ))}
+              </select>
+            </Field>
+            <Field label="Carrera profesional" className="col-span-2">
+              <select {...register('carrera_id')} disabled={!areaActiva} className={SELECT_CLS}>
+                <option value="">{areaActiva ? 'Sin asignar' : 'Elige sección primero'}</option>
+                {carreras.map((c) => (
+                  <option key={c.id} value={c.id}>{c.nombre}</option>
                 ))}
               </select>
             </Field>

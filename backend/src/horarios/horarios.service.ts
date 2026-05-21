@@ -23,12 +23,12 @@ export class HorariosService {
   constructor(private prisma: PrismaService) {}
 
   async findAll(dto: FilterHorariosDto) {
-    const { page = 1, limit = 50, seccion_id, docente_id, dia_semana } = dto;
+    const { page = 1, limit = 50, aula_id, docente_id, dia_semana } = dto;
     const skip = (page - 1) * limit;
 
     const where: any = {};
-    if (seccion_id) where.seccionId  = seccion_id;
-    if (docente_id) where.docenteId  = docente_id;
+    if (aula_id)   where.aulaId    = aula_id;
+    if (docente_id) where.docenteId = docente_id;
     if (dia_semana !== undefined) where.diaSemana = dia_semana;
 
     const [items, total] = await Promise.all([
@@ -40,7 +40,7 @@ export class HorariosService {
         include: {
           docente: { select: { id: true, nombre: true, apellidos: true, dni: true } },
           curso:   { select: { id: true, nombre: true, codigo: true } },
-          seccion: {
+          aula: {
             select: {
               id: true, nombre: true,
               ciclo: { select: { id: true, nombre: true } },
@@ -60,7 +60,7 @@ export class HorariosService {
       include: {
         docente: { select: { id: true, nombre: true, apellidos: true, dni: true } },
         curso:   { select: { id: true, nombre: true, codigo: true } },
-        seccion: {
+        aula: {
           select: {
             id: true, nombre: true,
             ciclo: { select: { id: true, nombre: true } },
@@ -82,16 +82,15 @@ export class HorariosService {
       data: {
         docenteId:  dto.docente_id,
         cursoId:    dto.curso_id,
-        seccionId:  dto.seccion_id,
+        aulaId:     dto.aula_id,
         diaSemana:  dto.dia_semana,
         horaInicio: timeStringToDate(dto.hora_inicio),
         horaFin:    timeStringToDate(dto.hora_fin),
-        aula:       dto.aula,
       },
       include: {
         docente: { select: { id: true, nombre: true, apellidos: true } },
         curso:   { select: { id: true, nombre: true, codigo: true } },
-        seccion: { select: { id: true, nombre: true } },
+        aula:    { select: { id: true, nombre: true } },
       },
     });
   }
@@ -102,11 +101,10 @@ export class HorariosService {
     const dtoCompleto: CreateHorarioDto = {
       docente_id:  dto.docente_id  ?? existing.docenteId,
       curso_id:    dto.curso_id    ?? existing.cursoId,
-      seccion_id:  dto.seccion_id  ?? existing.seccionId,
+      aula_id:     dto.aula_id    ?? existing.aulaId,
       dia_semana:  dto.dia_semana  ?? existing.diaSemana,
       hora_inicio: dto.hora_inicio ?? formatTime(existing.horaInicio),
       hora_fin:    dto.hora_fin    ?? formatTime(existing.horaFin),
-      aula:        dto.aula        ?? existing.aula ?? undefined,
     };
 
     const conflictos = await this.detectarConflictos(dtoCompleto, id);
@@ -119,16 +117,15 @@ export class HorariosService {
       data: {
         ...(dto.docente_id  !== undefined && { docenteId:  dto.docente_id }),
         ...(dto.curso_id    !== undefined && { cursoId:    dto.curso_id }),
-        ...(dto.seccion_id  !== undefined && { seccionId:  dto.seccion_id }),
+        ...(dto.aula_id     !== undefined && { aulaId:     dto.aula_id }),
         ...(dto.dia_semana  !== undefined && { diaSemana:  dto.dia_semana }),
         ...(dto.hora_inicio !== undefined && { horaInicio: timeStringToDate(dto.hora_inicio) }),
         ...(dto.hora_fin    !== undefined && { horaFin:    timeStringToDate(dto.hora_fin) }),
-        ...(dto.aula        !== undefined && { aula:       dto.aula }),
       },
       include: {
         docente: { select: { id: true, nombre: true, apellidos: true } },
         curso:   { select: { id: true, nombre: true, codigo: true } },
-        seccion: { select: { id: true, nombre: true } },
+        aula:    { select: { id: true, nombre: true } },
       },
     });
   }
@@ -144,7 +141,7 @@ export class HorariosService {
       include: {
         docente: { select: { id: true, nombre: true, apellidos: true } },
         curso:   { select: { id: true, nombre: true } },
-        seccion: { select: { id: true, nombre: true } },
+        aula:    { select: { id: true, nombre: true } },
       },
     });
 
@@ -159,7 +156,7 @@ export class HorariosService {
         const fB = getTimeMinutes(h2.horaFin);
         if (!(iA < fB && fA > iB)) continue;
         const mismoDocente = h.docenteId === h2.docenteId;
-        const mismaAula    = h.aula && h2.aula && h.aula === h2.aula;
+        const mismaAula    = h.aulaId === h2.aulaId;
         if ((mismoDocente || mismaAula) && !conflictivos.find((c) => c.id === h.id)) {
           conflictivos.push(h);
           break;
@@ -182,7 +179,7 @@ export class HorariosService {
       include: {
         docente: { select: { nombre: true, apellidos: true } },
         curso:   { select: { nombre: true } },
-        seccion: { select: { nombre: true } },
+        aula:    { select: { nombre: true } },
       },
     });
 
@@ -194,7 +191,7 @@ export class HorariosService {
       if (!(inicioNuevo < fE && finNuevo > iE)) continue;
 
       if (h.docenteId === dto.docente_id) conflictos.push({ tipo: 'docente', horario: h });
-      if (dto.aula && h.aula && dto.aula === h.aula)  conflictos.push({ tipo: 'aula',    horario: h });
+      if (h.aulaId    === dto.aula_id)    conflictos.push({ tipo: 'aula',    horario: h });
     }
 
     return conflictos;

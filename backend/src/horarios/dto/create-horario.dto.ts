@@ -1,5 +1,5 @@
-import { ApiProperty, ApiPropertyOptional } from '@nestjs/swagger';
-import { IsInt, IsNotEmpty, IsOptional, IsString, IsUUID, Matches, Max, Min } from 'class-validator';
+import { ApiProperty } from '@nestjs/swagger';
+import { IsInt, IsNotEmpty, IsString, IsUUID, Matches, Max, Min } from 'class-validator';
 
 export class CreateHorarioDto {
   @ApiProperty({ description: 'UUID del docente asignado' })
@@ -12,10 +12,10 @@ export class CreateHorarioDto {
   @IsNotEmpty()
   curso_id: string;
 
-  @ApiProperty({ description: 'UUID de la sección asignada' })
+  @ApiProperty({ description: 'UUID del aula asignada' })
   @IsUUID()
   @IsNotEmpty()
-  seccion_id: string;
+  aula_id: string;
 
   @ApiProperty({
     example: 1,
@@ -39,9 +39,4 @@ export class CreateHorarioDto {
   @IsNotEmpty()
   @Matches(/^([01]\d|2[0-3]):([0-5]\d)$/, { message: 'hora_fin debe tener formato HH:mm (24h)' })
   hora_fin: string;
-
-  @ApiPropertyOptional({ example: 'Aula 201', description: 'Aula asignada' })
-  @IsOptional()
-  @IsString()
-  aula?: string;
 }

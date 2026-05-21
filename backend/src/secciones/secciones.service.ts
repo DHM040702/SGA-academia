@@ -1,14 +1,14 @@
 import { BadRequestException, Injectable, NotFoundException } from '@nestjs/common';
 import { PrismaService } from '../prisma/prisma.service';
-import { CreateSeccionDto } from './dto/create-seccion.dto';
-import { UpdateSeccionDto } from './dto/update-seccion.dto';
+import { CreateAulaDto } from './dto/create-seccion.dto';
+import { UpdateAulaDto } from './dto/update-seccion.dto';
 
 @Injectable()
 export class SeccionesService {
   constructor(private prisma: PrismaService) {}
 
   async findAll(ciclo_id?: string) {
-    return this.prisma.seccion.findMany({
+    return this.prisma.aula.findMany({
       where: ciclo_id ? { cicloId: ciclo_id } : undefined,
       orderBy: [{ ciclo: { fechaInicio: 'desc' } }, { area: 'asc' }, { turno: 'asc' }, { nombre: 'asc' }],
       include: {
@@ -19,7 +19,7 @@ export class SeccionesService {
   }
 
   async findOne(id: string) {
-    const seccion = await this.prisma.seccion.findFirst({
+    const aula = await this.prisma.aula.findFirst({
       where: { id },
       include: {
         ciclo: { select: { id: true, nombre: true, activo: true, fechaInicio: true, fechaFin: true } },
@@ -38,28 +38,27 @@ export class SeccionesService {
       },
     });
 
-    if (!seccion) throw new NotFoundException('Sección no encontrada');
-    return seccion;
+    if (!aula) throw new NotFoundException('Aula no encontrada');
+    return aula;
   }
 
-  async create(dto: CreateSeccionDto) {
+  async create(dto: CreateAulaDto) {
     const ciclo = await this.prisma.ciclo.findFirst({ where: { id: dto.ciclo_id } });
     if (!ciclo) throw new BadRequestException('El ciclo especificado no existe');
 
-    return this.prisma.seccion.create({
+    return this.prisma.aula.create({
       data: {
         nombre:     dto.nombre,
         cicloId:    dto.ciclo_id,
         turno:      dto.turno,
         area:       dto.area,
-        carrera:    dto.carrera,
         cupoMaximo: dto.cupo_maximo,
       },
       include: { ciclo: { select: { id: true, nombre: true } } },
     });
   }
 
-  async update(id: string, dto: UpdateSeccionDto) {
+  async update(id: string, dto: UpdateAulaDto) {
     await this.findOne(id);
 
     if (dto.ciclo_id) {
@@ -67,14 +66,13 @@ export class SeccionesService {
       if (!ciclo) throw new BadRequestException('El ciclo especificado no existe');
     }
 
-    return this.prisma.seccion.update({
+    return this.prisma.aula.update({
       where: { id },
       data: {
         ...(dto.nombre      !== undefined && { nombre:     dto.nombre }),
         ...(dto.ciclo_id    !== undefined && { cicloId:    dto.ciclo_id }),
         ...(dto.turno       !== undefined && { turno:      dto.turno }),
         ...(dto.area        !== undefined && { area:       dto.area }),
-        ...(dto.carrera     !== undefined && { carrera:    dto.carrera }),
         ...(dto.cupo_maximo !== undefined && { cupoMaximo: dto.cupo_maximo }),
       },
       include: { ciclo: { select: { id: true, nombre: true } } },
@@ -83,9 +81,9 @@ export class SeccionesService {
 
   async remove(id: string) {
     await this.findOne(id);
-    const alumnos = await this.prisma.alumno.count({ where: { seccionId: id, deletedAt: null } });
-    if (alumnos > 0) throw new BadRequestException('No se puede eliminar una sección con alumnos');
-    await this.prisma.seccion.delete({ where: { id } });
+    const alumnos = await this.prisma.alumno.count({ where: { aulaId: id, deletedAt: null } });
+    if (alumnos > 0) throw new BadRequestException('No se puede eliminar un aula con alumnos');
+    await this.prisma.aula.delete({ where: { id } });
     return { success: true };
   }
 }

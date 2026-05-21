@@ -197,8 +197,8 @@ export default function ComunicadosPage() {
                 <div className="bg-surface-2 p-3 rounded-2 border border-border-s">
                   <div className="text-[12px] text-text-mute mb-1">Audiencia</div>
                   <div className="text-[13.5px] font-semibold capitalize">{display.destinatarioTipo}</div>
-                  {display.seccion && (
-                    <div className="text-[11.5px] text-text-mute mt-0.5">Sección {display.seccion.nombre}</div>
+                  {(display as any).aula && (
+                    <div className="text-[11.5px] text-text-mute mt-0.5">Aula {(display as any).aula.nombre}</div>
                   )}
                 </div>
 

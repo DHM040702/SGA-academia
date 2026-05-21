@@ -18,10 +18,10 @@ export class CreateComunicadoDto {
   @IsEnum(TipoDestinatario)
   destinatario_tipo?: TipoDestinatario;
 
-  @ApiPropertyOptional({ description: 'UUID de la sección (cuando destinatario_tipo = seccion)', format: 'uuid' })
+  @ApiPropertyOptional({ description: 'UUID del aula (cuando destinatario_tipo = seccion)', format: 'uuid' })
   @IsOptional()
   @IsUUID()
-  seccion_id?: string;
+  aula_id?: string;
 
   @ApiPropertyOptional({ description: 'Enviar por canal interno del sistema', default: true })
   @IsOptional()

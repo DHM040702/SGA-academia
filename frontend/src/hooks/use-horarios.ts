@@ -3,18 +3,17 @@ import api from '@/lib/api'
 
 export interface Horario {
   id: string
-  seccionId: string
+  aulaId: string
   cursoId: string
   docenteId: string
   diaSemana: number  // 1=Lunes … 7=Domingo
   horaInicio: string
   horaFin: string
-  aula?: string | null
   publicado: boolean
   createdAt: string
   docente: { id: string; nombre: string; apellidos: string; dni?: string }
   curso: { id: string; nombre: string; codigo: string }
-  seccion: {
+  aula: {
     id: string
     nombre: string
     ciclo: { id: string; nombre: string }
@@ -22,7 +21,7 @@ export interface Horario {
 }
 
 export interface FilterHorarios {
-  seccion_id?: string
+  aula_id?: string
   docente_id?: string
   dia_semana?: number
   page?: number

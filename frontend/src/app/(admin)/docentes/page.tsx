@@ -182,7 +182,7 @@ export default function DocentesPage() {
                   const asistPct = d.asistencia_pct ?? 98
                   const cursos = d.horarios?.map((h) => h.curso.nombre) ?? []
                   const uniqueCursos = [...new Set(cursos)]
-                  const secciones = d.horarios?.map((h) => h.seccion.nombre) ?? []
+                  const secciones = d.horarios?.map((h) => h.aula?.nombre ?? '—') ?? []
                   const uniqueSecciones = [...new Set(secciones)]
 
                   return (

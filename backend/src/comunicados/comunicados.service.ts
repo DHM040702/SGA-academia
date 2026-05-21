@@ -20,7 +20,7 @@ export class ComunicadosService {
         orderBy: { createdAt: 'desc' },
         include: {
           publicadoPor: { select: { id: true, email: true } },
-          seccion:      { select: { id: true, nombre: true } },
+          aula:         { select: { id: true, nombre: true } },
           _count:       { select: { envios: true } },
         },
       }),
@@ -46,7 +46,7 @@ export class ComunicadosService {
       where: { id },
       include: {
         publicadoPor: { select: { id: true, email: true } },
-        seccion:      { select: { id: true, nombre: true } },
+        aula:         { select: { id: true, nombre: true } },
         envios: {
           select: {
             id: true, usuarioId: true, canal: true,
@@ -66,7 +66,7 @@ export class ComunicadosService {
           titulo:           dto.titulo,
           cuerpo:           dto.cuerpo,
           destinatarioTipo: (dto.destinatario_tipo as TipoDestinatario) ?? TipoDestinatario.todos,
-          seccionId:        dto.seccion_id,
+          aulaId:           dto.aula_id,
           canalSistema:     dto.canal_sistema ?? true,
           canalWhatsapp:    dto.canal_whatsapp ?? false,
           publicadoPorId,

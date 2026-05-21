@@ -9,10 +9,10 @@ export class FilterAsistenciaDto extends PaginationDto {
   @IsISO8601({ strict: false })
   fecha?: string;
 
-  @ApiPropertyOptional({ description: 'UUID de la sección', format: 'uuid' })
+  @ApiPropertyOptional({ description: 'UUID del aula', format: 'uuid' })
   @IsOptional()
   @IsUUID()
-  seccion_id?: string;
+  aula_id?: string;
 
   @ApiPropertyOptional({ description: 'UUID del alumno', format: 'uuid' })
   @IsOptional()

@@ -14,12 +14,14 @@ import { AsistenciaModule } from './asistencia/asistencia.module';
 import { ComunicadosModule } from './comunicados/comunicados.module';
 import { BibliotecaModule } from './biblioteca/biblioteca.module';
 import { ReportesModule } from './reportes/reportes.module';
+import { CarrerasModule } from './carreras/carreras.module';
 
 @Module({
   imports: [
     ConfigModule.forRoot({ isGlobal: true }),
     PrismaModule,
     AuthModule,
+    CarrerasModule,
     AlumnosModule,
     DocentesModule,
     CiclosModule,

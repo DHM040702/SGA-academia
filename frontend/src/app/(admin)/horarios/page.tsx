@@ -2,7 +2,7 @@
 
 import { useState } from 'react'
 import { useHorarios, useConflictosHorario } from '@/hooks/use-horarios'
-import { useSecciones } from '@/hooks/use-ciclos'
+import { useAulas } from '@/hooks/use-ciclos'
 import { Pill } from '@/components/ui/pill'
 import { Dot } from '@/components/ui/dot'
 import { Card } from '@/components/ui/card'
@@ -40,9 +40,9 @@ function cursoColor(nombre: string) {
 }
 
 export default function HorariosPage() {
-  const [seccionId, setSeccionId] = useState<string>('')
-  const { data: secciones = [] } = useSecciones()
-  const { data: horariosPage, isLoading } = useHorarios({ seccion_id: seccionId || undefined })
+  const [aulaId, setAulaId] = useState<string>('')
+  const { data: secciones = [] } = useAulas()
+  const { data: horariosPage, isLoading } = useHorarios({ aula_id: aulaId || undefined })
   const { data: conflictos = [] } = useConflictosHorario()
 
   const horarios: Horario[] = (horariosPage as any)?.data ?? horariosPage ?? []
@@ -80,8 +80,8 @@ export default function HorariosPage() {
           {/* Toolbar */}
           <div className="flex gap-2.5 items-center">
             <select
-              value={seccionId}
-              onChange={(e) => setSeccionId(e.target.value)}
+              value={aulaId}
+              onChange={(e) => setAulaId(e.target.value)}
               className="px-3 py-1.5 text-[13px] border border-border rounded-2 bg-surface"
             >
               <option value="">Todas las secciones</option>
@@ -118,7 +118,7 @@ export default function HorariosPage() {
               <div className="text-center py-10 text-text-mute text-[13px]">Cargando horarios…</div>
             ) : slots.length === 0 ? (
               <div className="text-center py-10 text-text-mute text-[13px]">
-                No hay horarios registrados{seccionId ? ' para esta sección' : ''}.
+                No hay horarios registrados{aulaId ? ' para esta aula' : ''}.
               </div>
             ) : (
               <table className="w-full border-collapse">

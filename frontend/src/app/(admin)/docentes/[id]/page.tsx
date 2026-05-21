@@ -166,7 +166,7 @@ export default function DocenteDetallePage() {
                         >
                           <div className="flex-1 min-w-0">
                             <div className="text-[12.5px] font-semibold truncate">{h.curso.nombre}</div>
-                            <div className="text-[11px] text-text-mute">{h.seccion.nombre}</div>
+                            <div className="text-[11px] text-text-mute">{h.aula?.nombre ?? '—'}</div>
                           </div>
                           <div className="text-right shrink-0">
                             <div className="font-mono text-[11px] text-text-mute">
@@ -369,7 +369,7 @@ export default function DocenteDetallePage() {
                             <div className="text-[11px] text-text-mute font-mono">{h.curso.codigo}</div>
                           </td>
                           <td className="px-3.5 py-2.5">
-                            <Pill tone="neutral">{h.seccion.nombre}</Pill>
+                            <Pill tone="neutral">{h.aula?.nombre ?? '—'}</Pill>
                           </td>
                           <td className="px-3.5 py-2.5 text-[12px] text-text-mute">
                             {h.aula ?? '—'}

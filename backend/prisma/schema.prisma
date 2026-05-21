@@ -1,5 +1,3 @@
-// backend/prisma/schema.prisma
-
 generator client {
   provider = "prisma-client-js"
 }
@@ -8,9 +6,230 @@ datasource db {
   provider = "postgresql"
 }
 
-// ─────────────────────────────────────────
-// ENUMS
-// ─────────────────────────────────────────
+model Usuario {
+  id                     String              @id @default(dbgenerated("gen_random_uuid()")) @db.Uuid
+  email                  String              @unique @db.VarChar(150)
+  passwordHash           String              @map("password_hash") @db.VarChar(255)
+  rol                    Rol
+  activo                 Boolean             @default(true)
+  createdAt              DateTime            @default(now()) @map("created_at") @db.Timestamptz(6)
+  updatedAt              DateTime            @default(now()) @updatedAt @map("updated_at") @db.Timestamptz(6)
+  deletedAt              DateTime?           @map("deleted_at") @db.Timestamptz(6)
+  alumno                 Alumno?
+  apoderado              Apoderado?
+  asistenciasRegistradas Asistencia[]        @relation("RegistradoPor")
+  comunicadosPublicados  Comunicado[]        @relation("PublicadoPor")
+  comunicadosEnvios      ComunicadoEnvio[]
+  docente                Docente?
+  recursosBiblioteca     RecursoBiblioteca[]
+
+  @@map("usuarios")
+}
+
+model Carrera {
+  id      String   @id @default(dbgenerated("gen_random_uuid()")) @db.Uuid
+  nombre  String   @db.VarChar(100)
+  area    Area
+  activo  Boolean  @default(true)
+  alumnos Alumno[]
+
+  @@map("carreras")
+}
+
+model Alumno {
+  id              String            @id @default(dbgenerated("gen_random_uuid()")) @db.Uuid
+  usuarioId       String            @unique @map("usuario_id") @db.Uuid
+  dni             String            @unique @db.VarChar(12)
+  nombre          String            @db.VarChar(100)
+  apellidos       String            @db.VarChar(150)
+  fechaNacimiento DateTime?         @map("fecha_nacimiento") @db.Date
+  telefono        String?           @db.VarChar(20)
+  codigoBarras    String            @unique @map("codigo_barras") @db.VarChar(6)
+  fotoUrl         String?           @map("foto_url") @db.VarChar(500)
+  aulaId          String?           @map("aula_id") @db.Uuid
+  carreraId       String?           @map("carrera_id") @db.Uuid
+  createdAt       DateTime          @default(now()) @map("created_at") @db.Timestamptz(6)
+  updatedAt       DateTime          @default(now()) @updatedAt @map("updated_at") @db.Timestamptz(6)
+  deletedAt       DateTime?         @map("deleted_at") @db.Timestamptz(6)
+  aula            Aula?             @relation(fields: [aulaId], references: [id])
+  carrera         Carrera?          @relation(fields: [carreraId], references: [id])
+  usuario         Usuario           @relation(fields: [usuarioId], references: [id])
+  apoderados      AlumnoApoderado[]
+  asistencias     Asistencia[]
+
+  @@map("alumnos")
+}
+
+model Apoderado {
+  id               String            @id @default(dbgenerated("gen_random_uuid()")) @db.Uuid
+  usuarioId        String            @unique @map("usuario_id") @db.Uuid
+  nombre           String            @db.VarChar(100)
+  apellidos        String            @db.VarChar(150)
+  dni              String            @unique @db.VarChar(12)
+  telefonoWhatsapp String            @map("telefono_whatsapp") @db.VarChar(20)
+  createdAt        DateTime          @default(now()) @map("created_at") @db.Timestamptz(6)
+  deletedAt        DateTime?         @map("deleted_at") @db.Timestamptz(6)
+  alumnos          AlumnoApoderado[]
+  usuario          Usuario           @relation(fields: [usuarioId], references: [id])
+
+  @@map("apoderados")
+}
+
+model AlumnoApoderado {
+  alumnoId    String    @map("alumno_id") @db.Uuid
+  apoderadoId String    @map("apoderado_id") @db.Uuid
+  parentesco  String    @db.VarChar(50)
+  esPrincipal Boolean   @default(false) @map("es_principal")
+  alumno      Alumno    @relation(fields: [alumnoId], references: [id])
+  apoderado   Apoderado @relation(fields: [apoderadoId], references: [id])
+
+  @@id([alumnoId, apoderadoId])
+  @@map("alumnos_apoderados")
+}
+
+model Docente {
+  id               String       @id @default(dbgenerated("gen_random_uuid()")) @db.Uuid
+  usuarioId        String       @unique @map("usuario_id") @db.Uuid
+  dni              String       @unique @db.VarChar(12)
+  nombre           String       @db.VarChar(100)
+  apellidos        String       @db.VarChar(150)
+  especialidad     String?      @db.VarChar(100)
+  telefonoWhatsapp String?      @map("telefono_whatsapp") @db.VarChar(20)
+  fotoUrl          String?      @map("foto_url") @db.VarChar(500)
+  createdAt        DateTime     @default(now()) @map("created_at") @db.Timestamptz(6)
+  deletedAt        DateTime?    @map("deleted_at") @db.Timestamptz(6)
+  asistencias      Asistencia[]
+  usuario          Usuario      @relation(fields: [usuarioId], references: [id])
+  horarios         Horario[]
+
+  @@map("docentes")
+}
+
+model Ciclo {
+  id          String    @id @default(dbgenerated("gen_random_uuid()")) @db.Uuid
+  nombre      String    @db.VarChar(100)
+  fechaInicio DateTime  @map("fecha_inicio") @db.Date
+  fechaFin    DateTime  @map("fecha_fin") @db.Date
+  activo      Boolean   @default(false)
+  createdAt   DateTime  @default(now()) @map("created_at") @db.Timestamptz(6)
+  aulas       Aula[]
+
+  @@map("ciclos")
+}
+
+model Aula {
+  id         String       @id @default(dbgenerated("gen_random_uuid()")) @db.Uuid
+  cicloId    String       @map("ciclo_id") @db.Uuid
+  nombre     String       @db.VarChar(20)
+  turno      Turno
+  area       Area
+  cupoMaximo Int          @default(40) @map("cupo_maximo")
+  createdAt  DateTime     @default(now()) @map("created_at") @db.Timestamptz(6)
+  alumnos    Alumno[]
+  comunicados Comunicado[]
+  horarios   Horario[]
+  ciclo      Ciclo        @relation(fields: [cicloId], references: [id])
+
+  @@map("aulas")
+}
+
+model Curso {
+  id       String              @id @default(dbgenerated("gen_random_uuid()")) @db.Uuid
+  nombre   String              @db.VarChar(100)
+  codigo   String              @unique @db.VarChar(20)
+  activo   Boolean             @default(true)
+  horarios Horario[]
+  recursos RecursoBiblioteca[]
+
+  @@map("cursos")
+}
+
+model Horario {
+  id         String   @id @default(dbgenerated("gen_random_uuid()")) @db.Uuid
+  aulaId     String   @map("aula_id") @db.Uuid
+  cursoId    String   @map("curso_id") @db.Uuid
+  docenteId  String   @map("docente_id") @db.Uuid
+  diaSemana  Int      @map("dia_semana") @db.SmallInt
+  horaInicio DateTime @map("hora_inicio") @db.Time(6)
+  horaFin    DateTime @map("hora_fin") @db.Time(6)
+  publicado  Boolean  @default(false)
+  createdAt  DateTime @default(now()) @map("created_at") @db.Timestamptz(6)
+  aula       Aula     @relation(fields: [aulaId], references: [id])
+  curso      Curso    @relation(fields: [cursoId], references: [id])
+  docente    Docente  @relation(fields: [docenteId], references: [id])
+
+  @@map("horarios")
+}
+
+model Asistencia {
+  id              String      @id @default(dbgenerated("gen_random_uuid()")) @db.Uuid
+  tipoPersona     TipoPersona @map("tipo_persona")
+  alumnoId        String?     @map("alumno_id") @db.Uuid
+  docenteId       String?     @map("docente_id") @db.Uuid
+  fecha           DateTime    @db.Date
+  horaIngreso     DateTime    @map("hora_ingreso") @db.Timestamptz(6)
+  esTardanza      Boolean     @default(false) @map("es_tardanza")
+  esManual        Boolean     @default(false) @map("es_manual")
+  motivoManual    String?     @map("motivo_manual")
+  registradoPorId String      @map("registrado_por") @db.Uuid
+  createdAt       DateTime    @default(now()) @map("created_at") @db.Timestamptz(6)
+  alumno          Alumno?     @relation(fields: [alumnoId], references: [id])
+  docente         Docente?    @relation(fields: [docenteId], references: [id])
+  registradoPor   Usuario     @relation("RegistradoPor", fields: [registradoPorId], references: [id])
+
+  @@map("asistencias")
+}
+
+model Comunicado {
+  id               String            @id @default(dbgenerated("gen_random_uuid()")) @db.Uuid
+  titulo           String            @db.VarChar(200)
+  cuerpo           String
+  adjuntoUrl       String?           @map("adjunto_url") @db.VarChar(500)
+  destinatarioTipo TipoDestinatario  @map("destinatario_tipo")
+  aulaId           String?           @map("aula_id") @db.Uuid
+  canalSistema     Boolean           @default(true) @map("canal_sistema")
+  canalWhatsapp    Boolean           @default(false) @map("canal_whatsapp")
+  publicadoPorId   String            @map("publicado_por") @db.Uuid
+  publicadoAt      DateTime?         @map("publicado_at") @db.Timestamptz(6)
+  createdAt        DateTime          @default(now()) @map("created_at") @db.Timestamptz(6)
+  aula             Aula?             @relation(fields: [aulaId], references: [id])
+  publicadoPor     Usuario           @relation("PublicadoPor", fields: [publicadoPorId], references: [id])
+  envios           ComunicadoEnvio[]
+
+  @@map("comunicados")
+}
+
+model ComunicadoEnvio {
+  id           String      @id @default(dbgenerated("gen_random_uuid()")) @db.Uuid
+  comunicadoId String      @map("comunicado_id") @db.Uuid
+  usuarioId    String      @map("usuario_id") @db.Uuid
+  canal        CanalEnvio
+  estado       EstadoEnvio @default(pendiente)
+  enviadoAt    DateTime?   @map("enviado_at") @db.Timestamptz(6)
+  errorDetalle String?     @map("error_detalle")
+  comunicado   Comunicado  @relation(fields: [comunicadoId], references: [id])
+  usuario      Usuario     @relation(fields: [usuarioId], references: [id])
+
+  @@map("comunicados_envios")
+}
+
+model RecursoBiblioteca {
+  id          String      @id @default(dbgenerated("gen_random_uuid()")) @db.Uuid
+  titulo      String      @db.VarChar(200)
+  descripcion String?
+  tipo        TipoRecurso
+  url         String      @db.VarChar(500)
+  cursoId     String?     @map("curso_id") @db.Uuid
+  nivel       String?     @db.VarChar(50)
+  activo      Boolean     @default(true)
+  descargas   Int         @default(0)
+  subidoPorId String      @map("subido_por") @db.Uuid
+  createdAt   DateTime    @default(now()) @map("created_at") @db.Timestamptz(6)
+  curso       Curso?      @relation(fields: [cursoId], references: [id])
+  subidoPor   Usuario     @relation(fields: [subidoPorId], references: [id])
+
+  @@map("recursos_biblioteca")
+}
 
 enum Rol {
   admin
@@ -27,9 +246,9 @@ enum Turno {
 }
 
 enum Area {
-  ciencias  // A — Ciencias (Ing. Civil, Sistemas, Agronómica…)
-  letras    // B — Letras (Derecho, Economía, CC.PP…)
-  medicas   // C — Médicas (Enfermería, Obstetricia, Farmacia…)
+  ciencias
+  letras
+  medicas
 }
 
 enum TipoPersona {
@@ -62,315 +281,4 @@ enum EstadoEnvio {
   pendiente
   enviado
   fallido
-}
-
-// ─────────────────────────────────────────
-// USUARIOS
-// ─────────────────────────────────────────
-
-model Usuario {
-  id           String    @id @default(dbgenerated("gen_random_uuid()")) @db.Uuid
-  email        String    @unique @db.VarChar(150)
-  passwordHash String    @map("password_hash") @db.VarChar(255)
-  rol          Rol
-  activo       Boolean   @default(true)
-  createdAt    DateTime  @default(now()) @map("created_at") @db.Timestamptz
-  updatedAt    DateTime  @updatedAt @map("updated_at") @db.Timestamptz
-  deletedAt    DateTime? @map("deleted_at") @db.Timestamptz
-
-  // Relaciones
-  alumno              Alumno?
-  docente             Docente?
-  apoderado           Apoderado?
-  asistenciasRegistradas Asistencia[] @relation("RegistradoPor")
-  comunicadosPublicados  Comunicado[] @relation("PublicadoPor")
-  comunicadosEnvios      ComunicadoEnvio[]
-  recursosBiblioteca     RecursoBiblioteca[]
-
-  @@map("usuarios")
-}
-
-// ─────────────────────────────────────────
-// CARRERAS
-// ─────────────────────────────────────────
-
-model Carrera {
-  id     String  @id @default(dbgenerated("gen_random_uuid()")) @db.Uuid
-  nombre String  @db.VarChar(100)
-  area   Area
-  activo Boolean @default(true)
-
-  // Relaciones
-  alumnos Alumno[]
-
-  @@map("carreras")
-}
-
-// ─────────────────────────────────────────
-// ALUMNOS
-// ─────────────────────────────────────────
-
-model Alumno {
-  id              String    @id @default(dbgenerated("gen_random_uuid()")) @db.Uuid
-  usuarioId       String    @unique @map("usuario_id") @db.Uuid
-  dni             String    @unique @db.VarChar(12)
-  nombre          String    @db.VarChar(100)
-  apellidos       String    @db.VarChar(150)
-  fechaNacimiento DateTime? @map("fecha_nacimiento") @db.Date
-  telefono        String?   @db.VarChar(20)
-  codigoBarras    String    @unique @map("codigo_barras") @db.VarChar(6)
-  fotoUrl         String?   @map("foto_url") @db.VarChar(500)
-  seccionId       String?   @map("seccion_id") @db.Uuid
-  carreraId       String?   @map("carrera_id") @db.Uuid
-  createdAt       DateTime  @default(now()) @map("created_at") @db.Timestamptz
-  updatedAt       DateTime  @updatedAt @map("updated_at") @db.Timestamptz
-  deletedAt       DateTime? @map("deleted_at") @db.Timestamptz
-
-  // Relaciones
-  usuario     Usuario              @relation(fields: [usuarioId], references: [id])
-  seccion     Seccion?             @relation(fields: [seccionId], references: [id])
-  carrera     Carrera?             @relation(fields: [carreraId], references: [id])
-  apoderados  AlumnoApoderado[]
-  asistencias Asistencia[]
-
-  @@map("alumnos")
-}
-
-// ─────────────────────────────────────────
-// APODERADOS
-// ─────────────────────────────────────────
-
-model Apoderado {
-  id               String    @id @default(dbgenerated("gen_random_uuid()")) @db.Uuid
-  usuarioId        String    @unique @map("usuario_id") @db.Uuid
-  nombre           String    @db.VarChar(100)
-  apellidos        String    @db.VarChar(150)
-  dni              String    @unique @db.VarChar(12)
-  telefonoWhatsapp String    @map("telefono_whatsapp") @db.VarChar(20)
-  createdAt        DateTime  @default(now()) @map("created_at") @db.Timestamptz
-  deletedAt        DateTime? @map("deleted_at") @db.Timestamptz
-
-  // Relaciones
-  usuario  Usuario           @relation(fields: [usuarioId], references: [id])
-  alumnos  AlumnoApoderado[]
-
-  @@map("apoderados")
-}
-
-// ─────────────────────────────────────────
-// ALUMNOS_APODERADOS (tabla pivote)
-// ─────────────────────────────────────────
-
-model AlumnoApoderado {
-  alumnoId    String  @map("alumno_id") @db.Uuid
-  apoderadoId String  @map("apoderado_id") @db.Uuid
-  parentesco  String  @db.VarChar(50)
-  esPrincipal Boolean @default(false) @map("es_principal")
-
-  // Relaciones
-  alumno    Alumno    @relation(fields: [alumnoId], references: [id])
-  apoderado Apoderado @relation(fields: [apoderadoId], references: [id])
-
-  @@id([alumnoId, apoderadoId])
-  @@map("alumnos_apoderados")
-}
-
-// ─────────────────────────────────────────
-// DOCENTES
-// ─────────────────────────────────────────
-
-model Docente {
-  id               String    @id @default(dbgenerated("gen_random_uuid()")) @db.Uuid
-  usuarioId        String    @unique @map("usuario_id") @db.Uuid
-  dni              String    @unique @db.VarChar(12)
-  nombre           String    @db.VarChar(100)
-  apellidos        String    @db.VarChar(150)
-  especialidad     String?   @db.VarChar(100)
-  telefonoWhatsapp String?   @map("telefono_whatsapp") @db.VarChar(20)
-  fotoUrl          String?   @map("foto_url") @db.VarChar(500)
-  createdAt        DateTime  @default(now()) @map("created_at") @db.Timestamptz
-  deletedAt        DateTime? @map("deleted_at") @db.Timestamptz
-
-  // Relaciones
-  usuario     Usuario    @relation(fields: [usuarioId], references: [id])
-  horarios    Horario[]
-  asistencias Asistencia[]
-
-  @@map("docentes")
-}
-
-// ─────────────────────────────────────────
-// CICLOS
-// ─────────────────────────────────────────
-
-model Ciclo {
-  id          String    @id @default(dbgenerated("gen_random_uuid()")) @db.Uuid
-  nombre      String    @db.VarChar(100)
-  fechaInicio DateTime  @map("fecha_inicio") @db.Date
-  fechaFin    DateTime  @map("fecha_fin") @db.Date
-  activo      Boolean   @default(false)
-  createdAt   DateTime  @default(now()) @map("created_at") @db.Timestamptz
-
-  // Relaciones
-  secciones Seccion[]
-
-  @@map("ciclos")
-}
-
-// ─────────────────────────────────────────
-// SECCIONES
-// ─────────────────────────────────────────
-
-model Seccion {
-  id          String   @id @default(dbgenerated("gen_random_uuid()")) @db.Uuid
-  cicloId     String   @map("ciclo_id") @db.Uuid
-  nombre      String   @db.VarChar(50)
-  turno       Turno
-  area        Area
-  carrera     String?  @map("nivel") @db.VarChar(150)
-  cupoMaximo  Int      @default(40) @map("cupo_maximo")
-  createdAt   DateTime @default(now()) @map("created_at") @db.Timestamptz
-
-  // Relaciones
-  ciclo       Ciclo       @relation(fields: [cicloId], references: [id])
-  alumnos     Alumno[]
-  horarios    Horario[]
-  comunicados Comunicado[]
-
-  @@map("secciones")
-}
-
-// ─────────────────────────────────────────
-// CURSOS
-// ─────────────────────────────────────────
-
-model Curso {
-  id      String  @id @default(dbgenerated("gen_random_uuid()")) @db.Uuid
-  nombre  String  @db.VarChar(100)
-  codigo  String  @unique @db.VarChar(20)
-  activo  Boolean @default(true)
-
-  // Relaciones
-  horarios  Horario[]
-  recursos  RecursoBiblioteca[]
-
-  @@map("cursos")
-}
-
-// ─────────────────────────────────────────
-// HORARIOS
-// ─────────────────────────────────────────
-
-model Horario {
-  id         String   @id @default(dbgenerated("gen_random_uuid()")) @db.Uuid
-  seccionId  String   @map("seccion_id") @db.Uuid
-  cursoId    String   @map("curso_id") @db.Uuid
-  docenteId  String   @map("docente_id") @db.Uuid
-  diaSemana  Int      @map("dia_semana") @db.SmallInt
-  horaInicio DateTime @map("hora_inicio") @db.Time
-  horaFin    DateTime @map("hora_fin") @db.Time
-  aula       String?  @db.VarChar(50)
-  publicado  Boolean  @default(false)
-  createdAt  DateTime @default(now()) @map("created_at") @db.Timestamptz
-
-  // Relaciones
-  seccion Seccion @relation(fields: [seccionId], references: [id])
-  curso   Curso   @relation(fields: [cursoId], references: [id])
-  docente Docente @relation(fields: [docenteId], references: [id])
-
-  @@map("horarios")
-}
-
-// ─────────────────────────────────────────
-// ASISTENCIAS
-// ─────────────────────────────────────────
-
-model Asistencia {
-  id              String      @id @default(dbgenerated("gen_random_uuid()")) @db.Uuid
-  tipoPersona     TipoPersona @map("tipo_persona")
-  alumnoId        String?     @map("alumno_id") @db.Uuid
-  docenteId       String?     @map("docente_id") @db.Uuid
-  fecha           DateTime    @db.Date
-  horaIngreso     DateTime    @map("hora_ingreso") @db.Timestamptz
-  esTardanza      Boolean     @default(false) @map("es_tardanza")
-  esManual        Boolean     @default(false) @map("es_manual")
-  motivoManual    String?     @map("motivo_manual")
-  registradoPorId String      @map("registrado_por") @db.Uuid
-  createdAt       DateTime    @default(now()) @map("created_at") @db.Timestamptz
-
-  // Relaciones
-  alumno        Alumno?  @relation(fields: [alumnoId], references: [id])
-  docente       Docente? @relation(fields: [docenteId], references: [id])
-  registradoPor Usuario  @relation("RegistradoPor", fields: [registradoPorId], references: [id])
-
-  @@map("asistencias")
-}
-
-// ─────────────────────────────────────────
-// COMUNICADOS
-// ─────────────────────────────────────────
-
-model Comunicado {
-  id               String           @id @default(dbgenerated("gen_random_uuid()")) @db.Uuid
-  titulo           String           @db.VarChar(200)
-  cuerpo           String
-  adjuntoUrl       String?          @map("adjunto_url") @db.VarChar(500)
-  destinatarioTipo TipoDestinatario @map("destinatario_tipo")
-  seccionId        String?          @map("seccion_id") @db.Uuid
-  canalSistema     Boolean          @default(true) @map("canal_sistema")
-  canalWhatsapp    Boolean          @default(false) @map("canal_whatsapp")
-  publicadoPorId   String           @map("publicado_por") @db.Uuid
-  publicadoAt      DateTime?        @map("publicado_at") @db.Timestamptz
-  createdAt        DateTime         @default(now()) @map("created_at") @db.Timestamptz
-
-  // Relaciones
-  seccion      Seccion?          @relation(fields: [seccionId], references: [id])
-  publicadoPor Usuario           @relation("PublicadoPor", fields: [publicadoPorId], references: [id])
-  envios       ComunicadoEnvio[]
-
-  @@map("comunicados")
-}
-
-// ─────────────────────────────────────────
-// COMUNICADOS_ENVIOS
-// ─────────────────────────────────────────
-
-model ComunicadoEnvio {
-  id            String      @id @default(dbgenerated("gen_random_uuid()")) @db.Uuid
-  comunicadoId  String      @map("comunicado_id") @db.Uuid
-  usuarioId     String      @map("usuario_id") @db.Uuid
-  canal         CanalEnvio
-  estado        EstadoEnvio @default(pendiente)
-  enviadoAt     DateTime?   @map("enviado_at") @db.Timestamptz
-  errorDetalle  String?     @map("error_detalle")
-
-  // Relaciones
-  comunicado Comunicado @relation(fields: [comunicadoId], references: [id])
-  usuario    Usuario    @relation(fields: [usuarioId], references: [id])
-
-  @@map("comunicados_envios")
-}
-
-// ─────────────────────────────────────────
-// RECURSOS_BIBLIOTECA
-// ─────────────────────────────────────────
-
-model RecursoBiblioteca {
-  id          String      @id @default(dbgenerated("gen_random_uuid()")) @db.Uuid
-  titulo      String      @db.VarChar(200)
-  descripcion String?
-  tipo        TipoRecurso
-  url         String      @db.VarChar(500)
-  cursoId     String?     @map("curso_id") @db.Uuid
-  nivel       String?     @db.VarChar(50)
-  activo      Boolean     @default(true)
-  descargas   Int         @default(0)
-  subidoPorId String      @map("subido_por") @db.Uuid
-  createdAt   DateTime    @default(now()) @map("created_at") @db.Timestamptz
-
-  // Relaciones
-  curso    Curso?  @relation(fields: [cursoId], references: [id])
-  subidoPor Usuario @relation(fields: [subidoPorId], references: [id])
-
-  @@map("recursos_biblioteca")
 }

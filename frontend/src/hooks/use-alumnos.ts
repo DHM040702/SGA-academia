@@ -12,15 +12,22 @@ export interface Alumno {
   dni: string
   telefono?: string | null
   fecha_nacimiento?: string | null
-  seccion_id?: string | null
+  aula_id?: string | null
+  carreraId?: string | null
   created_at: string
   asistencia_pct: number
   estado: EstadoAlumno
   usuario: { email: string; activo: boolean; rol: string }
-  seccion?: {
+  aula?: {
     id: string
     nombre: string
+    area?: 'ciencias' | 'letras' | 'medicas'
     ciclo: { id: string; nombre: string }
+  } | null
+  carrera?: {
+    id: string
+    nombre: string
+    area: 'ciencias' | 'letras' | 'medicas'
   } | null
 }
 
@@ -37,7 +44,7 @@ export interface FilterAlumnos {
   limit?: number
   q?: string
   ciclo_id?: string
-  seccion_id?: string
+  aula_id?: string
   estado?: EstadoAlumno
 }
 

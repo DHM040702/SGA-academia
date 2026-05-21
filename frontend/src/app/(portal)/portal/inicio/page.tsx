@@ -81,11 +81,11 @@ function AlumnoInicio({ user }: { user: ReturnType<typeof useAuth>['user'] }) {
   const apellidos = alumno?.apellidos ?? ''
   const fullName = `${nombre} ${apellidos}`.trim()
   const firstName = nombre.split(' ')[0]
-  const seccionId: string | undefined = alumno?.seccionId ?? undefined
+  const aulaId: string | undefined = (alumno as any)?.aulaId ?? undefined
   const alumnoId: string | undefined = alumno?.id
   const codigoBarras: string = alumno?.codigoBarras ?? '000000'
 
-  const { data: horariosRes } = useHorarios(seccionId ? { seccion_id: seccionId } : {})
+  const { data: horariosRes } = useHorarios(aulaId ? { aula_id: aulaId } : {})
   const { data: asistencias } = useAsistencia(alumnoId ? { alumno_id: alumnoId, limit: 15 } : {})
   const { data: comunicados } = useComunicados({ limit: 3 })
   const { data: recursos } = useBiblioteca({ limit: 4 })
@@ -254,7 +254,7 @@ function AlumnoInicio({ user }: { user: ReturnType<typeof useAuth>['user'] }) {
                   <div className="text-[9px] tracking-[0.12em] uppercase opacity-80">Mi carnet · 2026-I</div>
                   <div className="font-serif text-[15px] font-semibold mt-0.5 leading-tight">{fullName}</div>
                   <div className="text-[11px] opacity-85 mt-0.5">
-                    {alumno?.seccionId ? 'Sección activa' : 'Sin sección'} · DNI —
+                    {aulaId ? 'Aula activa' : 'Sin aula'} · DNI —
                   </div>
                 </div>
               </div>

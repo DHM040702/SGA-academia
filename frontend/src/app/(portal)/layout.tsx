@@ -110,7 +110,7 @@ export default function PortalLayout({ children }: { children: React.ReactNode }
                 {alumno.codigoBarras ?? '——'}
               </div>
               <div className="text-[10px] opacity-75 mt-0.5">
-                {alumno.seccionId ? 'Sección activa' : 'Sin sección'} · 2026-I
+                {(alumno as any).aulaId ? 'Aula activa' : 'Sin aula'} · 2026-I
               </div>
             </div>
           </div>

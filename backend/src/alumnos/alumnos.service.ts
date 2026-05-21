@@ -31,7 +31,7 @@ export class AlumnosService {
   constructor(private prisma: PrismaService) {}
 
   async findAll(dto: FilterAlumnosDto) {
-    const { page = 1, limit = 20, q, ciclo_id, seccion_id } = dto;
+    const { page = 1, limit = 20, q, ciclo_id, aula_id } = dto as any;
     const skip = (page - 1) * limit;
 
     const searchWhere = q
@@ -45,13 +45,13 @@ export class AlumnosService {
         }
       : {};
 
-    const sectionWhere = seccion_id ? { seccionId: seccion_id } : {};
-    const cicloWhere   = ciclo_id   ? { seccion: { cicloId: ciclo_id } } : {};
+    const aulaWhere  = aula_id  ? { aulaId: aula_id } : {};
+    const cicloWhere = ciclo_id ? { aula: { cicloId: ciclo_id } } : {};
 
     const where = {
       deletedAt: null,
       ...searchWhere,
-      ...sectionWhere,
+      ...aulaWhere,
       ...cicloWhere,
     };
 
@@ -63,13 +63,14 @@ export class AlumnosService {
         orderBy: [{ apellidos: 'asc' }, { nombre: 'asc' }],
         include: {
           usuario: { select: { email: true, activo: true, rol: true } },
-          seccion: { include: { ciclo: { select: { id: true, nombre: true } } } },
+          aula:    { include: { ciclo: { select: { id: true, nombre: true } } } },
+          carrera: { select: { id: true, nombre: true, area: true } },
         },
       }),
       this.prisma.alumno.count({ where }),
     ]);
 
-    // Calcula % asistencia: días con registro / días con al menos un registro en la sección
+    // Calcula % asistencia: días con registro / días con al menos un registro en el aula
     const enriched = await Promise.all(
       items.map(async (a) => {
         const asistencias = await this.prisma.asistencia.findMany({
@@ -80,17 +81,17 @@ export class AlumnosService {
           asistencias.map((x) => x.fecha.toISOString().split('T')[0]),
         ).size;
 
-        let diasSeccion = diasAlumno;
-        if (a.seccionId) {
-          const seccionAsist = await this.prisma.asistencia.findMany({
-            where: { tipoPersona: 'alumno', alumno: { seccionId: a.seccionId } },
+        let diasAula = diasAlumno;
+        if (a.aulaId) {
+          const aulaAsist = await this.prisma.asistencia.findMany({
+            where: { tipoPersona: 'alumno', alumno: { aulaId: a.aulaId } },
             select: { fecha: true },
             distinct: ['fecha'],
           });
-          diasSeccion = seccionAsist.length;
+          diasAula = aulaAsist.length;
         }
 
-        const pct = diasSeccion > 0 ? Math.round((diasAlumno / diasSeccion) * 100) : 100;
+        const pct = diasAula > 0 ? Math.round((diasAlumno / diasAula) * 100) : 100;
         return {
           ...a,
           nombres: a.nombre,
@@ -101,8 +102,8 @@ export class AlumnosService {
       }),
     );
 
-    const filtered = dto.estado
-      ? enriched.filter((a) => a.estado === dto.estado)
+    const filtered = (dto as any).estado
+      ? enriched.filter((a) => a.estado === (dto as any).estado)
       : enriched;
 
     return paginate(filtered, total, page, limit);
@@ -112,8 +113,9 @@ export class AlumnosService {
     const alumno = await this.prisma.alumno.findFirst({
       where: { id, deletedAt: null },
       include: {
-        usuario: { select: { email: true, activo: true, rol: true } },
-        seccion: { include: { ciclo: true } },
+        usuario:  { select: { email: true, activo: true, rol: true } },
+        aula:     { include: { ciclo: true } },
+        carrera:  { select: { id: true, nombre: true, area: true } },
         apoderados: {
           where: { apoderado: { deletedAt: null } },
           include: { apoderado: { include: { usuario: { select: { email: true } } } } },
@@ -133,16 +135,16 @@ export class AlumnosService {
     const diasAlumno = new Set(
       asistencias.map((x) => x.fecha.toISOString().split('T')[0]),
     ).size;
-    let diasSeccion = diasAlumno;
-    if (alumno.seccionId) {
-      const seccionAsist = await this.prisma.asistencia.findMany({
-        where: { tipoPersona: 'alumno', alumno: { seccionId: alumno.seccionId } },
+    let diasAula = diasAlumno;
+    if (alumno.aulaId) {
+      const aulaAsist = await this.prisma.asistencia.findMany({
+        where: { tipoPersona: 'alumno', alumno: { aulaId: alumno.aulaId } },
         select: { fecha: true },
         distinct: ['fecha'],
       });
-      diasSeccion = seccionAsist.length;
+      diasAula = aulaAsist.length;
     }
-    const pct = diasSeccion > 0 ? Math.round((diasAlumno / diasSeccion) * 100) : 100;
+    const pct = diasAula > 0 ? Math.round((diasAlumno / diasAula) * 100) : 100;
 
     return {
       ...alumno,
@@ -175,16 +177,21 @@ export class AlumnosService {
 
       return tx.alumno.create({
         data: {
-          usuarioId: usuario.id,
-          nombre: dto.nombres,
-          apellidos: dto.apellidos,
-          dni: dto.dni,
+          usuarioId:       usuario.id,
+          nombre:          dto.nombres,
+          apellidos:       dto.apellidos,
+          dni:             dto.dni,
           codigoBarras,
           fechaNacimiento: dto.fecha_nacimiento ? new Date(dto.fecha_nacimiento) : null,
-          telefono: dto.telefono,
-          seccionId: dto.seccion_id,
+          telefono:        dto.telefono,
+          aulaId:          dto.aula_id,
+          carreraId:       dto.carrera_id,
         },
-        include: { usuario: { select: { email: true } }, seccion: true },
+        include: {
+          usuario: { select: { email: true } },
+          aula:    true,
+          carrera: { select: { id: true, nombre: true, area: true } },
+        },
       });
     });
   }
@@ -209,10 +216,15 @@ export class AlumnosService {
           ...(rest.apellidos        && { apellidos:        rest.apellidos }),
           ...(rest.dni              && { dni:              rest.dni }),
           ...(rest.fecha_nacimiento && { fechaNacimiento:  new Date(rest.fecha_nacimiento) }),
-          ...(rest.telefono   !== undefined && { telefono:   rest.telefono }),
-          ...(rest.seccion_id !== undefined && { seccionId:  rest.seccion_id }),
+          ...(rest.telefono  !== undefined && { telefono:  rest.telefono }),
+          ...(rest.aula_id   !== undefined && { aulaId:    rest.aula_id }),
+          ...(rest.carrera_id !== undefined && { carreraId: rest.carrera_id }),
         },
-        include: { usuario: { select: { email: true } }, seccion: true },
+        include: {
+          usuario: { select: { email: true } },
+          aula:    true,
+          carrera: { select: { id: true, nombre: true, area: true } },
+        },
       });
     });
   }
