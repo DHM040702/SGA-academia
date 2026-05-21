@@ -25,10 +25,10 @@ export class CreateRecursoDto {
   @MinLength(1)
   url: string;
 
-  @ApiPropertyOptional({ description: 'UUID de la sección asociada', format: 'uuid' })
+  @ApiPropertyOptional({ description: 'Nivel académico (ej. 5to secundaria)' })
   @IsOptional()
-  @IsUUID()
-  seccion_id?: string;
+  @IsString()
+  nivel?: string;
 
   @ApiPropertyOptional({ description: 'UUID del curso asociado', format: 'uuid' })
   @IsOptional()

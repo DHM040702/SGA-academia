@@ -1,13 +1,13 @@
-import { ApiProperty, ApiPropertyOptional } from '@nestjs/swagger';
-import { IsEnum, IsOptional, IsString, Matches } from 'class-validator';
-import { EstadoAsistencia } from '@prisma/client';
+import { ApiPropertyOptional } from '@nestjs/swagger';
+import { IsBoolean, IsOptional, IsString, Matches } from 'class-validator';
 
 export class ManualCorrectionDto {
-  @ApiProperty({ enum: EstadoAsistencia, description: 'Nuevo estado de asistencia' })
-  @IsEnum(EstadoAsistencia)
-  estado: EstadoAsistencia;
+  @ApiPropertyOptional({ description: 'Marcar como tardanza (true) o puntual (false)' })
+  @IsOptional()
+  @IsBoolean()
+  es_tardanza?: boolean;
 
-  @ApiPropertyOptional({ description: 'Observación o motivo de la corrección' })
+  @ApiPropertyOptional({ description: 'Motivo o observación de la corrección manual' })
   @IsOptional()
   @IsString()
   observacion?: string;
@@ -18,8 +18,6 @@ export class ManualCorrectionDto {
   })
   @IsOptional()
   @IsString()
-  @Matches(/^([01]\d|2[0-3]):[0-5]\d$/, {
-    message: 'hora_llegada debe tener formato HH:mm',
-  })
+  @Matches(/^([01]\d|2[0-3]):[0-5]\d$/, { message: 'hora_llegada debe tener formato HH:mm' })
   hora_llegada?: string;
 }

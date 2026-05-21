@@ -1,6 +1,6 @@
 import { cn } from '@/lib/utils'
 
-type DotTone = 'success' | 'warning' | 'danger' | 'info' | 'neutral'
+type DotTone = 'success' | 'warning' | 'danger' | 'info' | 'neutral' | 'primary'
 
 interface DotProps {
   tone?: DotTone
@@ -14,6 +14,7 @@ const toneClass: Record<DotTone, string> = {
   danger:  'bg-danger',
   info:    'bg-info',
   neutral: 'bg-text-soft',
+  primary: 'bg-primary',
 }
 
 export function Dot({ tone = 'success', size = 8, className }: DotProps) {

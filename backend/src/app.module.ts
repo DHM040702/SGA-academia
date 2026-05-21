@@ -10,6 +10,10 @@ import { CiclosModule } from './ciclos/ciclos.module';
 import { SeccionesModule } from './secciones/secciones.module';
 import { CursosModule } from './cursos/cursos.module';
 import { HorariosModule } from './horarios/horarios.module';
+import { AsistenciaModule } from './asistencia/asistencia.module';
+import { ComunicadosModule } from './comunicados/comunicados.module';
+import { BibliotecaModule } from './biblioteca/biblioteca.module';
+import { ReportesModule } from './reportes/reportes.module';
 
 @Module({
   imports: [
@@ -22,6 +26,10 @@ import { HorariosModule } from './horarios/horarios.module';
     SeccionesModule,
     CursosModule,
     HorariosModule,
+    AsistenciaModule,
+    ComunicadosModule,
+    BibliotecaModule,
+    ReportesModule,
   ],
   controllers: [AppController],
   providers: [AppService],

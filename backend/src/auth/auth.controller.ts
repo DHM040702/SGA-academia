@@ -4,7 +4,7 @@ import {
 } from '@nestjs/common';
 import { AuthGuard } from '@nestjs/passport';
 import { ApiBearerAuth, ApiCookieAuth, ApiOperation, ApiTags } from '@nestjs/swagger';
-import { Request as Req, Response as Res } from 'express';
+import type { Request as Req, Response as Res } from 'express';
 import { AuthService } from './auth.service';
 import { LoginDto } from './dto/login.dto';
 import { JwtAuthGuard } from '../common/guards/jwt-auth.guard';
@@ -28,9 +28,11 @@ export class AuthController {
   @UseGuards(AuthGuard('local'))
   @ApiOperation({ summary: 'Iniciar sesión' })
   async login(@Request() req: Req, @Body() _: LoginDto, @Response({ passthrough: true }) res: Res) {
-    const { accessToken, refreshToken } = await this.authService.login(req.user as any);
+    const reqUser = req.user as { id: string; email: string; rol: string };
+    const { accessToken, refreshToken } = await this.authService.login(reqUser);
+    const user = await this.authService.me(reqUser.id);
     res.cookie('refresh_token', refreshToken, COOKIE_OPTS);
-    return { accessToken };
+    return { access_token: accessToken, user };
   }
 
   @Post('refresh')
@@ -41,7 +43,7 @@ export class AuthController {
   async refresh(@Request() req: Req, @Response({ passthrough: true }) res: Res) {
     const { accessToken, refreshToken } = await this.authService.refresh(req.user as any);
     res.cookie('refresh_token', refreshToken, COOKIE_OPTS);
-    return { accessToken };
+    return { access_token: accessToken };
   }
 
   @Post('logout')

@@ -1,4 +1,5 @@
 import { cn } from '@/lib/utils'
+import * as React from 'react'
 
 type PillTone = 'neutral' | 'primary' | 'success' | 'warning' | 'danger' | 'info'
 
@@ -6,6 +7,7 @@ interface PillProps {
   tone?: PillTone
   children: React.ReactNode
   className?: string
+  style?: React.CSSProperties
 }
 
 const toneClass: Record<PillTone, string> = {
@@ -17,7 +19,7 @@ const toneClass: Record<PillTone, string> = {
   info:    'bg-info-light text-info border-transparent',
 }
 
-export function Pill({ tone = 'neutral', children, className }: PillProps) {
+export function Pill({ tone = 'neutral', children, className, style }: PillProps) {
   return (
     <span
       className={cn(
@@ -26,6 +28,7 @@ export function Pill({ tone = 'neutral', children, className }: PillProps) {
         toneClass[tone],
         className,
       )}
+      style={style}
     >
       {children}
     </span>

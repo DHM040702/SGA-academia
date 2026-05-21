@@ -1,6 +1,6 @@
 import { ApiPropertyOptional } from '@nestjs/swagger';
-import { IsEnum, IsOptional, IsUUID } from 'class-validator';
-import { DiaSemana } from '@prisma/client';
+import { IsInt, IsOptional, IsUUID, Max, Min } from 'class-validator';
+import { Type } from 'class-transformer';
 import { PaginationDto } from '../../common/dto/pagination.dto';
 
 export class FilterHorariosDto extends PaginationDto {
@@ -14,8 +14,11 @@ export class FilterHorariosDto extends PaginationDto {
   @IsUUID()
   docente_id?: string;
 
-  @ApiPropertyOptional({ enum: DiaSemana, description: 'Filtrar por día de la semana' })
+  @ApiPropertyOptional({ description: 'Filtrar por día de semana (1=Lunes…7=Domingo)', minimum: 1, maximum: 7 })
   @IsOptional()
-  @IsEnum(DiaSemana)
-  dia_semana?: DiaSemana;
+  @Type(() => Number)
+  @IsInt()
+  @Min(1)
+  @Max(7)
+  dia_semana?: number;
 }

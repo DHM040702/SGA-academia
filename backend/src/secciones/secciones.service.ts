@@ -1,8 +1,4 @@
-import {
-  BadRequestException,
-  Injectable,
-  NotFoundException,
-} from '@nestjs/common';
+import { BadRequestException, Injectable, NotFoundException } from '@nestjs/common';
 import { PrismaService } from '../prisma/prisma.service';
 import { CreateSeccionDto } from './dto/create-seccion.dto';
 import { UpdateSeccionDto } from './dto/update-seccion.dto';
@@ -12,14 +8,9 @@ export class SeccionesService {
   constructor(private prisma: PrismaService) {}
 
   async findAll(ciclo_id?: string) {
-    const where = {
-      deleted_at: null,
-      ...(ciclo_id ? { ciclo_id } : {}),
-    };
-
     return this.prisma.seccion.findMany({
-      where,
-      orderBy: [{ ciclo: { fecha_inicio: 'desc' } }, { nombre: 'asc' }],
+      where: ciclo_id ? { cicloId: ciclo_id } : undefined,
+      orderBy: [{ ciclo: { fechaInicio: 'desc' } }, { nombre: 'asc' }],
       include: {
         ciclo: { select: { id: true, nombre: true, activo: true } },
         _count: { select: { alumnos: true, horarios: true } },
@@ -29,23 +20,20 @@ export class SeccionesService {
 
   async findOne(id: string) {
     const seccion = await this.prisma.seccion.findFirst({
-      where: { id, deleted_at: null },
+      where: { id },
       include: {
-        ciclo: { select: { id: true, nombre: true, activo: true, fecha_inicio: true, fecha_fin: true } },
+        ciclo: { select: { id: true, nombre: true, activo: true, fechaInicio: true, fechaFin: true } },
         alumnos: {
-          where: { deleted_at: null },
-          orderBy: [{ apellidos: 'asc' }, { nombres: 'asc' }],
-          include: {
-            usuario: { select: { email: true, activo: true } },
-          },
+          where: { deletedAt: null },
+          orderBy: [{ apellidos: 'asc' }, { nombre: 'asc' }],
+          include: { usuario: { select: { email: true, activo: true } } },
         },
         horarios: {
-          where: { deleted_at: null },
           include: {
-            docente: { select: { id: true, nombres: true, apellidos: true } },
-            curso: { select: { id: true, nombre: true, codigo: true } },
+            docente: { select: { id: true, nombre: true, apellidos: true } },
+            curso:   { select: { id: true, nombre: true, codigo: true } },
           },
-          orderBy: [{ dia_semana: 'asc' }, { hora_inicio: 'asc' }],
+          orderBy: [{ diaSemana: 'asc' }, { horaInicio: 'asc' }],
         },
       },
     });
@@ -55,20 +43,18 @@ export class SeccionesService {
   }
 
   async create(dto: CreateSeccionDto) {
-    const cicloExists = await this.prisma.ciclo.findFirst({
-      where: { id: dto.ciclo_id, deleted_at: null },
-    });
-    if (!cicloExists) throw new BadRequestException('El ciclo especificado no existe');
+    const ciclo = await this.prisma.ciclo.findFirst({ where: { id: dto.ciclo_id } });
+    if (!ciclo) throw new BadRequestException('El ciclo especificado no existe');
 
     return this.prisma.seccion.create({
       data: {
-        nombre: dto.nombre,
-        ciclo_id: dto.ciclo_id,
-        aula: dto.aula,
+        nombre:     dto.nombre,
+        cicloId:    dto.ciclo_id,
+        turno:      dto.turno,
+        nivel:      dto.nivel,
+        cupoMaximo: dto.cupo_maximo,
       },
-      include: {
-        ciclo: { select: { id: true, nombre: true } },
-      },
+      include: { ciclo: { select: { id: true, nombre: true } } },
     });
   }
 
@@ -76,31 +62,29 @@ export class SeccionesService {
     await this.findOne(id);
 
     if (dto.ciclo_id) {
-      const cicloExists = await this.prisma.ciclo.findFirst({
-        where: { id: dto.ciclo_id, deleted_at: null },
-      });
-      if (!cicloExists) throw new BadRequestException('El ciclo especificado no existe');
+      const ciclo = await this.prisma.ciclo.findFirst({ where: { id: dto.ciclo_id } });
+      if (!ciclo) throw new BadRequestException('El ciclo especificado no existe');
     }
 
     return this.prisma.seccion.update({
       where: { id },
       data: {
-        ...(dto.nombre !== undefined && { nombre: dto.nombre }),
-        ...(dto.ciclo_id !== undefined && { ciclo_id: dto.ciclo_id }),
-        ...(dto.aula !== undefined && { aula: dto.aula }),
+        ...(dto.nombre      !== undefined && { nombre:     dto.nombre }),
+        ...(dto.ciclo_id    !== undefined && { cicloId:    dto.ciclo_id }),
+        ...(dto.turno       !== undefined && { turno:      dto.turno }),
+        ...(dto.nivel       !== undefined && { nivel:      dto.nivel }),
+        ...(dto.cupo_maximo !== undefined && { cupoMaximo: dto.cupo_maximo }),
       },
-      include: {
-        ciclo: { select: { id: true, nombre: true } },
-      },
+      include: { ciclo: { select: { id: true, nombre: true } } },
     });
   }
 
   async remove(id: string) {
     await this.findOne(id);
-    await this.prisma.seccion.update({
-      where: { id },
-      data: { deleted_at: new Date() },
-    });
+    // Verificar si hay alumnos o comunicados vinculados
+    const alumnos = await this.prisma.alumno.count({ where: { seccionId: id, deletedAt: null } });
+    if (alumnos > 0) throw new BadRequestException('No se puede eliminar una sección con alumnos');
+    await this.prisma.seccion.delete({ where: { id } });
     return { success: true };
   }
 }

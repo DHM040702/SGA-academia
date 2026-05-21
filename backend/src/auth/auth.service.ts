@@ -14,11 +14,11 @@ export class AuthService {
 
   async validateUser(email: string, password: string) {
     const user = await this.prisma.usuario.findFirst({
-      where: { email, deleted_at: null },
+      where: { email, deletedAt: null },
     });
     if (!user || !user.activo) return null;
 
-    const valid = await bcrypt.compare(password, user.password_hash);
+    const valid = await bcrypt.compare(password, user.passwordHash);
     if (!valid) return null;
 
     return user;
@@ -56,9 +56,9 @@ export class AuthService {
         email: true,
         rol: true,
         activo: true,
-        alumno: { select: { id: true, nombres: true, apellidos: true, codigo_barra: true, seccion_id: true } },
-        docente: { select: { id: true, nombres: true, apellidos: true } },
-        apoderado: { select: { id: true, nombres: true, apellidos: true } },
+        alumno:    { select: { id: true, nombre: true, apellidos: true, codigoBarras: true, seccionId: true } },
+        docente:   { select: { id: true, nombre: true, apellidos: true } },
+        apoderado: { select: { id: true, nombre: true, apellidos: true } },
       },
     });
   }

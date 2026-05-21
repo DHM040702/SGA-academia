@@ -1,5 +1,5 @@
 import { Injectable, NotFoundException } from '@nestjs/common';
-import { CanalComunicado, EstadoEnvio } from '@prisma/client';
+import { CanalEnvio, EstadoEnvio, TipoDestinatario } from '@prisma/client';
 import { PrismaService } from '../prisma/prisma.service';
 import { paginate, PaginationDto } from '../common/dto/pagination.dto';
 import { CreateComunicadoDto } from './dto/create-comunicado.dto';
@@ -15,38 +15,26 @@ export class ComunicadosService {
 
     const [items, total] = await Promise.all([
       this.prisma.comunicado.findMany({
-        where: { deleted_at: null },
         skip,
         take: limit,
-        orderBy: { created_at: 'desc' },
+        orderBy: { createdAt: 'desc' },
         include: {
-          autor: {
-            select: {
-              id: true,
-              email: true,
-              alumno: { select: { nombres: true, apellidos: true } },
-              docente: { select: { nombres: true, apellidos: true } },
-            },
-          },
-          _count: { select: { envios: true } },
+          publicadoPor: { select: { id: true, email: true } },
+          seccion:      { select: { id: true, nombre: true } },
+          _count:       { select: { envios: true } },
         },
       }),
-      this.prisma.comunicado.count({ where: { deleted_at: null } }),
+      this.prisma.comunicado.count(),
     ]);
 
-    // Enriquecer con porcentaje leído
     const enriched = await Promise.all(
       items.map(async (c) => {
         const [enviados, total_envios] = await Promise.all([
-          this.prisma.comunicadoEnvio.count({
-            where: { comunicado_id: c.id, estado: EstadoEnvio.enviado, deleted_at: null },
-          }),
-          this.prisma.comunicadoEnvio.count({
-            where: { comunicado_id: c.id, deleted_at: null },
-          }),
+          this.prisma.comunicadoEnvio.count({ where: { comunicadoId: c.id, estado: EstadoEnvio.enviado } }),
+          this.prisma.comunicadoEnvio.count({ where: { comunicadoId: c.id } }),
         ]);
-        const pct_leido = total_envios > 0 ? Math.round((enviados / total_envios) * 100) : 0;
-        return { ...c, pct_leido };
+        const pct_enviado = total_envios > 0 ? Math.round((enviados / total_envios) * 100) : 0;
+        return { ...c, pct_enviado };
       }),
     );
 
@@ -55,97 +43,50 @@ export class ComunicadosService {
 
   async findOne(id: string) {
     const comunicado = await this.prisma.comunicado.findFirst({
-      where: { id, deleted_at: null },
+      where: { id },
       include: {
-        autor: {
-          select: {
-            id: true,
-            email: true,
-            alumno: { select: { nombres: true, apellidos: true } },
-            docente: { select: { nombres: true, apellidos: true } },
-          },
-        },
+        publicadoPor: { select: { id: true, email: true } },
+        seccion:      { select: { id: true, nombre: true } },
         envios: {
-          where: { deleted_at: null },
           select: {
-            id: true,
-            destinatario_id: true,
-            canal: true,
-            estado: true,
-            enviado_at: true,
-            error_mensaje: true,
+            id: true, usuarioId: true, canal: true,
+            estado: true, enviadoAt: true, errorDetalle: true,
           },
         },
       },
     });
-
     if (!comunicado) throw new NotFoundException('Comunicado no encontrado');
-
-    // Estadísticas por canal
-    const stats_por_canal = await this.prisma.comunicadoEnvio.groupBy({
-      by: ['canal', 'estado'],
-      where: { comunicado_id: id, deleted_at: null },
-      _count: { id: true },
-    });
-
-    return { ...comunicado, stats_por_canal };
+    return comunicado;
   }
 
-  async create(dto: CreateComunicadoDto, autor_id: string) {
+  async create(dto: CreateComunicadoDto, publicadoPorId: string) {
     return this.prisma.$transaction(async (tx) => {
       const comunicado = await tx.comunicado.create({
         data: {
-          titulo: dto.titulo,
-          contenido: dto.contenido,
-          canales: dto.canales,
-          roles_destino: dto.roles_destino,
-          autor_id,
+          titulo:           dto.titulo,
+          cuerpo:           dto.cuerpo,
+          destinatarioTipo: (dto.destinatario_tipo as TipoDestinatario) ?? TipoDestinatario.todos,
+          seccionId:        dto.seccion_id,
+          canalSistema:     dto.canal_sistema ?? true,
+          canalWhatsapp:    dto.canal_whatsapp ?? false,
+          publicadoPorId,
+          publicadoAt:      dto.publicar_ahora ? new Date() : null,
         },
       });
 
-      // Para canal 'interno': crear ComunicadoEnvio por cada usuario con rol destino
-      if (dto.canales.includes(CanalComunicado.interno)) {
+      // Crear envíos pendientes para todos los usuarios activos (canal sistema)
+      if (dto.canal_sistema !== false) {
         const destinatarios = await tx.usuario.findMany({
-          where: {
-            rol: { in: dto.roles_destino },
-            activo: true,
-            deleted_at: null,
-          },
+          where: { activo: true, deletedAt: null },
           select: { id: true },
         });
-
         if (destinatarios.length > 0) {
           await tx.comunicadoEnvio.createMany({
             data: destinatarios.map((u) => ({
-              comunicado_id: comunicado.id,
-              destinatario_id: u.id,
-              canal: CanalComunicado.interno,
-              estado: EstadoEnvio.pendiente,
-            })),
-          });
-        }
-      }
-
-      // Para WhatsApp / SMS: crear registros pendientes (integración Twilio futura)
-      for (const canal of dto.canales) {
-        if (canal === CanalComunicado.interno) continue;
-
-        const destinatarios = await tx.usuario.findMany({
-          where: {
-            rol: { in: dto.roles_destino },
-            activo: true,
-            deleted_at: null,
-          },
-          select: { id: true },
-        });
-
-        if (destinatarios.length > 0) {
-          await tx.comunicadoEnvio.createMany({
-            data: destinatarios.map((u) => ({
-              comunicado_id: comunicado.id,
-              destinatario_id: u.id,
-              canal,
-              estado: EstadoEnvio.pendiente,
+              comunicadoId: comunicado.id,
+              usuarioId:    u.id,
+              canal:        CanalEnvio.sistema,
+              estado:       EstadoEnvio.pendiente,
             })),
           });
         }
@@ -156,57 +97,35 @@ export class ComunicadosService {
   }
 
   async update(id: string, dto: UpdateComunicadoDto) {
-    const comunicado = await this.prisma.comunicado.findFirst({
-      where: { id, deleted_at: null },
-    });
+    const comunicado = await this.prisma.comunicado.findFirst({ where: { id } });
     if (!comunicado) throw new NotFoundException('Comunicado no encontrado');
 
     return this.prisma.comunicado.update({
       where: { id },
       data: {
         ...(dto.titulo !== undefined && { titulo: dto.titulo }),
-        ...(dto.contenido !== undefined && { contenido: dto.contenido }),
+        ...(dto.cuerpo !== undefined && { cuerpo: dto.cuerpo }),
       },
     });
   }
 
   async remove(id: string) {
-    const comunicado = await this.prisma.comunicado.findFirst({
-      where: { id, deleted_at: null },
-    });
+    const comunicado = await this.prisma.comunicado.findFirst({ where: { id } });
     if (!comunicado) throw new NotFoundException('Comunicado no encontrado');
-
-    await this.prisma.comunicado.update({
-      where: { id },
-      data: { deleted_at: new Date() },
-    });
-
+    await this.prisma.comunicado.delete({ where: { id } });
     return { success: true };
   }
 
-  async marcarLeido(comunicado_id: string, usuario_id: string) {
+  async marcarLeido(comunicadoId: string, usuarioId: string) {
     const envio = await this.prisma.comunicadoEnvio.findFirst({
-      where: {
-        comunicado_id,
-        destinatario_id: usuario_id,
-        canal: CanalComunicado.interno,
-        deleted_at: null,
-      },
+      where: { comunicadoId, usuarioId, canal: CanalEnvio.sistema },
     });
-
-    if (!envio) {
-      // Comunicado no dirigido al usuario o ya no existe; no es un error crítico
-      return { success: false, message: 'No se encontró envío para este usuario' };
-    }
+    if (!envio) return { success: false, message: 'Envío no encontrado para este usuario' };
 
     await this.prisma.comunicadoEnvio.update({
       where: { id: envio.id },
-      data: {
-        estado: EstadoEnvio.enviado,
-        enviado_at: new Date(),
-      },
+      data: { estado: EstadoEnvio.enviado, enviadoAt: new Date() },
     });
-
     return { success: true };
   }
 }

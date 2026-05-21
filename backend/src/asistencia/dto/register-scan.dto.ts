@@ -1,6 +1,5 @@
-import { ApiProperty, ApiPropertyOptional } from '@nestjs/swagger';
-import { IsEnum, IsOptional, IsString, Length } from 'class-validator';
-import { TipoAsistencia } from '@prisma/client';
+import { ApiProperty } from '@nestjs/swagger';
+import { IsString, Length } from 'class-validator';
 
 export class RegisterScanDto {
   @ApiProperty({
@@ -10,12 +9,4 @@ export class RegisterScanDto {
   @IsString()
   @Length(6, 20)
   codigo: string;
-
-  @ApiPropertyOptional({
-    enum: TipoAsistencia,
-    description: 'Tipo de asistencia. Si no se envía, se auto-detecta por el código.',
-  })
-  @IsOptional()
-  @IsEnum(TipoAsistencia)
-  tipo?: TipoAsistencia;
 }

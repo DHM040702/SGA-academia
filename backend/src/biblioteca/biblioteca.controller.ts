@@ -38,7 +38,7 @@ export class BibliotecaController {
   }
 
   @Get('stats')
-  @Roles(Rol.admin, Rol.director)
+  @Roles(Rol.admin, Rol.director, Rol.alumno, Rol.apoderado)
   @ApiOperation({ summary: 'Estadísticas de la biblioteca digital' })
   stats() {
     return this.service.stats();

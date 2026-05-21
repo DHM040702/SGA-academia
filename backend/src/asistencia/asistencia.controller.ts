@@ -1,23 +1,8 @@
 import {
-  Body,
-  Controller,
-  Get,
-  HttpCode,
-  HttpStatus,
-  Param,
-  ParseIntPipe,
-  ParseUUIDPipe,
-  Patch,
-  Post,
-  Query,
-  UseGuards,
+  Body, Controller, Delete, Get, HttpCode, HttpStatus,
+  Param, ParseUUIDPipe, Patch, Post, Query, UseGuards,
 } from '@nestjs/common';
-import {
-  ApiBearerAuth,
-  ApiOperation,
-  ApiQuery,
-  ApiTags,
-} from '@nestjs/swagger';
+import { ApiBearerAuth, ApiOperation, ApiQuery, ApiTags } from '@nestjs/swagger';
 import { Rol } from '@prisma/client';
 import { JwtAuthGuard } from '../common/guards/jwt-auth.guard';
 import { RolesGuard } from '../common/guards/roles.guard';
@@ -33,21 +18,18 @@ import { FilterAsistenciaDto } from './dto/filter-asistencia.dto';
 export class AsistenciaController {
   constructor(private readonly service: AsistenciaService) {}
 
-  /**
-   * POST /asistencia/scan
-   * Público — usado desde la pantalla del vigilante (modo HID).
-   */
+  /** POST /asistencia/scan — kiosko vigilante (Bearer del vigilante) */
   @Post('scan')
   @HttpCode(HttpStatus.OK)
-  @ApiOperation({ summary: 'Registrar asistencia por escaneo de código de barras' })
-  scan(@Body() dto: RegisterScanDto) {
-    return this.service.scan(dto);
+  @ApiBearerAuth('access-token')
+  @UseGuards(JwtAuthGuard, RolesGuard)
+  @Roles(Rol.admin, Rol.director, Rol.vigilante)
+  @ApiOperation({ summary: 'Registrar asistencia por código de barras (modo HID)' })
+  scan(@Body() dto: RegisterScanDto, @CurrentUser() user: { id: string }) {
+    return this.service.scan(dto, user.id);
   }
 
-  /**
-   * GET /asistencia/stats
-   * Estadísticas del día actual.
-   */
+  /** GET /asistencia/stats — estadísticas del día */
   @Get('stats')
   @ApiBearerAuth('access-token')
   @UseGuards(JwtAuthGuard, RolesGuard)
@@ -57,40 +39,31 @@ export class AsistenciaController {
     return this.service.stats();
   }
 
-  /**
-   * GET /asistencia
-   * Listado paginado con filtros.
-   */
+  /** GET /asistencia — listado paginado con filtros */
   @Get()
   @ApiBearerAuth('access-token')
   @UseGuards(JwtAuthGuard, RolesGuard)
-  @Roles(Rol.admin, Rol.director)
+  @Roles(Rol.admin, Rol.director, Rol.alumno, Rol.apoderado, Rol.vigilante)
   @ApiOperation({ summary: 'Listar asistencias paginadas con filtros' })
   findAll(@Query() dto: FilterAsistenciaDto) {
     return this.service.findAll(dto);
   }
 
-  /**
-   * GET /asistencia/alumno/:alumno_id
-   * Últimas asistencias de un alumno.
-   */
-  @Get('alumno/:alumno_id')
+  /** GET /asistencia/alumno/:id — últimas asistencias de un alumno */
+  @Get('alumno/:alumnoId')
   @ApiBearerAuth('access-token')
   @UseGuards(JwtAuthGuard, RolesGuard)
-  @Roles(Rol.admin, Rol.director, Rol.alumno)
+  @Roles(Rol.admin, Rol.director, Rol.alumno, Rol.apoderado)
   @ApiOperation({ summary: 'Obtener últimas asistencias de un alumno' })
-  @ApiQuery({ name: 'limit', required: false, type: Number, description: 'Máximo de registros (default 50)' })
+  @ApiQuery({ name: 'limit', required: false, type: Number })
   findByAlumno(
-    @Param('alumno_id', ParseUUIDPipe) alumno_id: string,
+    @Param('alumnoId', ParseUUIDPipe) alumnoId: string,
     @Query('limit') limit?: string,
   ) {
-    return this.service.findByAlumno(alumno_id, limit ? parseInt(limit, 10) : 50);
+    return this.service.findByAlumno(alumnoId, limit ? parseInt(limit, 10) : 50);
   }
 
-  /**
-   * PATCH /asistencia/:id
-   * Corrección manual de un registro.
-   */
+  /** PATCH /asistencia/:id — corrección manual */
   @Patch(':id')
   @ApiBearerAuth('access-token')
   @UseGuards(JwtAuthGuard, RolesGuard)
@@ -102,5 +75,16 @@ export class AsistenciaController {
     @CurrentUser() user: { id: string },
   ) {
     return this.service.corregir(id, dto, user.id);
+  }
+
+  /** DELETE /asistencia/:id — eliminar registro (admin only) */
+  @Delete(':id')
+  @HttpCode(HttpStatus.OK)
+  @ApiBearerAuth('access-token')
+  @UseGuards(JwtAuthGuard, RolesGuard)
+  @Roles(Rol.admin)
+  @ApiOperation({ summary: 'Eliminar registro de asistencia' })
+  remove(@Param('id', ParseUUIDPipe) id: string) {
+    return this.service.remove(id);
   }
 }

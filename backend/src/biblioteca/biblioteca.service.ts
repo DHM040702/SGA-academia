@@ -11,17 +11,15 @@ export class BibliotecaService {
   constructor(private prisma: PrismaService) {}
 
   async findAll(dto: FilterBibliotecaDto) {
-    const { page = 1, limit = 20, q, tipo, curso_id, seccion_id } = dto;
+    const { page = 1, limit = 20, q, tipo, curso_id } = dto;
     const skip = (page - 1) * limit;
 
-    const where: any = { deleted_at: null };
-
-    if (tipo) where.tipo = tipo;
-    if (curso_id) where.curso_id = curso_id;
-    if (seccion_id) where.seccion_id = seccion_id;
+    const where: any = { activo: true };
+    if (tipo)     where.tipo    = tipo;
+    if (curso_id) where.cursoId = curso_id;
     if (q) {
       where.OR = [
-        { titulo: { contains: q, mode: 'insensitive' } },
+        { titulo:      { contains: q, mode: 'insensitive' } },
         { descripcion: { contains: q, mode: 'insensitive' } },
       ];
     }
@@ -31,18 +29,10 @@ export class BibliotecaService {
         where,
         skip,
         take: limit,
-        orderBy: { created_at: 'desc' },
+        orderBy: { createdAt: 'desc' },
         include: {
-          autor: {
-            select: {
-              id: true,
-              email: true,
-              docente: { select: { nombres: true, apellidos: true } },
-              alumno: { select: { nombres: true, apellidos: true } },
-            },
-          },
-          curso: { select: { id: true, nombre: true, codigo: true } },
-          seccion: { select: { id: true, nombre: true } },
+          subidoPor: { select: { id: true, email: true } },
+          curso:     { select: { id: true, nombre: true, codigo: true } },
         },
       }),
       this.prisma.recursoBiblioteca.count({ where }),
@@ -53,94 +43,77 @@ export class BibliotecaService {
 
   async findOne(id: string) {
     const recurso = await this.prisma.recursoBiblioteca.findFirst({
-      where: { id, deleted_at: null },
+      where: { id, activo: true },
       include: {
-        autor: {
-          select: {
-            id: true,
-            email: true,
-            docente: { select: { nombres: true, apellidos: true } },
-            alumno: { select: { nombres: true, apellidos: true } },
-          },
-        },
-        curso: { select: { id: true, nombre: true, codigo: true } },
-        seccion: { select: { id: true, nombre: true } },
+        subidoPor: { select: { id: true, email: true } },
+        curso:     { select: { id: true, nombre: true, codigo: true } },
       },
     });
-
     if (!recurso) throw new NotFoundException('Recurso de biblioteca no encontrado');
+
+    // Incrementar contador de descargas en background
+    void this.prisma.recursoBiblioteca.update({
+      where: { id },
+      data: { descargas: { increment: 1 } },
+    });
+
     return recurso;
   }
 
-  async create(dto: CreateRecursoDto, subido_por_id: string) {
+  async create(dto: CreateRecursoDto, subidoPorId: string) {
     return this.prisma.recursoBiblioteca.create({
       data: {
-        titulo: dto.titulo,
-        descripcion: dto.descripcion,
-        tipo: dto.tipo,
-        url: dto.url,
-        seccion_id: dto.seccion_id ?? null,
-        curso_id: dto.curso_id ?? null,
-        subido_por: subido_por_id,
+        titulo:       dto.titulo,
+        descripcion:  dto.descripcion,
+        tipo:         dto.tipo,
+        url:          dto.url,
+        nivel:        dto.nivel,
+        cursoId:      dto.curso_id ?? null,
+        subidoPorId,
+        activo:       true,
       },
       include: {
-        autor: { select: { id: true, email: true } },
-        curso: { select: { id: true, nombre: true } },
-        seccion: { select: { id: true, nombre: true } },
+        subidoPor: { select: { id: true, email: true } },
+        curso:     { select: { id: true, nombre: true } },
       },
     });
   }
 
   async update(id: string, dto: UpdateRecursoDto) {
     await this.findOne(id);
-
     return this.prisma.recursoBiblioteca.update({
       where: { id },
       data: {
-        ...(dto.titulo !== undefined && { titulo: dto.titulo }),
-        ...(dto.descripcion !== undefined && { descripcion: dto.descripcion }),
-        ...(dto.tipo !== undefined && { tipo: dto.tipo }),
-        ...(dto.url !== undefined && { url: dto.url }),
-        ...(dto.seccion_id !== undefined && { seccion_id: dto.seccion_id }),
-        ...(dto.curso_id !== undefined && { curso_id: dto.curso_id }),
+        ...(dto.titulo       !== undefined && { titulo:       dto.titulo }),
+        ...(dto.descripcion  !== undefined && { descripcion:  dto.descripcion }),
+        ...(dto.tipo         !== undefined && { tipo:         dto.tipo }),
+        ...(dto.url          !== undefined && { url:          dto.url }),
+        ...(dto.nivel        !== undefined && { nivel:        dto.nivel }),
+        ...(dto.curso_id     !== undefined && { cursoId:      dto.curso_id }),
       },
       include: {
-        autor: { select: { id: true, email: true } },
-        curso: { select: { id: true, nombre: true } },
-        seccion: { select: { id: true, nombre: true } },
+        subidoPor: { select: { id: true, email: true } },
+        curso:     { select: { id: true, nombre: true } },
       },
     });
   }
 
   async remove(id: string) {
     await this.findOne(id);
-
     await this.prisma.recursoBiblioteca.update({
       where: { id },
-      data: { deleted_at: new Date() },
+      data: { activo: false },
     });
-
     return { success: true };
   }
 
   async stats() {
-    const [total_pdf, total_video, total_enlace] = await Promise.all([
-      this.prisma.recursoBiblioteca.count({
-        where: { tipo: TipoRecurso.pdf, deleted_at: null },
-      }),
-      this.prisma.recursoBiblioteca.count({
-        where: { tipo: TipoRecurso.video, deleted_at: null },
-      }),
-      this.prisma.recursoBiblioteca.count({
-        where: { tipo: TipoRecurso.enlace, deleted_at: null },
-      }),
+    const [total_pdf, total_video, total_enlace, total_iframe] = await Promise.all([
+      this.prisma.recursoBiblioteca.count({ where: { tipo: TipoRecurso.pdf,     activo: true } }),
+      this.prisma.recursoBiblioteca.count({ where: { tipo: TipoRecurso.video,   activo: true } }),
+      this.prisma.recursoBiblioteca.count({ where: { tipo: TipoRecurso.enlace,  activo: true } }),
+      this.prisma.recursoBiblioteca.count({ where: { tipo: TipoRecurso.iframe,  activo: true } }),
     ]);
-
-    return {
-      total_pdf,
-      total_video,
-      total_enlace,
-      storage_used: 0, // Integración MinIO futura
-    };
+    return { total_pdf, total_video, total_enlace, total_iframe };
   }
 }

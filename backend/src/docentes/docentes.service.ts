@@ -1,9 +1,8 @@
 import {
-  BadRequestException,
-  Injectable,
-  NotFoundException,
+  BadRequestException, Injectable, NotFoundException,
 } from '@nestjs/common';
 import * as bcrypt from 'bcrypt';
+import { Rol } from '@prisma/client';
 import { PrismaService } from '../prisma/prisma.service';
 import { paginate } from '../common/dto/pagination.dto';
 import { CreateDocenteDto } from './dto/create-docente.dto';
@@ -21,24 +20,18 @@ export class DocentesService {
     const searchWhere = q
       ? {
           OR: [
-            { nombres: { contains: q, mode: 'insensitive' as const } },
+            { nombre:    { contains: q, mode: 'insensitive' as const } },
             { apellidos: { contains: q, mode: 'insensitive' as const } },
-            { dni: { contains: q } },
+            { dni:       { contains: q } },
           ],
         }
       : {};
 
-    const cursoWhere = curso_id
-      ? { horarios: { some: { curso_id, deleted_at: null } } }
-      : {};
-
-    const activoWhere =
-      activo !== undefined
-        ? { usuario: { activo } }
-        : {};
+    const cursoWhere  = curso_id ? { horarios: { some: { cursoId: curso_id } } } : {};
+    const activoWhere = activo !== undefined ? { usuario: { activo } } : {};
 
     const where = {
-      deleted_at: null,
+      deletedAt: null,
       ...searchWhere,
       ...cursoWhere,
       ...activoWhere,
@@ -49,14 +42,13 @@ export class DocentesService {
         where,
         skip,
         take: limit,
-        orderBy: [{ apellidos: 'asc' }, { nombres: 'asc' }],
+        orderBy: [{ apellidos: 'asc' }, { nombre: 'asc' }],
         include: {
           usuario: { select: { id: true, email: true, activo: true, rol: true } },
           horarios: {
-            where: { deleted_at: null },
             include: {
-              curso: { select: { id: true, nombre: true, codigo: true } },
-              seccion: { select: { id: true, nombre: true, aula: true } },
+              curso:   { select: { id: true, nombre: true, codigo: true } },
+              seccion: { select: { id: true, nombre: true } },
             },
           },
         },
@@ -72,21 +64,17 @@ export class DocentesService {
     treintaDiasAtras.setDate(treintaDiasAtras.getDate() - 30);
 
     const docente = await this.prisma.docente.findFirst({
-      where: { id, deleted_at: null },
+      where: { id, deletedAt: null },
       include: {
         usuario: { select: { id: true, email: true, activo: true, rol: true } },
         horarios: {
-          where: { deleted_at: null },
           include: {
-            curso: { select: { id: true, nombre: true, codigo: true } },
-            seccion: { select: { id: true, nombre: true, aula: true } },
+            curso:   { select: { id: true, nombre: true, codigo: true } },
+            seccion: { select: { id: true, nombre: true } },
           },
         },
         asistencias: {
-          where: {
-            deleted_at: null,
-            fecha: { gte: treintaDiasAtras },
-          },
+          where: { fecha: { gte: treintaDiasAtras } },
           orderBy: { fecha: 'desc' },
           take: 30,
         },
@@ -99,18 +87,14 @@ export class DocentesService {
 
   async create(dto: CreateDocenteDto) {
     const existingDni = await this.prisma.docente.findFirst({
-      where: { dni: dto.dni, deleted_at: null },
+      where: { dni: dto.dni, deletedAt: null },
     });
-    if (existingDni) {
-      throw new BadRequestException('Ya existe un docente con ese DNI');
-    }
+    if (existingDni) throw new BadRequestException('Ya existe un docente con ese DNI');
 
     const existingEmail = await this.prisma.usuario.findFirst({
-      where: { email: dto.email, deleted_at: null },
+      where: { email: dto.email, deletedAt: null },
     });
-    if (existingEmail) {
-      throw new BadRequestException('Ya existe un usuario con ese email');
-    }
+    if (existingEmail) throw new BadRequestException('Ya existe un usuario con ese email');
 
     const hash = await bcrypt.hash(dto.password, 12);
 
@@ -118,23 +102,21 @@ export class DocentesService {
       const usuario = await tx.usuario.create({
         data: {
           email: dto.email,
-          password_hash: hash,
-          rol: 'docente',
+          passwordHash: hash,
+          rol: Rol.docente,
         },
       });
 
       return tx.docente.create({
         data: {
-          usuario_id: usuario.id,
-          nombres: dto.nombres,
-          apellidos: dto.apellidos,
-          dni: dto.dni,
-          telefono: dto.telefono,
-          especialidad: dto.especialidad,
+          usuarioId:        usuario.id,
+          nombre:           dto.nombres,
+          apellidos:        dto.apellidos,
+          dni:              dto.dni,
+          telefonoWhatsapp: dto.telefono,
+          especialidad:     dto.especialidad,
         },
-        include: {
-          usuario: { select: { id: true, email: true, activo: true } },
-        },
+        include: { usuario: { select: { id: true, email: true, activo: true } } },
       });
     });
   }
@@ -151,20 +133,18 @@ export class DocentesService {
         const userUpdate: Record<string, unknown> = {};
         if (email) {
           const emailExists = await tx.usuario.findFirst({
-            where: { email, deleted_at: null, NOT: { id: docente.usuario_id } },
+            where: { email, deletedAt: null, NOT: { id: docente.usuarioId } },
           });
           if (emailExists) throw new BadRequestException('Ese email ya está en uso');
           userUpdate.email = email;
         }
-        if (password) {
-          userUpdate.password_hash = await bcrypt.hash(password, 12);
-        }
-        await tx.usuario.update({ where: { id: docente.usuario_id }, data: userUpdate });
+        if (password) userUpdate.passwordHash = await bcrypt.hash(password, 12);
+        await tx.usuario.update({ where: { id: docente.usuarioId }, data: userUpdate });
       }
 
       if (rest.dni) {
         const dniExists = await tx.docente.findFirst({
-          where: { dni: rest.dni, deleted_at: null, NOT: { id } },
+          where: { dni: rest.dni, deletedAt: null, NOT: { id } },
         });
         if (dniExists) throw new BadRequestException('Ya existe un docente con ese DNI');
       }
@@ -172,15 +152,13 @@ export class DocentesService {
       return tx.docente.update({
         where: { id },
         data: {
-          ...(rest.nombres !== undefined && { nombres: rest.nombres }),
-          ...(rest.apellidos !== undefined && { apellidos: rest.apellidos }),
-          ...(rest.dni !== undefined && { dni: rest.dni }),
-          ...(rest.telefono !== undefined && { telefono: rest.telefono }),
-          ...(rest.especialidad !== undefined && { especialidad: rest.especialidad }),
+          ...(rest.nombres      !== undefined && { nombre:           rest.nombres }),
+          ...(rest.apellidos    !== undefined && { apellidos:         rest.apellidos }),
+          ...(rest.dni          !== undefined && { dni:               rest.dni }),
+          ...(rest.telefono     !== undefined && { telefonoWhatsapp:  rest.telefono }),
+          ...(rest.especialidad !== undefined && { especialidad:      rest.especialidad }),
         },
-        include: {
-          usuario: { select: { id: true, email: true, activo: true } },
-        },
+        include: { usuario: { select: { id: true, email: true, activo: true } } },
       });
     });
   }
@@ -191,11 +169,11 @@ export class DocentesService {
     return this.prisma.$transaction(async (tx) => {
       const docente = await tx.docente.update({
         where: { id },
-        data: { deleted_at: now },
+        data: { deletedAt: now },
       });
       await tx.usuario.update({
-        where: { id: docente.usuario_id },
-        data: { activo: false, deleted_at: now },
+        where: { id: docente.usuarioId },
+        data: { activo: false, deletedAt: now },
       });
       return { success: true };
     });

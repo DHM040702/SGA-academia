@@ -1,12 +1,6 @@
-import { ApiProperty } from '@nestjs/swagger';
-import {
-  ArrayMinSize,
-  IsArray,
-  IsEnum,
-  IsString,
-  MinLength,
-} from 'class-validator';
-import { CanalComunicado, Rol } from '@prisma/client';
+import { ApiProperty, ApiPropertyOptional } from '@nestjs/swagger';
+import { IsBoolean, IsEnum, IsOptional, IsString, IsUUID, MinLength } from 'class-validator';
+import { TipoDestinatario } from '@prisma/client';
 
 export class CreateComunicadoDto {
   @ApiProperty({ description: 'Título del comunicado', minLength: 3 })
@@ -14,30 +8,33 @@ export class CreateComunicadoDto {
   @MinLength(3)
   titulo: string;
 
-  @ApiProperty({ description: 'Contenido del comunicado' })
+  @ApiProperty({ description: 'Cuerpo / contenido del comunicado' })
   @IsString()
   @MinLength(1)
-  contenido: string;
+  cuerpo: string;
 
-  @ApiProperty({
-    enum: CanalComunicado,
-    isArray: true,
-    description: 'Canales de distribución (al menos 1)',
-    example: ['interno'],
-  })
-  @IsArray()
-  @ArrayMinSize(1)
-  @IsEnum(CanalComunicado, { each: true })
-  canales: CanalComunicado[];
+  @ApiPropertyOptional({ enum: TipoDestinatario, description: 'Tipo de destinatario', default: 'todos' })
+  @IsOptional()
+  @IsEnum(TipoDestinatario)
+  destinatario_tipo?: TipoDestinatario;
 
-  @ApiProperty({
-    enum: Rol,
-    isArray: true,
-    description: 'Roles de destino (al menos 1)',
-    example: ['alumno', 'apoderado'],
-  })
-  @IsArray()
-  @ArrayMinSize(1)
-  @IsEnum(Rol, { each: true })
-  roles_destino: Rol[];
+  @ApiPropertyOptional({ description: 'UUID de la sección (cuando destinatario_tipo = seccion)', format: 'uuid' })
+  @IsOptional()
+  @IsUUID()
+  seccion_id?: string;
+
+  @ApiPropertyOptional({ description: 'Enviar por canal interno del sistema', default: true })
+  @IsOptional()
+  @IsBoolean()
+  canal_sistema?: boolean;
+
+  @ApiPropertyOptional({ description: 'Enviar por WhatsApp via Twilio', default: false })
+  @IsOptional()
+  @IsBoolean()
+  canal_whatsapp?: boolean;
+
+  @ApiPropertyOptional({ description: 'Publicar inmediatamente (establece publicadoAt = ahora)' })
+  @IsOptional()
+  @IsBoolean()
+  publicar_ahora?: boolean;
 }

@@ -13,7 +13,7 @@ export class CursosService {
 
   async findAll() {
     return this.prisma.curso.findMany({
-      where: { deleted_at: null },
+      where: { activo: true },
       orderBy: { nombre: 'asc' },
       include: {
         _count: { select: { horarios: true } },
@@ -23,17 +23,15 @@ export class CursosService {
 
   async findOne(id: string) {
     const curso = await this.prisma.curso.findFirst({
-      where: { id, deleted_at: null },
+      where: { id, activo: true },
       include: {
         horarios: {
-          where: { deleted_at: null },
           include: {
-            docente: { select: { id: true, nombres: true, apellidos: true } },
+            docente: { select: { id: true, nombre: true, apellidos: true } },
             seccion: {
               select: {
                 id: true,
                 nombre: true,
-                aula: true,
                 ciclo: { select: { id: true, nombre: true } },
               },
             },
@@ -49,7 +47,7 @@ export class CursosService {
 
   async create(dto: CreateCursoDto) {
     const existing = await this.prisma.curso.findFirst({
-      where: { codigo: dto.codigo, deleted_at: null },
+      where: { codigo: dto.codigo, activo: true },
     });
     if (existing) {
       throw new BadRequestException(`Ya existe un curso con el código '${dto.codigo}'`);
@@ -68,7 +66,7 @@ export class CursosService {
 
     if (dto.codigo) {
       const existing = await this.prisma.curso.findFirst({
-        where: { codigo: dto.codigo, deleted_at: null, NOT: { id } },
+        where: { codigo: dto.codigo, activo: true, NOT: { id } },
       });
       if (existing) {
         throw new BadRequestException(`Ya existe un curso con el código '${dto.codigo}'`);
@@ -88,7 +86,7 @@ export class CursosService {
     await this.findOne(id);
     await this.prisma.curso.update({
       where: { id },
-      data: { deleted_at: new Date() },
+      data: { activo: false },
     });
     return { success: true };
   }
