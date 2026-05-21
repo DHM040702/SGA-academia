@@ -7,6 +7,7 @@ import { Pill } from '@/components/ui/pill'
 import { Dot } from '@/components/ui/dot'
 import { Avatar } from '@/components/ui/avatar'
 import { Input } from '@/components/ui/input'
+import { ImportExcelModal } from '@/components/alumnos/import-excel-modal'
 import { useAlumnos, useDeleteAlumno, type EstadoAlumno, type FilterAlumnos } from '@/hooks/use-alumnos'
 import { useCiclos, useSecciones } from '@/hooks/use-ciclos'
 import { cn } from '@/lib/utils'
@@ -122,6 +123,7 @@ export default function AlumnosPage() {
   const [cicloId, setCicloId] = React.useState('')
   const [seccionId, setSeccionId] = React.useState('')
   const [openMenu, setOpenMenu] = React.useState<string | null>(null)
+  const [showImport, setShowImport] = React.useState(false)
 
   /* ── Cerrar menú al click fuera ── */
   React.useEffect(() => {
@@ -169,7 +171,7 @@ export default function AlumnosPage() {
         crumbs={['Administración', 'Alumnos']}
         action={
           <>
-            <Btn variant="secondary" size="sm" onClick={() => alert('Importación Excel: próximamente')}>
+            <Btn variant="secondary" size="sm" onClick={() => setShowImport(true)}>
               <Upload size={14} />Importar Excel
             </Btn>
             <Btn variant="secondary" size="sm" onClick={() => alert('Generación de carnets: próximamente')}>
@@ -336,6 +338,10 @@ export default function AlumnosPage() {
           />
         </div>
       </div>
+
+      {showImport && (
+        <ImportExcelModal onClose={() => setShowImport(false)} />
+      )}
     </div>
   )
 }

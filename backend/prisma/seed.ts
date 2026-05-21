@@ -4,7 +4,7 @@
  * Ejecutar: npx prisma db seed
  */
 
-import { PrismaClient, Rol, Turno, TipoPersona, TipoRecurso, TipoDestinatario } from '@prisma/client'
+import { PrismaClient, Rol, Turno, Area, TipoPersona, TipoRecurso, TipoDestinatario } from '@prisma/client'
 import { PrismaPg } from '@prisma/adapter-pg'
 import { Pool } from 'pg'
 import * as bcrypt from 'bcrypt'
@@ -84,12 +84,16 @@ async function main() {
   console.log(`   ✓ Ciclo: ${ciclo.nombre}`)
 
   // ── 4. Secciones ──────────────────────────────────────────────────────────
-  const [secA, secB, secC] = await Promise.all([
-    prisma.seccion.create({ data: { cicloId: ciclo.id, nombre: 'Sección A', turno: Turno.manana, nivel: 'Preuniversitario', cupoMaximo: 40 } }),
-    prisma.seccion.create({ data: { cicloId: ciclo.id, nombre: 'Sección B', turno: Turno.tarde,  nivel: 'Preuniversitario', cupoMaximo: 40 } }),
-    prisma.seccion.create({ data: { cicloId: ciclo.id, nombre: 'Sección C', turno: Turno.noche,  nivel: 'Preuniversitario', cupoMaximo: 35 } }),
+  // Nomenclatura: [Área]-[Turno inicial]  →  A=Ciencias, B=Letras, C=Médicas
+  const [secAM, secAT, secBM, secBT, secCM, secCT] = await Promise.all([
+    prisma.seccion.create({ data: { cicloId: ciclo.id, nombre: 'A-M', turno: Turno.manana, area: Area.ciencias, carrera: 'Ing. Civil, Sistemas, Agronómica',        cupoMaximo: 40 } }),
+    prisma.seccion.create({ data: { cicloId: ciclo.id, nombre: 'A-T', turno: Turno.tarde,  area: Area.ciencias, carrera: 'Ing. Civil, Sistemas, Agronómica',        cupoMaximo: 40 } }),
+    prisma.seccion.create({ data: { cicloId: ciclo.id, nombre: 'B-M', turno: Turno.manana, area: Area.letras,   carrera: 'Derecho, Ciencias Políticas, Economía',   cupoMaximo: 40 } }),
+    prisma.seccion.create({ data: { cicloId: ciclo.id, nombre: 'B-T', turno: Turno.tarde,  area: Area.letras,   carrera: 'Derecho, Ciencias Políticas, Economía',   cupoMaximo: 40 } }),
+    prisma.seccion.create({ data: { cicloId: ciclo.id, nombre: 'C-M', turno: Turno.manana, area: Area.medicas,  carrera: 'Enfermería, Obstetricia, Farmacia',        cupoMaximo: 35 } }),
+    prisma.seccion.create({ data: { cicloId: ciclo.id, nombre: 'C-T', turno: Turno.tarde,  area: Area.medicas,  carrera: 'Enfermería, Obstetricia, Farmacia',        cupoMaximo: 35 } }),
   ])
-  console.log('   ✓ Secciones: A (mañana), B (tarde), C (noche)')
+  console.log('   ✓ Secciones: A-M, A-T (Ciencias) | B-M, B-T (Letras) | C-M, C-T (Médicas)')
 
   // ── 5. Cursos ─────────────────────────────────────────────────────────────
   const [cMat, cFis, cQui, cBio, cLen, cLit] = await Promise.all([
@@ -126,40 +130,44 @@ async function main() {
   console.log('   ✓ Docentes (6)')
 
   // ── 7. Alumnos ───────────────────────────────────────────────────────────
+  // 30 alumnos, 5 por sección
   const alumnosDef = [
-    // ── Sección A (turno mañana) ──────────────────────────────
-    { nombre: 'Ana Sofía',       apellidos: 'Torres García',    dni: '70100001', cod: '100001', seccion: secA },
-    { nombre: 'Diego Alejandro', apellidos: 'Ramírez Cruz',     dni: '70100002', cod: '100002', seccion: secA },
-    { nombre: 'Camila Beatriz',  apellidos: 'Mendoza Espinoza', dni: '70100003', cod: '100003', seccion: secA },
-    { nombre: 'Sebastián Omar',  apellidos: 'Huanca Soto',      dni: '70100004', cod: '100004', seccion: secA },
-    { nombre: 'Valeria Paola',   apellidos: 'Ruiz Chávez',      dni: '70100005', cod: '100005', seccion: secA },
-    { nombre: 'Andrés Felipe',   apellidos: 'López Flores',     dni: '70100006', cod: '100006', seccion: secA },
-    { nombre: 'Luciana Isabel',  apellidos: 'Mamani Paredes',   dni: '70100007', cod: '100007', seccion: secA },
-    { nombre: 'Rodrigo Manuel',  apellidos: 'Quispe Vargas',    dni: '70100008', cod: '100008', seccion: secA },
-    { nombre: 'Isabella F.',     apellidos: 'Salazar Medina',   dni: '70100009', cod: '100009', seccion: secA },
-    { nombre: 'Mateo José',      apellidos: 'Pizarro Castillo', dni: '70100010', cod: '100010', seccion: secA },
-    // ── Sección B (turno tarde) ───────────────────────────────
-    { nombre: 'Valentina',       apellidos: 'Cruz Herrera',     dni: '70100011', cod: '100011', seccion: secB },
-    { nombre: 'Javier Eduardo',  apellidos: 'Morales Díaz',     dni: '70100012', cod: '100012', seccion: secB },
-    { nombre: 'Daniela',         apellidos: 'Vega Romero',      dni: '70100013', cod: '100013', seccion: secB },
-    { nombre: 'Óscar Renato',    apellidos: 'Cano Peña',        dni: '70100014', cod: '100014', seccion: secB },
-    { nombre: 'Fabiola',         apellidos: 'Espinoza Ríos',    dni: '70100015', cod: '100015', seccion: secB },
-    { nombre: 'Gonzalo',         apellidos: 'Reyes Aguirre',    dni: '70100016', cod: '100016', seccion: secB },
-    { nombre: 'Milagros',        apellidos: 'Sánchez Lara',     dni: '70100017', cod: '100017', seccion: secB },
-    { nombre: 'Emilio',          apellidos: 'Peña Ortega',      dni: '70100018', cod: '100018', seccion: secB },
-    { nombre: 'Claudia Renata',  apellidos: 'Aguilar Nieto',    dni: '70100019', cod: '100019', seccion: secB },
-    { nombre: 'Erick Iván',      apellidos: 'Fuentes Palma',    dni: '70100020', cod: '100020', seccion: secB },
-    // ── Sección C (turno noche) ───────────────────────────────
-    { nombre: 'Paula Jimena',    apellidos: 'Torres Díaz',      dni: '70100021', cod: '100021', seccion: secC },
-    { nombre: 'Kevin André',     apellidos: 'Navarro Castro',   dni: '70100022', cod: '100022', seccion: secC },
-    { nombre: 'Natalia',         apellidos: 'Campos Vera',      dni: '70100023', cod: '100023', seccion: secC },
-    { nombre: 'Renzo',           apellidos: 'Villanueva Meza',  dni: '70100024', cod: '100024', seccion: secC },
-    { nombre: 'Fiorella',        apellidos: 'Contreras Quispe', dni: '70100025', cod: '100025', seccion: secC },
-    { nombre: 'Bryan Stiven',    apellidos: 'Tapia Luna',       dni: '70100026', cod: '100026', seccion: secC },
-    { nombre: 'Xiomara',         apellidos: 'Montoya Pacheco',  dni: '70100027', cod: '100027', seccion: secC },
-    { nombre: 'Jesús Alberto',   apellidos: 'Portillo Benites', dni: '70100028', cod: '100028', seccion: secC },
-    { nombre: 'Cinthya',         apellidos: 'Atahuaman Rojas',  dni: '70100029', cod: '100029', seccion: secC },
-    { nombre: 'Víctor Hugo',     apellidos: 'Llanos Guerrero',  dni: '70100030', cod: '100030', seccion: secC },
+    // ── A-M: Ciencias mañana ──────────────────────────────────
+    { nombre: 'Ana Sofía',       apellidos: 'Torres García',    dni: '70100001', cod: '100001', seccion: secAM },
+    { nombre: 'Diego Alejandro', apellidos: 'Ramírez Cruz',     dni: '70100002', cod: '100002', seccion: secAM },
+    { nombre: 'Camila Beatriz',  apellidos: 'Mendoza Espinoza', dni: '70100003', cod: '100003', seccion: secAM },
+    { nombre: 'Sebastián Omar',  apellidos: 'Huanca Soto',      dni: '70100004', cod: '100004', seccion: secAM },
+    { nombre: 'Valeria Paola',   apellidos: 'Ruiz Chávez',      dni: '70100005', cod: '100005', seccion: secAM },
+    // ── A-T: Ciencias tarde ───────────────────────────────────
+    { nombre: 'Andrés Felipe',   apellidos: 'López Flores',     dni: '70100006', cod: '100006', seccion: secAT },
+    { nombre: 'Luciana Isabel',  apellidos: 'Mamani Paredes',   dni: '70100007', cod: '100007', seccion: secAT },
+    { nombre: 'Rodrigo Manuel',  apellidos: 'Quispe Vargas',    dni: '70100008', cod: '100008', seccion: secAT },
+    { nombre: 'Isabella',        apellidos: 'Salazar Medina',   dni: '70100009', cod: '100009', seccion: secAT },
+    { nombre: 'Mateo José',      apellidos: 'Pizarro Castillo', dni: '70100010', cod: '100010', seccion: secAT },
+    // ── B-M: Letras mañana ────────────────────────────────────
+    { nombre: 'Valentina',       apellidos: 'Cruz Herrera',     dni: '70100011', cod: '100011', seccion: secBM },
+    { nombre: 'Javier Eduardo',  apellidos: 'Morales Díaz',     dni: '70100012', cod: '100012', seccion: secBM },
+    { nombre: 'Daniela',         apellidos: 'Vega Romero',      dni: '70100013', cod: '100013', seccion: secBM },
+    { nombre: 'Óscar Renato',    apellidos: 'Cano Peña',        dni: '70100014', cod: '100014', seccion: secBM },
+    { nombre: 'Fabiola',         apellidos: 'Espinoza Ríos',    dni: '70100015', cod: '100015', seccion: secBM },
+    // ── B-T: Letras tarde ─────────────────────────────────────
+    { nombre: 'Gonzalo',         apellidos: 'Reyes Aguirre',    dni: '70100016', cod: '100016', seccion: secBT },
+    { nombre: 'Milagros',        apellidos: 'Sánchez Lara',     dni: '70100017', cod: '100017', seccion: secBT },
+    { nombre: 'Emilio',          apellidos: 'Peña Ortega',      dni: '70100018', cod: '100018', seccion: secBT },
+    { nombre: 'Claudia Renata',  apellidos: 'Aguilar Nieto',    dni: '70100019', cod: '100019', seccion: secBT },
+    { nombre: 'Erick Iván',      apellidos: 'Fuentes Palma',    dni: '70100020', cod: '100020', seccion: secBT },
+    // ── C-M: Médicas mañana ───────────────────────────────────
+    { nombre: 'Paula Jimena',    apellidos: 'Torres Díaz',      dni: '70100021', cod: '100021', seccion: secCM },
+    { nombre: 'Kevin André',     apellidos: 'Navarro Castro',   dni: '70100022', cod: '100022', seccion: secCM },
+    { nombre: 'Natalia',         apellidos: 'Campos Vera',      dni: '70100023', cod: '100023', seccion: secCM },
+    { nombre: 'Renzo',           apellidos: 'Villanueva Meza',  dni: '70100024', cod: '100024', seccion: secCM },
+    { nombre: 'Fiorella',        apellidos: 'Contreras Quispe', dni: '70100025', cod: '100025', seccion: secCM },
+    // ── C-T: Médicas tarde ────────────────────────────────────
+    { nombre: 'Bryan Stiven',    apellidos: 'Tapia Luna',       dni: '70100026', cod: '100026', seccion: secCT },
+    { nombre: 'Xiomara',         apellidos: 'Montoya Pacheco',  dni: '70100027', cod: '100027', seccion: secCT },
+    { nombre: 'Jesús Alberto',   apellidos: 'Portillo Benites', dni: '70100028', cod: '100028', seccion: secCT },
+    { nombre: 'Cinthya',         apellidos: 'Atahuaman Rojas',  dni: '70100029', cod: '100029', seccion: secCT },
+    { nombre: 'Víctor Hugo',     apellidos: 'Llanos Guerrero',  dni: '70100030', cod: '100030', seccion: secCT },
   ]
 
   const alumnos = await Promise.all(
@@ -181,7 +189,7 @@ async function main() {
       }),
     ),
   )
-  console.log('   ✓ Alumnos (30): 10 por sección')
+  console.log('   ✓ Alumnos (30): 5 por sección')
 
   // ── 8. Apoderados ────────────────────────────────────────────────────────
   type ApoderadoDef = { nombre: string; apellidos: string; dni: string; tel: string; email: string; hijoIdxs: number[] }
@@ -215,51 +223,53 @@ async function main() {
   console.log('   ✓ Apoderados (3) vinculados a alumnos')
 
   // ── 9. Horarios ──────────────────────────────────────────────────────────
-  // Distribución por día:
-  //  Lun/Jue → MAT 2h + FIS 2h
-  //  Mar/Vie → QUI 2h + BIO 2h
-  //  Mié/Sáb → LEN 2h + LIT 2h
-  // Sección A: 07-09 / 09-11  |  B: 13-15 / 15-17  |  C: 18-20 / 20-22
+  // Lun/Jue → MAT 2h + FIS 2h  |  Mar/Vie → QUI 2h + BIO 2h  |  Mié/Sáb → LEN 2h + LIT 2h
+  // Aulas: C-001/C-002 (Ciencias) | L-001/L-002 (Letras) | M-002 (Médicas)
 
   const cursoToDocente = new Map(docentesDef.map((d, i) => [d.cursoId, docentes[i].id]))
 
-  type SlotDef = { dia: number; hi: number; hf: number; cursoId: string; aula: string }
+  // Slots con offset de horas relativo al inicio del turno (0=inicio, 2=segunda clase)
+  type SlotDef = { dia: number; hi: number; hf: number; cursoId: string }
   const slots: SlotDef[] = [
-    { dia: 1, hi: 7,  hf: 9,  cursoId: cMat.id, aula: 'Aula 101' },
-    { dia: 1, hi: 9,  hf: 11, cursoId: cFis.id, aula: 'Lab Física' },
-    { dia: 2, hi: 7,  hf: 9,  cursoId: cQui.id, aula: 'Lab Química' },
-    { dia: 2, hi: 9,  hf: 11, cursoId: cBio.id, aula: 'Lab Biología' },
-    { dia: 3, hi: 7,  hf: 9,  cursoId: cLen.id, aula: 'Aula 102' },
-    { dia: 3, hi: 9,  hf: 11, cursoId: cLit.id, aula: 'Aula 103' },
-    { dia: 4, hi: 7,  hf: 9,  cursoId: cMat.id, aula: 'Aula 101' },
-    { dia: 4, hi: 9,  hf: 11, cursoId: cFis.id, aula: 'Lab Física' },
-    { dia: 5, hi: 7,  hf: 9,  cursoId: cQui.id, aula: 'Lab Química' },
-    { dia: 5, hi: 9,  hf: 11, cursoId: cBio.id, aula: 'Lab Biología' },
-    { dia: 6, hi: 7,  hf: 9,  cursoId: cLen.id, aula: 'Aula 102' },
-    { dia: 6, hi: 9,  hf: 11, cursoId: cLit.id, aula: 'Aula 103' },
+    { dia: 1, hi: 0, hf: 2, cursoId: cMat.id },
+    { dia: 1, hi: 2, hf: 4, cursoId: cFis.id },
+    { dia: 2, hi: 0, hf: 2, cursoId: cQui.id },
+    { dia: 2, hi: 2, hf: 4, cursoId: cBio.id },
+    { dia: 3, hi: 0, hf: 2, cursoId: cLen.id },
+    { dia: 3, hi: 2, hf: 4, cursoId: cLit.id },
+    { dia: 4, hi: 0, hf: 2, cursoId: cMat.id },
+    { dia: 4, hi: 2, hf: 4, cursoId: cFis.id },
+    { dia: 5, hi: 0, hf: 2, cursoId: cQui.id },
+    { dia: 5, hi: 2, hf: 4, cursoId: cBio.id },
+    { dia: 6, hi: 0, hf: 2, cursoId: cLen.id },
+    { dia: 6, hi: 2, hf: 4, cursoId: cLit.id },
   ]
 
-  const seccionOffsets: Array<{ sec: typeof secA; dh: number; suffix: string }> = [
-    { sec: secA, dh: 0,  suffix: '' },
-    { sec: secB, dh: 6,  suffix: ' B' },
-    { sec: secC, dh: 11, suffix: ' C' },
+  type SeccionConfig = { sec: { id: string }; baseH: number; aula: string }
+  const seccionConfigs: SeccionConfig[] = [
+    { sec: secAM, baseH: 7,  aula: 'C-001' },
+    { sec: secAT, baseH: 13, aula: 'C-002' },
+    { sec: secBM, baseH: 7,  aula: 'L-001' },
+    { sec: secBT, baseH: 13, aula: 'L-002' },
+    { sec: secCM, baseH: 7,  aula: 'M-002' },
+    { sec: secCT, baseH: 13, aula: 'M-002' },
   ]
 
-  const horariosData = seccionOffsets.flatMap(({ sec, dh, suffix }) =>
+  const horariosData = seccionConfigs.flatMap(({ sec, baseH, aula }) =>
     slots.map((s) => ({
       seccionId:  sec.id,
       cursoId:    s.cursoId,
       docenteId:  cursoToDocente.get(s.cursoId)!,
       diaSemana:  s.dia,
-      horaInicio: new Date(`1970-01-01T${pad(s.hi + dh)}:00:00.000Z`),
-      horaFin:    new Date(`1970-01-01T${pad(s.hf + dh)}:00:00.000Z`),
-      aula:       s.aula + suffix,
+      horaInicio: new Date(`1970-01-01T${pad(baseH + s.hi)}:00:00.000Z`),
+      horaFin:    new Date(`1970-01-01T${pad(baseH + s.hf)}:00:00.000Z`),
+      aula,
       publicado:  true,
     })),
   )
 
   await prisma.horario.createMany({ data: horariosData })
-  console.log(`   ✓ Horarios (${horariosData.length}: 12 × 3 secciones)`)
+  console.log(`   ✓ Horarios (${horariosData.length}: 12 × 6 secciones)`)
 
   // ── 10. Asistencias ──────────────────────────────────────────────────────
   const today = new Date('2026-05-20')
@@ -272,8 +282,8 @@ async function main() {
   }> = []
 
   for (let ai = 0; ai < alumnos.length; ai++) {
-    const secIdx = Math.floor(ai / 10)           // 0=A 07h, 1=B 13h, 2=C 18h
-    const baseH  = [7, 13, 18][secIdx]
+    const secIdx = Math.floor(ai / 5)            // 0=AM 07h, 1=AT 13h, 2=BM 07h, 3=BT 13h, 4=CM 07h, 5=CT 13h
+    const baseH  = [7, 13, 7, 13, 7, 13][secIdx]
     for (let di = 0; di < schoolDays.length; di++) {
       const v = det(ai, di)
       if (v < 5) continue                         // 5 % ausencia
@@ -342,7 +352,7 @@ async function main() {
       cuerpo: 'El sábado 24 de mayo se realizará el simulacro de examen de admisión.\n\nHorario: 8:00 am – 12:00 pm\nLugar: Pabellón Central\n\nEs obligatoria la asistencia. Traer: lápiz HB, lapicero azul, borrador y código de barras de estudiante.\n\nResultados disponibles el lunes 27 en el portal del alumno.',
       destinatarioTipo: TipoDestinatario.seccion,
       canalWhatsapp: true,
-      seccionId: secA.id,
+      seccionId: secAM.id,
       daysAgo: 6,
     },
     {
@@ -419,7 +429,7 @@ async function main() {
   console.log('  roberto.torres@gmail.com        → apoderado123')
   console.log('═══════════════════════════════════════════════════════════════')
   console.log(`  Ciclo 2026-I · Mar–Jul 2026 · ACTIVO`)
-  console.log(`  30 alumnos (10 × sección A/B/C)`)
+  console.log(`  30 alumnos (5 × sección A-M/A-T/B-M/B-T/C-M/C-T)`)
   console.log(`  ${schoolDays.length} días escolares con asistencia registrada`)
 }
 

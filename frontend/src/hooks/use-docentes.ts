@@ -3,8 +3,20 @@ import api from '@/lib/api'
 
 export interface DocenteHorario {
   id: string
+  diaSemana: number
+  horaInicio: string
+  horaFin: string
+  aula?: string | null
   curso: { id: string; nombre: string; codigo: string }
   seccion: { id: string; nombre: string }
+}
+
+export interface DocenteAsistencia {
+  id: string
+  fecha: string
+  horaIngreso?: string | null
+  esTardanza: boolean
+  esManual: boolean
 }
 
 export interface Docente {
@@ -19,6 +31,7 @@ export interface Docente {
   deletedAt?: string | null
   usuario: { id: string; email: string; activo: boolean }
   horarios?: DocenteHorario[]
+  asistencias?: DocenteAsistencia[]
   asistencia_pct?: number
   ultima_marca?: string | null
 }

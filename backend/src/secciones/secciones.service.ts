@@ -10,7 +10,7 @@ export class SeccionesService {
   async findAll(ciclo_id?: string) {
     return this.prisma.seccion.findMany({
       where: ciclo_id ? { cicloId: ciclo_id } : undefined,
-      orderBy: [{ ciclo: { fechaInicio: 'desc' } }, { nombre: 'asc' }],
+      orderBy: [{ ciclo: { fechaInicio: 'desc' } }, { area: 'asc' }, { turno: 'asc' }, { nombre: 'asc' }],
       include: {
         ciclo: { select: { id: true, nombre: true, activo: true } },
         _count: { select: { alumnos: true, horarios: true } },
@@ -51,7 +51,8 @@ export class SeccionesService {
         nombre:     dto.nombre,
         cicloId:    dto.ciclo_id,
         turno:      dto.turno,
-        nivel:      dto.nivel,
+        area:       dto.area,
+        carrera:    dto.carrera,
         cupoMaximo: dto.cupo_maximo,
       },
       include: { ciclo: { select: { id: true, nombre: true } } },
@@ -72,7 +73,8 @@ export class SeccionesService {
         ...(dto.nombre      !== undefined && { nombre:     dto.nombre }),
         ...(dto.ciclo_id    !== undefined && { cicloId:    dto.ciclo_id }),
         ...(dto.turno       !== undefined && { turno:      dto.turno }),
-        ...(dto.nivel       !== undefined && { nivel:      dto.nivel }),
+        ...(dto.area        !== undefined && { area:       dto.area }),
+        ...(dto.carrera     !== undefined && { carrera:    dto.carrera }),
         ...(dto.cupo_maximo !== undefined && { cupoMaximo: dto.cupo_maximo }),
       },
       include: { ciclo: { select: { id: true, nombre: true } } },
@@ -81,7 +83,6 @@ export class SeccionesService {
 
   async remove(id: string) {
     await this.findOne(id);
-    // Verificar si hay alumnos o comunicados vinculados
     const alumnos = await this.prisma.alumno.count({ where: { seccionId: id, deletedAt: null } });
     if (alumnos > 0) throw new BadRequestException('No se puede eliminar una sección con alumnos');
     await this.prisma.seccion.delete({ where: { id } });

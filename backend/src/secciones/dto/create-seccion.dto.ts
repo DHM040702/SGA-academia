@@ -1,9 +1,9 @@
 import { ApiProperty, ApiPropertyOptional } from '@nestjs/swagger';
 import { IsEnum, IsInt, IsNotEmpty, IsOptional, IsString, IsUUID, Min } from 'class-validator';
-import { Turno } from '@prisma/client';
+import { Area, Turno } from '@prisma/client';
 
 export class CreateSeccionDto {
-  @ApiProperty({ example: 'Sección A', description: 'Nombre de la sección' })
+  @ApiProperty({ example: 'A-M', description: 'Código de la sección (ej. A-M, B-T, C-M)' })
   @IsString()
   @IsNotEmpty()
   nombre: string;
@@ -13,14 +13,18 @@ export class CreateSeccionDto {
   @IsNotEmpty()
   ciclo_id: string;
 
-  @ApiProperty({ enum: Turno, description: 'Turno de la sección' })
+  @ApiProperty({ enum: Turno, description: 'Turno: manana o tarde' })
   @IsEnum(Turno)
   turno: Turno;
 
-  @ApiPropertyOptional({ example: '5to Secundaria', description: 'Nivel académico' })
+  @ApiProperty({ enum: Area, description: 'Área académica: ciencias, letras o medicas' })
+  @IsEnum(Area)
+  area: Area;
+
+  @ApiPropertyOptional({ example: 'Ing. Civil, Sistemas, Agronómica', description: 'Carreras profesionales objetivo' })
   @IsOptional()
   @IsString()
-  nivel?: string;
+  carrera?: string;
 
   @ApiPropertyOptional({ example: 40, description: 'Cupo máximo de alumnos', minimum: 1 })
   @IsOptional()

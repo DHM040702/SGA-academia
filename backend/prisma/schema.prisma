@@ -24,7 +24,12 @@ enum Rol {
 enum Turno {
   manana
   tarde
-  noche
+}
+
+enum Area {
+  ciencias  // A — Ciencias (Ing. Civil, Sistemas, Agronómica…)
+  letras    // B — Letras (Derecho, Economía, CC.PP…)
+  medicas   // C — Médicas (Enfermería, Obstetricia, Farmacia…)
 }
 
 enum TipoPersona {
@@ -86,6 +91,22 @@ model Usuario {
 }
 
 // ─────────────────────────────────────────
+// CARRERAS
+// ─────────────────────────────────────────
+
+model Carrera {
+  id     String  @id @default(dbgenerated("gen_random_uuid()")) @db.Uuid
+  nombre String  @db.VarChar(100)
+  area   Area
+  activo Boolean @default(true)
+
+  // Relaciones
+  alumnos Alumno[]
+
+  @@map("carreras")
+}
+
+// ─────────────────────────────────────────
 // ALUMNOS
 // ─────────────────────────────────────────
 
@@ -100,6 +121,7 @@ model Alumno {
   codigoBarras    String    @unique @map("codigo_barras") @db.VarChar(6)
   fotoUrl         String?   @map("foto_url") @db.VarChar(500)
   seccionId       String?   @map("seccion_id") @db.Uuid
+  carreraId       String?   @map("carrera_id") @db.Uuid
   createdAt       DateTime  @default(now()) @map("created_at") @db.Timestamptz
   updatedAt       DateTime  @updatedAt @map("updated_at") @db.Timestamptz
   deletedAt       DateTime? @map("deleted_at") @db.Timestamptz
@@ -107,6 +129,7 @@ model Alumno {
   // Relaciones
   usuario     Usuario              @relation(fields: [usuarioId], references: [id])
   seccion     Seccion?             @relation(fields: [seccionId], references: [id])
+  carrera     Carrera?             @relation(fields: [carreraId], references: [id])
   apoderados  AlumnoApoderado[]
   asistencias Asistencia[]
 
@@ -199,12 +222,13 @@ model Ciclo {
 // ─────────────────────────────────────────
 
 model Seccion {
-  id          String  @id @default(dbgenerated("gen_random_uuid()")) @db.Uuid
-  cicloId     String  @map("ciclo_id") @db.Uuid
-  nombre      String  @db.VarChar(50)
+  id          String   @id @default(dbgenerated("gen_random_uuid()")) @db.Uuid
+  cicloId     String   @map("ciclo_id") @db.Uuid
+  nombre      String   @db.VarChar(50)
   turno       Turno
-  nivel       String? @db.VarChar(50)
-  cupoMaximo  Int     @default(40) @map("cupo_maximo")
+  area        Area
+  carrera     String?  @map("nivel") @db.VarChar(150)
+  cupoMaximo  Int      @default(40) @map("cupo_maximo")
   createdAt   DateTime @default(now()) @map("created_at") @db.Timestamptz
 
   // Relaciones

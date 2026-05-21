@@ -10,14 +10,13 @@ import { Btn } from '@/components/ui/btn'
 import { PageHeader } from '@/components/layout/page-header'
 import { Plus, Eye, Calendar, MoreHorizontal } from '@/components/icons'
 
-const TURNO_LABEL: Record<string, string> = { manana: 'Mañana', tarde: 'Tarde', noche: 'Noche' }
-const SECCION_COLORS = [
-  'oklch(0.55 0.13 240)',
-  'oklch(0.55 0.13 145)',
-  'oklch(0.55 0.13 30)',
-  'oklch(0.55 0.13 280)',
-  'oklch(0.55 0.13 60)',
-]
+const TURNO_LABEL: Record<string, string> = { manana: 'Mañana', tarde: 'Tarde' }
+const AREA_LABEL: Record<string, string> = { ciencias: 'Área A — Ciencias', letras: 'Área B — Letras', medicas: 'Área C — Médicas' }
+const AREA_COLOR: Record<string, string> = {
+  ciencias: 'oklch(0.42 0.12 240)',
+  letras:   'oklch(0.50 0.13 50)',
+  medicas:  'oklch(0.42 0.12 155)',
+}
 
 function formatDate(s: string) {
   return new Date(s).toLocaleDateString('es-PE', { day: '2-digit', month: 'short', year: 'numeric' })
@@ -121,8 +120,8 @@ export default function CiclosPage() {
         {/* Secciones del ciclo activo */}
         {secciones.length > 0 && (
           <div className="grid gap-3.5" style={{ gridTemplateColumns: `repeat(${Math.min(secciones.length, 3)}, 1fr)` }}>
-            {secciones.map((s, idx) => {
-              const col = SECCION_COLORS[idx % SECCION_COLORS.length]
+            {secciones.map((s) => {
+              const col = AREA_COLOR[s.area] ?? 'oklch(0.42 0.10 255)'
               return (
                 <Card key={s.id}>
                   <div className="p-[18px]">
@@ -138,9 +137,12 @@ export default function CiclosPage() {
                           <h3 className="font-serif text-[17px] font-semibold m-0">{s.nombre}</h3>
                         </div>
                         <div className="mt-1.5 text-[12.5px] text-text-mute">
-                          {TURNO_LABEL[s.turno] ?? s.turno}
-                          {s.nivel && ` · ${s.nivel}`}
+                          {s.ciclo?.nombre ?? '—'} · {TURNO_LABEL[s.turno] ?? s.turno}
                         </div>
+                        <div className="mt-0.5 text-[11px] text-text-soft">{AREA_LABEL[s.area] ?? s.area}</div>
+                        {s.carrera && (
+                          <div className="mt-0.5 text-[11px] text-text-soft leading-tight opacity-75">{s.carrera}</div>
+                        )}
                       </div>
                       <Btn variant="ghost" size="sm" style={{ padding: 4 }}>
                         <MoreHorizontal size={16} />

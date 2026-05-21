@@ -16,8 +16,9 @@ export interface Ciclo {
 export interface Seccion {
   id: string
   nombre: string
-  turno: 'manana' | 'tarde' | 'noche'
-  nivel?: string | null
+  turno: 'manana' | 'tarde'
+  area: 'ciencias' | 'letras' | 'medicas'
+  carrera?: string | null
   cupoMaximo: number
   cicloId: string
   ciclo?: { id: string; nombre: string; activo: boolean }

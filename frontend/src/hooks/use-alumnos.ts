@@ -88,3 +88,22 @@ export function useDeleteAlumno() {
     onSuccess: () => qc.invalidateQueries({ queryKey: ['alumnos'] }),
   })
 }
+
+export interface ImportResult {
+  ok: number
+  errores: { fila: number; msg: string }[]
+}
+
+export function useImportarAlumnos() {
+  const qc = useQueryClient()
+  return useMutation({
+    mutationFn: (file: File): Promise<ImportResult> => {
+      const form = new FormData()
+      form.append('file', file)
+      return api.post('/alumnos/import', form, {
+        headers: { 'Content-Type': 'multipart/form-data' },
+      }).then((r) => r.data)
+    },
+    onSuccess: () => qc.invalidateQueries({ queryKey: ['alumnos'] }),
+  })
+}
