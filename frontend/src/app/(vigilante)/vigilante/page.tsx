@@ -34,7 +34,10 @@ export default function VigilantePage() {
   const [scanState, setScanState] = useState<ScanState>('idle')
   const [lastScan, setLastScan] = useState<LastScan | null>(null)
   const [errorMsg, setErrorMsg] = useState('')
+  const [manualCode, setManualCode] = useState('')
+  const [inputFocused, setInputFocused] = useState(false)
   const bufferTimer = useRef<ReturnType<typeof setTimeout> | undefined>(undefined)
+  const manualInputRef = useRef<HTMLInputElement>(null)
 
   // Live feed
   const { data: page } = useAsistencia({ fecha: TODAY, limit: 20 })
@@ -49,46 +52,58 @@ export default function VigilantePage() {
     return () => clearInterval(id)
   }, [])
 
+  function processCode(code: string) {
+    if (!code || scanMut.isPending) return
+    scanMut
+      .mutateAsync({ codigo: code })
+      .then((result) => {
+        const alumno = result?.alumno
+        const docente = result?.docente
+        const persona = alumno ?? docente
+        setLastScan({
+          nombre: persona
+            ? `${persona.nombre ?? (persona as any).nombres} ${persona.apellidos}`
+            : code,
+          codigo: code,
+          seccion: alumno?.aula?.nombre ?? '—',
+          hora: new Date().toLocaleTimeString('es-PE', { hour: '2-digit', minute: '2-digit' }),
+          esTardanza: result?.esTardanza ?? false,
+        })
+        setScanState('success')
+        setTimeout(() => setScanState('idle'), 4000)
+      })
+      .catch((err) => {
+        const msg = err?.response?.data?.message ?? 'Código no encontrado'
+        setErrorMsg(typeof msg === 'string' ? msg : JSON.stringify(msg))
+        setScanState('error')
+        setTimeout(() => setScanState('idle'), 3000)
+      })
+  }
+
+  function submitManual() {
+    const code = manualCode.trim()
+    if (!code) return
+    setManualCode('')
+    processCode(code)
+  }
+
   // HID barcode reader: listen for keystrokes, collect 6-char buffer, submit on Enter
   const handleKeyDown = useCallback(
     (e: KeyboardEvent) => {
+      if (inputFocused) return  // manual input handles its own keys
       if (e.key === 'Enter') {
         const code = buffer.trim()
         setBuffer('')
         clearTimeout(bufferTimer.current)
-        if (code.length >= 4) {
-          scanMut
-            .mutateAsync({ codigo: code })
-            .then((result) => {
-              const alumno = result?.alumno
-              const docente = result?.docente
-              const persona = alumno ?? docente
-              setLastScan({
-                nombre: persona
-                  ? `${persona.nombre ?? (persona as any).nombres} ${persona.apellidos}`
-                  : code,
-                codigo: code,
-                seccion: alumno?.seccion?.nombre ?? '—',
-                hora: new Date().toLocaleTimeString('es-PE', { hour: '2-digit', minute: '2-digit' }),
-                esTardanza: result?.esTardanza ?? false,
-              })
-              setScanState('success')
-              setTimeout(() => setScanState('idle'), 4000)
-            })
-            .catch((err) => {
-              const msg = err?.response?.data?.message ?? 'Código no encontrado'
-              setErrorMsg(typeof msg === 'string' ? msg : JSON.stringify(msg))
-              setScanState('error')
-              setTimeout(() => setScanState('idle'), 3000)
-            })
-        }
+        if (code.length >= 4) processCode(code)
       } else if (e.key.length === 1) {
         setBuffer((b) => b + e.key)
         clearTimeout(bufferTimer.current)
         bufferTimer.current = setTimeout(() => setBuffer(''), 300)
       }
     },
-    [buffer, scanMut],
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+    [buffer, inputFocused],
   )
 
   useEffect(() => {
@@ -119,7 +134,7 @@ export default function VigilantePage() {
           <div className="font-serif text-[18px] font-semibold tracking-tight">
             <span style={{ color: accentColor }}>CEPREUNASAM</span>
             <span className="text-white/50 mx-1.5">·</span>
-            <span className="text-white/80 text-[14px] font-normal">Sistema de Asistencia</span>
+            <span className="text-white/80 text-[14px] font-normal">Registro con lectora HID</span>
           </div>
           <div className="flex-1" />
           <div
@@ -171,8 +186,12 @@ export default function VigilantePage() {
                     </h1>
                     <div className="mt-3 text-[16px] opacity-75">
                       <span className="font-mono">{lastScan.codigo}</span>
-                      <span className="mx-2.5 opacity-40">·</span>
-                      <span>Sección {lastScan.seccion}</span>
+                      {lastScan.seccion !== '—' && (
+                        <>
+                          <span className="mx-2.5 opacity-40">·</span>
+                          <span>Aula {lastScan.seccion}</span>
+                        </>
+                      )}
                     </div>
                     <div
                       className="inline-flex items-center gap-2.5 mt-6 px-5 py-3 rounded-full text-[16px] font-semibold"
@@ -218,7 +237,7 @@ export default function VigilantePage() {
                   {lastScan.nombre}
                 </h1>
                 <div className="mt-3 text-[16px] opacity-80">
-                  {lastScan.codigo} · Sección {lastScan.seccion}
+                  {lastScan.codigo}{lastScan.seccion !== '—' ? ` · Aula ${lastScan.seccion}` : ''}
                 </div>
                 <div
                   className="inline-flex items-center gap-2.5 mt-6 px-5 py-3 rounded-full text-[16px] font-semibold"
@@ -262,6 +281,39 @@ export default function VigilantePage() {
                 </div>
               </div>
               <kbd className="ml-2 px-2 py-1 bg-white/10 rounded text-[11px] font-mono">↵</kbd>
+            </div>
+
+            {/* Manual code input — fallback when HID fails */}
+            <div className="mx-auto mt-5 w-full max-w-sm">
+              <div className="text-[11px] tracking-[0.12em] uppercase opacity-50 mb-2 text-center">
+                Ingreso manual de código
+              </div>
+              <div className="flex gap-2">
+                <input
+                  ref={manualInputRef}
+                  type="text"
+                  value={manualCode}
+                  onChange={e => setManualCode(e.target.value)}
+                  onFocus={() => setInputFocused(true)}
+                  onBlur={() => setInputFocused(false)}
+                  onKeyDown={e => { if (e.key === 'Enter') { e.preventDefault(); submitManual() } }}
+                  placeholder="Código de alumno o DNI docente…"
+                  className="flex-1 px-3 py-2.5 text-[13px] rounded-2 font-mono outline-none"
+                  style={{
+                    background: 'rgba(255,255,255,.08)',
+                    border: inputFocused ? '1px solid rgba(138,168,255,.6)' : '1px solid rgba(255,255,255,.15)',
+                    color: '#fff',
+                  }}
+                />
+                <button
+                  onClick={submitManual}
+                  disabled={!manualCode.trim() || scanMut.isPending}
+                  className="px-4 py-2 text-[13px] font-semibold rounded-2 transition-opacity disabled:opacity-30"
+                  style={{ background: 'rgba(138,168,255,.2)', color: '#8aa8ff', border: '1px solid rgba(138,168,255,.3)' }}
+                >
+                  Registrar
+                </button>
+              </div>
             </div>
           </div>
         </div>
@@ -348,7 +400,7 @@ export default function VigilantePage() {
         <div className="px-4 py-3.5" style={{ borderTop: '1px solid rgba(255,255,255,0.06)', background: 'rgba(0,0,0,.15)' }}>
           <div className="text-[11px] opacity-55 tracking-[0.06em] uppercase mb-2">Atajos de teclado</div>
           <div className="grid gap-1.5 text-[12px]" style={{ gridTemplateColumns: 'auto 1fr' }}>
-            <Kbd>F2</Kbd><span className="opacity-85">Registro manual por DNI</span>
+            <Kbd>↵</Kbd><span className="opacity-85">Confirmar código escaneado</span>
             <Kbd>Esc</Kbd><span className="opacity-85">Limpiar pantalla</span>
           </div>
         </div>

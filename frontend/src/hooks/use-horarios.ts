@@ -37,7 +37,7 @@ export function useHorarios(filters: FilterHorarios = {}) {
   return useQuery({
     queryKey: ['horarios', filters],
     queryFn: async () => {
-      const { data } = await api.get('/horarios', { params: { ...filters, limit: 200 } })
+      const { data } = await api.get('/horarios', { params: { ...filters, limit: filters.limit ?? 200 } })
       return data
     },
     placeholderData: (prev) => prev,

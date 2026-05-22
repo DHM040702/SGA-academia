@@ -48,7 +48,7 @@ export class DocentesService {
           horarios: {
             include: {
               curso:   { select: { id: true, nombre: true, codigo: true } },
-              seccion: { select: { id: true, nombre: true } },
+              aula: { select: { id: true, nombre: true } },
             },
           },
         },
@@ -70,7 +70,7 @@ export class DocentesService {
         horarios: {
           include: {
             curso:   { select: { id: true, nombre: true, codigo: true } },
-            seccion: { select: { id: true, nombre: true } },
+            aula: { select: { id: true, nombre: true } },
           },
         },
         asistencias: {

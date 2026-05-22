@@ -5,6 +5,7 @@ import { paginate } from '../common/dto/pagination.dto';
 import type { RegisterScanDto } from './dto/register-scan.dto';
 import type { ManualCorrectionDto } from './dto/manual-correction.dto';
 import type { FilterAsistenciaDto } from './dto/filter-asistencia.dto';
+import type { CreateManualAsistenciaDto } from './dto/create-manual-asistencia.dto';
 
 @Injectable()
 export class AsistenciaService {
@@ -48,7 +49,7 @@ export class AsistenciaService {
         fecha: today,
       },
       include: {
-        alumno:  { select: { nombre: true, apellidos: true, codigoBarras: true, seccion: { select: { id: true, nombre: true } } } },
+        alumno:  { select: { nombre: true, apellidos: true, codigoBarras: true, aula: { select: { id: true, nombre: true } } } },
         docente: { select: { nombre: true, apellidos: true, dni: true } },
       },
     });
@@ -58,10 +59,10 @@ export class AsistenciaService {
     let esTardanza = false;
     if (alumnoId) {
       const alumno = await this.prisma.alumno.findUnique({ where: { id: alumnoId } });
-      if (alumno?.seccionId) {
+      if (alumno?.aulaId) {
         const diaSemana = now.getDay(); // 0=Dom, 1=Lun…
         const horario = await this.prisma.horario.findFirst({
-          where: { seccionId: alumno.seccionId, diaSemana },
+          where: { aulaId: alumno.aulaId, diaSemana },
           orderBy: { horaInicio: 'asc' },
         });
         if (horario) {
@@ -87,9 +88,54 @@ export class AsistenciaService {
         alumno:  {
           select: {
             nombre: true, apellidos: true, codigoBarras: true,
-            seccion: { select: { id: true, nombre: true } },
+            aula: { select: { id: true, nombre: true } },
           },
         },
+        docente: { select: { nombre: true, apellidos: true, dni: true } },
+      },
+    });
+  }
+
+  async createManual(dto: CreateManualAsistenciaDto, registradoPorId: string) {
+    if (dto.tipo_persona === TipoPersona.alumno) {
+      if (!dto.alumno_id) throw new BadRequestException('alumno_id es requerido para tipo alumno');
+      const alumno = await this.prisma.alumno.findFirst({ where: { id: dto.alumno_id, deletedAt: null } });
+      if (!alumno) throw new NotFoundException('Alumno no encontrado');
+    } else {
+      if (!dto.docente_id) throw new BadRequestException('docente_id es requerido para tipo docente');
+      const docente = await this.prisma.docente.findFirst({ where: { id: dto.docente_id, deletedAt: null } });
+      if (!docente) throw new NotFoundException('Docente no encontrado');
+    }
+
+    const [year, month, day] = dto.fecha.split('-').map(Number);
+    const fechaDate   = new Date(year, month - 1, day);
+    const [hh, mm]    = dto.hora_llegada.split(':').map(Number);
+    const horaIngreso = new Date(year, month - 1, day, hh, mm, 0);
+
+    const existente = await this.prisma.asistencia.findFirst({
+      where: {
+        tipoPersona: dto.tipo_persona,
+        ...(dto.alumno_id  ? { alumnoId:  dto.alumno_id  } : {}),
+        ...(dto.docente_id ? { docenteId: dto.docente_id } : {}),
+        fecha: fechaDate,
+      },
+    });
+    if (existente) throw new BadRequestException('Ya existe un registro de asistencia para esta persona en esa fecha');
+
+    return this.prisma.asistencia.create({
+      data: {
+        tipoPersona:    dto.tipo_persona,
+        alumnoId:       dto.alumno_id  ?? null,
+        docenteId:      dto.docente_id ?? null,
+        fecha:          fechaDate,
+        horaIngreso,
+        esTardanza:     dto.es_tardanza  ?? false,
+        esManual:       true,
+        motivoManual:   dto.observacion  ?? null,
+        registradoPorId,
+      },
+      include: {
+        alumno:  { select: { nombre: true, apellidos: true, codigoBarras: true, aula: { select: { id: true, nombre: true } } } },
         docente: { select: { nombre: true, apellidos: true, dni: true } },
       },
     });
@@ -122,7 +168,7 @@ export class AsistenciaService {
           alumno:  {
             select: {
               nombre: true, apellidos: true, codigoBarras: true,
-              seccion: { select: { id: true, nombre: true } },
+              aula: { select: { id: true, nombre: true } },
             },
           },
           docente: { select: { nombre: true, apellidos: true, dni: true } },
@@ -172,7 +218,7 @@ export class AsistenciaService {
         alumno:  {
           select: {
             nombre: true, apellidos: true, codigoBarras: true,
-            seccion: { select: { id: true, nombre: true } },
+            aula: { select: { id: true, nombre: true } },
           },
         },
         docente: { select: { nombre: true, apellidos: true, dni: true } },

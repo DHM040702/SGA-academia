@@ -56,7 +56,7 @@ export class AuthService {
         email: true,
         rol: true,
         activo: true,
-        alumno:    { select: { id: true, nombre: true, apellidos: true, codigoBarras: true, seccionId: true } },
+        alumno:    { select: { id: true, nombre: true, apellidos: true, codigoBarras: true, aulaId: true } },
         docente:   { select: { id: true, nombre: true, apellidos: true } },
         apoderado: { select: { id: true, nombre: true, apellidos: true } },
       },

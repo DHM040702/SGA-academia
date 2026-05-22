@@ -200,8 +200,8 @@ async function main() {
         data: {
           dni: a.dni, nombre: a.nombre, apellidos: a.apellidos,
           codigoBarras: a.cod,
-          aula:     { connect: { id: a.aula.id } },
-          carreraId: carrera.id,
+          aula:    { connect: { id: a.aula.id } },
+          carrera: { connect: { id: carrera.id } },
           fechaNacimiento: new Date(`200${5 + (i % 4)}-${pad((i % 9) + 1)}-${pad((i % 20) + 1)}`),
           usuario: {
             create: {
@@ -248,50 +248,50 @@ async function main() {
   console.log('   ✓ Apoderados (3) vinculados a alumnos')
 
   // ── 10. Horarios ─────────────────────────────────────────────────────────
-  // Lun/Jue → MAT 2h + FIS 2h  |  Mar/Vie → QUI 2h + BIO 2h  |  Mié/Sáb → LEN 2h + LIT 2h
+  // Rotamos los cursos por aula (offset) para que en la misma franja horaria
+  // las 3 aulas de mañana y las 3 de tarde tengan docentes distintos.
+  // Ej. Lunes 07:00 → C-001=MAT(Juan), L-001=QUI(Carlos), M-001=LEN(Luis) ✓
 
   const cursoToDocente = new Map(docentesDef.map((d, i) => [d.cursoId, docentes[i].id]))
+  const allCourses = [cMat, cFis, cQui, cBio, cLen, cLit]
 
-  type SlotDef = { dia: number; hi: number; hf: number; cursoId: string }
-  const slots: SlotDef[] = [
-    { dia: 1, hi: 0, hf: 2, cursoId: cMat.id },
-    { dia: 1, hi: 2, hf: 4, cursoId: cFis.id },
-    { dia: 2, hi: 0, hf: 2, cursoId: cQui.id },
-    { dia: 2, hi: 2, hf: 4, cursoId: cBio.id },
-    { dia: 3, hi: 0, hf: 2, cursoId: cLen.id },
-    { dia: 3, hi: 2, hf: 4, cursoId: cLit.id },
-    { dia: 4, hi: 0, hf: 2, cursoId: cMat.id },
-    { dia: 4, hi: 2, hf: 4, cursoId: cFis.id },
-    { dia: 5, hi: 0, hf: 2, cursoId: cQui.id },
-    { dia: 5, hi: 2, hf: 4, cursoId: cBio.id },
-    { dia: 6, hi: 0, hf: 2, cursoId: cLen.id },
-    { dia: 6, hi: 2, hf: 4, cursoId: cLit.id },
+  type SlotDef = { dia: number; hi: number; hf: number }
+  const slotPattern: SlotDef[] = [
+    { dia: 1, hi: 0, hf: 2 }, { dia: 1, hi: 2, hf: 4 },
+    { dia: 2, hi: 0, hf: 2 }, { dia: 2, hi: 2, hf: 4 },
+    { dia: 3, hi: 0, hf: 2 }, { dia: 3, hi: 2, hf: 4 },
+    { dia: 4, hi: 0, hf: 2 }, { dia: 4, hi: 2, hf: 4 },
+    { dia: 5, hi: 0, hf: 2 }, { dia: 5, hi: 2, hf: 4 },
+    { dia: 6, hi: 0, hf: 2 }, { dia: 6, hi: 2, hf: 4 },
   ]
 
-  type AulaConfig = { aula: { id: string }; baseH: number }
+  type AulaConfig = { aula: { id: string }; baseH: number; offset: number }
   const aulaConfigs: AulaConfig[] = [
-    { aula: aulaAM, baseH: 7  },
-    { aula: aulaAT, baseH: 13 },
-    { aula: aulaBM, baseH: 7  },
-    { aula: aulaBT, baseH: 13 },
-    { aula: aulaCM, baseH: 7  },
-    { aula: aulaCT, baseH: 13 },
+    { aula: aulaAM, baseH: 7,  offset: 0 },
+    { aula: aulaAT, baseH: 13, offset: 1 },
+    { aula: aulaBM, baseH: 7,  offset: 2 },
+    { aula: aulaBT, baseH: 13, offset: 3 },
+    { aula: aulaCM, baseH: 7,  offset: 4 },
+    { aula: aulaCT, baseH: 13, offset: 5 },
   ]
 
-  const horariosData = aulaConfigs.flatMap(({ aula, baseH }) =>
-    slots.map((s) => ({
-      aulaId:     aula.id,
-      cursoId:    s.cursoId,
-      docenteId:  cursoToDocente.get(s.cursoId)!,
-      diaSemana:  s.dia,
-      horaInicio: new Date(`1970-01-01T${pad(baseH + s.hi)}:00:00.000Z`),
-      horaFin:    new Date(`1970-01-01T${pad(baseH + s.hf)}:00:00.000Z`),
-      publicado:  true,
-    })),
+  const horariosData = aulaConfigs.flatMap(({ aula, baseH, offset }) =>
+    slotPattern.map((s, slotIdx) => {
+      const course = allCourses[(slotIdx + offset) % 6]
+      return {
+        aulaId:     aula.id,
+        cursoId:    course.id,
+        docenteId:  cursoToDocente.get(course.id)!,
+        diaSemana:  s.dia,
+        horaInicio: new Date(`1970-01-01T${pad(baseH + s.hi)}:00:00.000Z`),
+        horaFin:    new Date(`1970-01-01T${pad(baseH + s.hf)}:00:00.000Z`),
+        publicado:  true,
+      }
+    }),
   )
 
   await prisma.horario.createMany({ data: horariosData })
-  console.log(`   ✓ Horarios (${horariosData.length}: 12 × 6 aulas)`)
+  console.log(`   ✓ Horarios (${horariosData.length}: 12 × 6 aulas, sin conflictos)`)
 
   // ── 11. Asistencias ──────────────────────────────────────────────────────
   const today = new Date('2026-05-20')

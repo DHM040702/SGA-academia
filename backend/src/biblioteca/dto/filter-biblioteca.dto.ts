@@ -14,8 +14,8 @@ export class FilterBibliotecaDto extends PaginationDto {
   @IsUUID()
   curso_id?: string;
 
-  @ApiPropertyOptional({ description: 'UUID de la sección', format: 'uuid' })
+  @ApiPropertyOptional({ description: 'UUID del aula', format: 'uuid' })
   @IsOptional()
   @IsUUID()
-  seccion_id?: string;
+  aula_id?: string;
 }

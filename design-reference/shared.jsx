@@ -195,7 +195,7 @@ function LoginScreen() {
           </p>
         </div>
         <div style={{ fontSize: 11.5, opacity: .55, fontFamily: T.mono, letterSpacing: '0.05em' }}>
-          UNASAM · CEPREUNASAM · v1.0.0
+          UNASAM · CEPREUNASAM
         </div>
       </div>
 

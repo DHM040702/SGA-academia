@@ -77,7 +77,7 @@ export default function LoginPage() {
 
         {/* Version */}
         <div className="font-mono text-[11.5px] tracking-[0.05em] opacity-55 relative z-10">
-          UNASAM · CEPREUNASAM · v1.0.0
+          UNASAM · CEPREUNASAM
         </div>
       </div>
 

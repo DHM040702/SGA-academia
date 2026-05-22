@@ -28,7 +28,7 @@ export class CursosService {
         horarios: {
           include: {
             docente: { select: { id: true, nombre: true, apellidos: true } },
-            seccion: {
+            aula: {
               select: {
                 id: true,
                 nombre: true,

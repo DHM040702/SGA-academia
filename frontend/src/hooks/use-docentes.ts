@@ -6,9 +6,8 @@ export interface DocenteHorario {
   diaSemana: number
   horaInicio: string
   horaFin: string
-  aula?: string | null
   curso: { id: string; nombre: string; codigo: string }
-  seccion: { id: string; nombre: string }
+  aula: { id: string; nombre: string }
 }
 
 export interface DocenteAsistencia {

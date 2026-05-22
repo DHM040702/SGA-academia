@@ -1,35 +1,30 @@
 'use client'
 
-import { useState } from 'react'
-import { useHorarios, useConflictosHorario } from '@/hooks/use-horarios'
+import { useState, useRef, useEffect } from 'react'
+import {
+  useHorarios, useCreateHorario, useUpdateHorario,
+  useDeleteHorario, useConflictosHorario,
+} from '@/hooks/use-horarios'
+import type { Horario } from '@/hooks/use-horarios'
 import { useAulas } from '@/hooks/use-ciclos'
+import { useDocentes } from '@/hooks/use-docentes'
+import { useCursos } from '@/hooks/use-cursos'
 import { Pill } from '@/components/ui/pill'
 import { Dot } from '@/components/ui/dot'
 import { Card } from '@/components/ui/card'
 import { Btn } from '@/components/ui/btn'
 import { PageHeader } from '@/components/layout/page-header'
-import { Plus, Download, AlertTriangle, MoreHorizontal } from '@/components/icons'
-import type { Horario } from '@/hooks/use-horarios'
+import { Plus, Download, AlertTriangle, Edit, Trash, X } from '@/components/icons'
 
-const DIAS = ['Lun', 'Mar', 'Mié', 'Jue', 'Vie', 'Sáb']
 const DIA_FULL = ['Lunes', 'Martes', 'Miércoles', 'Jueves', 'Viernes', 'Sábado']
+const DIAS_NUM = [1, 2, 3, 4, 5, 6]
 
-// Group horarios into time slots
-function getSlots(horarios: Horario[]): string[] {
-  const times = new Set<string>()
-  horarios.forEach((h) => {
-    const t = typeof h.horaInicio === 'string' ? h.horaInicio.slice(11, 16) : '00:00'
-    times.add(t)
-  })
-  return Array.from(times).sort()
-}
-
-const CURSO_COLORS: Record<string, string> = {}
 const PALETTE = [
   'oklch(0.55 0.13 240)', 'oklch(0.55 0.13 280)', 'oklch(0.55 0.13 200)',
   'oklch(0.55 0.13 145)', 'oklch(0.55 0.13 110)', 'oklch(0.55 0.13 30)',
   'oklch(0.55 0.13 60)',  'oklch(0.55 0.13 170)',
 ]
+const CURSO_COLORS: Record<string, string> = {}
 let colorIdx = 0
 function cursoColor(nombre: string) {
   if (!CURSO_COLORS[nombre]) {
@@ -39,35 +34,519 @@ function cursoColor(nombre: string) {
   return CURSO_COLORS[nombre]
 }
 
-export default function HorariosPage() {
-  const [aulaId, setAulaId] = useState<string>('')
-  const { data: secciones = [] } = useAulas()
-  const { data: horariosPage, isLoading } = useHorarios({ aula_id: aulaId || undefined })
-  const { data: conflictos = [] } = useConflictosHorario()
+function pad2(n: number) { return String(n).padStart(2, '0') }
 
+function extractTime(dt: string | Date | undefined): string {
+  if (!dt) return '00:00'
+  const s = typeof dt === 'string' ? dt : dt.toISOString()
+  // "1970-01-01T07:00:00.000Z" → "07:00"  |  "07:00" → "07:00"
+  if (s.includes('T')) return s.slice(11, 16)
+  return s.slice(0, 5)
+}
+
+function getSlots(horarios: Horario[]): string[] {
+  const times = new Set<string>()
+  horarios.forEach((h) => times.add(extractTime(h.horaInicio)))
+  return Array.from(times).sort()
+}
+
+// ─── Modal ────────────────────────────────────────────────────────────────────
+
+interface ModalProps {
+  horario?: Horario | null
+  onClose: () => void
+}
+
+function HorarioModal({ horario, onClose }: ModalProps) {
+  const { data: aulas = [] }                       = useAulas()
+  const { data: docentesPage, isLoading: loadingD } = useDocentes({ limit: 100 })
+  const { data: cursos = [], isLoading: loadingC }  = useCursos()
+  const docentes = (docentesPage as any)?.data ?? (Array.isArray(docentesPage) ? docentesPage : [])
+
+  const createMut  = useCreateHorario()
+  const updateMut  = useUpdateHorario()
+  const isEditing  = Boolean(horario)
+
+  const [form, setForm] = useState({
+    aula_id:    horario?.aulaId    ?? '',
+    curso_id:   horario?.cursoId   ?? '',
+    docente_id: horario?.docenteId ?? '',
+    dia_semana: horario?.diaSemana ?? 1,
+    hora_inicio: extractTime(horario?.horaInicio),
+    hora_fin:    extractTime(horario?.horaFin),
+  })
+  const [error, setError] = useState('')
+
+  function set(k: string, v: string | number) {
+    setForm((f) => ({ ...f, [k]: v }))
+    setError('')
+  }
+
+  async function handleSubmit(e: React.FormEvent) {
+    e.preventDefault()
+    if (!form.aula_id || !form.curso_id || !form.docente_id || !form.hora_inicio || !form.hora_fin) {
+      setError('Todos los campos son obligatorios.')
+      return
+    }
+    try {
+      if (isEditing && horario) {
+        await updateMut.mutateAsync({ id: horario.id, ...form })
+      } else {
+        await createMut.mutateAsync(form)
+      }
+      onClose()
+    } catch (err: any) {
+      const msg = err?.response?.data?.message
+      setError(Array.isArray(msg) ? msg.join(', ') : (msg ?? 'Error al guardar.'))
+    }
+  }
+
+  const isPending = createMut.isPending || updateMut.isPending
+
+  return (
+    <div className="fixed inset-0 z-50 flex items-center justify-center" style={{ background: 'rgba(0,0,0,0.35)' }}>
+      <div className="bg-surface border border-border rounded-3 shadow-3 w-full max-w-md p-6 flex flex-col gap-4">
+        <div className="flex items-center justify-between">
+          <h2 className="text-[15px] font-semibold">{isEditing ? 'Editar clase' : 'Asignar clase'}</h2>
+          <button onClick={onClose} className="text-text-mute hover:text-text">
+            <X size={18} />
+          </button>
+        </div>
+
+        <form onSubmit={handleSubmit} className="flex flex-col gap-3">
+          {/* Aula */}
+          <label className="flex flex-col gap-1">
+            <span className="text-[12px] font-medium text-text-mute">Aula</span>
+            <select
+              value={form.aula_id}
+              onChange={(e) => set('aula_id', e.target.value)}
+              className="px-3 py-2 text-[13px] border border-border rounded-2 bg-surface"
+              required
+            >
+              <option value="">Seleccionar aula…</option>
+              {aulas.map((a) => (
+                <option key={a.id} value={a.id}>{a.nombre}</option>
+              ))}
+            </select>
+          </label>
+
+          {/* Curso */}
+          <label className="flex flex-col gap-1">
+            <span className="text-[12px] font-medium text-text-mute">Curso</span>
+            <select
+              value={form.curso_id}
+              onChange={(e) => set('curso_id', e.target.value)}
+              className="px-3 py-2 text-[13px] border border-border rounded-2 bg-surface"
+              required
+              disabled={loadingC}
+            >
+              <option value="">{loadingC ? 'Cargando cursos…' : 'Seleccionar curso…'}</option>
+              {cursos.map((c) => (
+                <option key={c.id} value={c.id}>{c.nombre}</option>
+              ))}
+            </select>
+          </label>
+
+          {/* Docente */}
+          <label className="flex flex-col gap-1">
+            <span className="text-[12px] font-medium text-text-mute">Docente</span>
+            <select
+              value={form.docente_id}
+              onChange={(e) => set('docente_id', e.target.value)}
+              className="px-3 py-2 text-[13px] border border-border rounded-2 bg-surface"
+              required
+              disabled={loadingD}
+            >
+              <option value="">{loadingD ? 'Cargando docentes…' : 'Seleccionar docente…'}</option>
+              {docentes.map((d: any) => (
+                <option key={d.id} value={d.id}>{d.nombre} {d.apellidos}</option>
+              ))}
+            </select>
+          </label>
+
+          {/* Día */}
+          <label className="flex flex-col gap-1">
+            <span className="text-[12px] font-medium text-text-mute">Día</span>
+            <select
+              value={form.dia_semana}
+              onChange={(e) => set('dia_semana', Number(e.target.value))}
+              className="px-3 py-2 text-[13px] border border-border rounded-2 bg-surface"
+            >
+              {DIA_FULL.map((d, i) => (
+                <option key={i + 1} value={i + 1}>{d}</option>
+              ))}
+            </select>
+          </label>
+
+          {/* Horas */}
+          <div className="grid grid-cols-2 gap-3">
+            <label className="flex flex-col gap-1">
+              <span className="text-[12px] font-medium text-text-mute">Hora inicio</span>
+              <input
+                type="time"
+                value={form.hora_inicio}
+                onChange={(e) => set('hora_inicio', e.target.value)}
+                className="px-3 py-2 text-[13px] border border-border rounded-2 bg-surface"
+                required
+              />
+            </label>
+            <label className="flex flex-col gap-1">
+              <span className="text-[12px] font-medium text-text-mute">Hora fin</span>
+              <input
+                type="time"
+                value={form.hora_fin}
+                onChange={(e) => set('hora_fin', e.target.value)}
+                className="px-3 py-2 text-[13px] border border-border rounded-2 bg-surface"
+                required
+              />
+            </label>
+          </div>
+
+          {error && (
+            <p className="text-[12px] text-danger">{error}</p>
+          )}
+
+          <div className="flex gap-2 pt-1">
+            <Btn type="button" variant="secondary" className="flex-1" onClick={onClose}>
+              Cancelar
+            </Btn>
+            <Btn type="submit" className="flex-1" disabled={isPending}>
+              {isPending ? 'Guardando…' : isEditing ? 'Guardar cambios' : 'Asignar'}
+            </Btn>
+          </div>
+        </form>
+      </div>
+    </div>
+  )
+}
+
+// ─── Cell menu ────────────────────────────────────────────────────────────────
+
+function CellMenu({ horario, onEdit, onDelete }: {
+  horario: Horario
+  onEdit: (h: Horario) => void
+  onDelete: (h: Horario) => void
+}) {
+  const [open, setOpen] = useState(false)
+  const ref = useRef<HTMLDivElement>(null)
+
+  useEffect(() => {
+    function handler(e: MouseEvent) {
+      if (ref.current && !ref.current.contains(e.target as Node)) setOpen(false)
+    }
+    document.addEventListener('mousedown', handler)
+    return () => document.removeEventListener('mousedown', handler)
+  }, [])
+
+  return (
+    <div ref={ref} className="relative" onClick={(e) => e.stopPropagation()}>
+      <button
+        onClick={() => setOpen((v) => !v)}
+        className="opacity-0 group-hover:opacity-100 p-0.5 rounded hover:bg-black/10 transition-opacity"
+      >
+        <Edit size={10} />
+      </button>
+      {open && (
+        <div className="absolute right-0 top-full mt-1 z-30 bg-surface border border-border rounded-2 shadow-2 py-1 w-36">
+          <button
+            className="w-full text-left px-3 py-1.5 text-[12px] hover:bg-surface-2 flex items-center gap-2"
+            onClick={() => { onEdit(horario); setOpen(false) }}
+          >
+            <Edit size={12} /> Editar
+          </button>
+          <button
+            className="w-full text-left px-3 py-1.5 text-[12px] text-danger hover:bg-danger-l flex items-center gap-2"
+            onClick={() => { onDelete(horario); setOpen(false) }}
+          >
+            <Trash size={12} /> Eliminar
+          </button>
+        </div>
+      )}
+    </div>
+  )
+}
+
+// ─── Export ───────────────────────────────────────────────────────────────────
+
+type ExportScope = 'completo' | 'aula' | 'dia'
+
+interface ExportModalProps {
+  horarios: Horario[]
+  aulas: { id: string; nombre: string }[]
+  onClose: () => void
+}
+
+function buildPrintHtml(
+  opts: { scope: ExportScope; aulaId: string; dia: number; orientacion: 'landscape' | 'portrait'; conDocentes: boolean },
+  horarios: Horario[],
+  aulas: { id: string; nombre: string }[],
+): string {
+  const css = `
+    @page { size: A4 ${opts.orientacion === 'landscape' ? 'landscape' : 'portrait'}; margin: 1.2cm; }
+    * { box-sizing: border-box; }
+    body { font-family: Arial, sans-serif; font-size: 11px; color: #1e293b; margin: 0; }
+    h2 { font-size: 14px; font-weight: 700; margin: 0 0 3px; }
+    .sub { font-size: 10px; color: #64748b; margin: 0 0 12px; }
+    table { width: 100%; border-collapse: collapse; margin-bottom: 20px; }
+    th { background: #f1f5f9; font-size: 9.5px; font-weight: 600; text-transform: uppercase;
+         letter-spacing: 0.04em; color: #475569; padding: 5px 6px; border: 1px solid #cbd5e1; text-align: center; }
+    th.hora { text-align: left; width: 52px; }
+    td { border: 1px solid #e2e8f0; padding: 3px; vertical-align: top; height: 66px; }
+    td.hora { font-family: monospace; font-size: 10px; font-weight: 600; color: #94a3b8;
+              background: #f8fafc; padding: 5px 6px; border-right: 1px solid #cbd5e1; }
+    .card { height: 100%; padding: 3px 5px; font-size: 10px; line-height: 1.35; }
+    .cn { font-weight: 600; }
+    .cd { color: #64748b; }
+    .page-break { page-break-after: always; }
+  `
+  const fecha = new Date().toLocaleDateString('es-PE', { day: 'numeric', month: 'long', year: 'numeric' })
+  const DIAS = ['Lunes', 'Martes', 'Miércoles', 'Jueves', 'Viernes', 'Sábado']
+
+  function t(dt: string | Date | undefined): string {
+    if (!dt) return '00:00'
+    const s = typeof dt === 'string' ? dt : dt.toISOString()
+    return s.includes('T') ? s.slice(11, 16) : s.slice(0, 5)
+  }
+  function uniq(arr: string[]): string[] { return Array.from(new Set(arr)) }
+
+  function aulaTable(data: Horario[], nombre: string): string {
+    const slots = uniq(data.map(h => t(h.horaInicio))).sort()
+    if (!slots.length) return `<h2>Aula ${nombre}</h2><p class="sub">Sin horarios asignados.</p>`
+    const rows = slots.map(s => {
+      const cells = [1,2,3,4,5,6].map(d => {
+        const h = data.find(x => x.diaSemana === d && t(x.horaInicio) === s)
+        if (!h) return '<td></td>'
+        const doc = opts.conDocentes ? `<div class="cd">${h.docente.nombre} ${h.docente.apellidos}</div>` : ''
+        return `<td><div class="card"><div class="cn">${h.curso.nombre}</div>${doc}</div></td>`
+      }).join('')
+      return `<tr><td class="hora">${s}</td>${cells}</tr>`
+    }).join('')
+    return `
+      <h2>Horario — Aula ${nombre}</h2>
+      <p class="sub">Sistema de Gestión Académica · ${fecha}</p>
+      <table>
+        <thead><tr><th class="hora">Hora</th>${DIAS.map(d => `<th>${d}</th>`).join('')}</tr></thead>
+        <tbody>${rows}</tbody>
+      </table>`
+  }
+
+  function diaTable(data: Horario[], diaNum: number): string {
+    const slots = uniq(data.map(h => t(h.horaInicio))).sort()
+    if (!slots.length) return `<h2>${DIAS[diaNum - 1]}</h2><p class="sub">Sin horarios asignados.</p>`
+    const rows = slots.map(s => {
+      const cells = aulas.map(a => {
+        const h = data.find(x => x.aulaId === a.id && t(x.horaInicio) === s)
+        if (!h) return '<td></td>'
+        const doc = opts.conDocentes ? `<div class="cd">${h.docente.nombre} ${h.docente.apellidos}</div>` : ''
+        return `<td><div class="card"><div class="cn">${h.curso.nombre}</div>${doc}</div></td>`
+      }).join('')
+      return `<tr><td class="hora">${s}</td>${cells}</tr>`
+    }).join('')
+    return `
+      <h2>Horarios del ${DIAS[diaNum - 1]}</h2>
+      <p class="sub">Sistema de Gestión Académica · ${fecha}</p>
+      <table>
+        <thead><tr><th class="hora">Hora</th>${aulas.map(a => `<th>${a.nombre}</th>`).join('')}</tr></thead>
+        <tbody>${rows}</tbody>
+      </table>`
+  }
+
+  let body = ''
+  if (opts.scope === 'aula') {
+    const aula = aulas.find(a => a.id === opts.aulaId)
+    body = aulaTable(horarios.filter(h => h.aulaId === opts.aulaId), aula?.nombre ?? '—')
+  } else if (opts.scope === 'dia') {
+    body = diaTable(horarios.filter(h => h.diaSemana === opts.dia), opts.dia)
+  } else {
+    body = aulas.map((a, i) => {
+      const table = aulaTable(horarios.filter(h => h.aulaId === a.id), a.nombre)
+      return i < aulas.length - 1 ? `${table}<div class="page-break"></div>` : table
+    }).join('')
+  }
+
+  return `<!DOCTYPE html><html lang="es"><head><meta charset="UTF-8">
+    <title>Horarios SGA</title><style>${css}</style>
+    </head><body>${body}</body></html>`
+}
+
+function ExportModal({ horarios, aulas, onClose }: ExportModalProps) {
+  const [scope, setScope]           = useState<ExportScope>('completo')
+  const [aulaId, setAulaId]         = useState(aulas[0]?.id ?? '')
+  const [dia, setDia]               = useState(1)
+  const [orientacion, setOrientacion] = useState<'landscape' | 'portrait'>('landscape')
+  const [conDocentes, setConDocentes] = useState(true)
+
+  function handleExport() {
+    const html = buildPrintHtml({ scope, aulaId, dia, orientacion, conDocentes }, horarios, aulas)
+    const w = window.open('', '_blank', 'width=960,height=720')
+    if (!w) { alert('Habilita las ventanas emergentes para exportar.'); return }
+    w.document.write(html)
+    w.document.close()
+    w.focus()
+    setTimeout(() => w.print(), 400)
+    onClose()
+  }
+
+  const scopeOpts: { value: ExportScope; label: string; desc: string }[] = [
+    { value: 'completo', label: 'Horario completo', desc: 'Todas las aulas — una página por aula' },
+    { value: 'aula',     label: 'Por aula',         desc: 'Una aula específica, vista semanal' },
+    { value: 'dia',      label: 'Por día',           desc: 'Un día con todas las aulas en columnas' },
+  ]
+
+  return (
+    <div className="fixed inset-0 z-50 flex items-center justify-center" style={{ background: 'rgba(0,0,0,0.35)' }}>
+      <div className="bg-surface border border-border rounded-3 shadow-3 w-full max-w-md p-6 flex flex-col gap-5">
+        <div className="flex items-center justify-between">
+          <h2 className="text-[15px] font-semibold">Exportar horario</h2>
+          <button onClick={onClose} className="text-text-mute hover:text-text"><X size={18} /></button>
+        </div>
+
+        {/* Alcance */}
+        <div className="flex flex-col gap-2">
+          <span className="text-[12px] font-medium text-text-mute uppercase tracking-wide">¿Qué exportar?</span>
+          <div className="flex flex-col gap-2">
+            {scopeOpts.map(opt => (
+              <button
+                key={opt.value}
+                onClick={() => setScope(opt.value)}
+                className={`flex items-center gap-3 px-3 py-2.5 rounded-2 border text-left transition-colors ${
+                  scope === opt.value ? 'border-primary bg-primary/5' : 'border-border hover:bg-surface-2'
+                }`}
+              >
+                <span className={`w-4 h-4 rounded-full border-2 flex items-center justify-center shrink-0 transition-colors ${
+                  scope === opt.value ? 'border-primary' : 'border-border'
+                }`}>
+                  {scope === opt.value && <span className="w-2 h-2 rounded-full bg-primary" />}
+                </span>
+                <div>
+                  <div className="text-[13px] font-medium">{opt.label}</div>
+                  <div className="text-[11px] text-text-mute">{opt.desc}</div>
+                </div>
+              </button>
+            ))}
+          </div>
+        </div>
+
+        {/* Selector condicional */}
+        {scope === 'aula' && (
+          <label className="flex flex-col gap-1">
+            <span className="text-[12px] font-medium text-text-mute">Aula</span>
+            <select value={aulaId} onChange={(e) => setAulaId(e.target.value)}
+              className="px-3 py-2 text-[13px] border border-border rounded-2 bg-surface">
+              {aulas.map(a => <option key={a.id} value={a.id}>{a.nombre}</option>)}
+            </select>
+          </label>
+        )}
+        {scope === 'dia' && (
+          <label className="flex flex-col gap-1">
+            <span className="text-[12px] font-medium text-text-mute">Día</span>
+            <select value={dia} onChange={(e) => setDia(Number(e.target.value))}
+              className="px-3 py-2 text-[13px] border border-border rounded-2 bg-surface">
+              {DIA_FULL.map((d, i) => <option key={i + 1} value={i + 1}>{d}</option>)}
+            </select>
+          </label>
+        )}
+
+        {/* Opciones */}
+        <div className="flex flex-col gap-3">
+          <span className="text-[12px] font-medium text-text-mute uppercase tracking-wide">Opciones de formato</span>
+          <div className="flex flex-col gap-3">
+            <div className="flex items-center justify-between">
+              <span className="text-[13px]">Orientación de página</span>
+              <div className="flex rounded-2 border border-border overflow-hidden text-[12px]">
+                {(['landscape', 'portrait'] as const).map(o => (
+                  <button key={o} onClick={() => setOrientacion(o)}
+                    className={`px-3 py-1.5 transition-colors ${
+                      orientacion === o ? 'bg-primary text-white font-medium' : 'bg-surface hover:bg-surface-2 text-text'
+                    }`}>
+                    {o === 'landscape' ? 'Horizontal' : 'Vertical'}
+                  </button>
+                ))}
+              </div>
+            </div>
+            <div className="flex items-center justify-between">
+              <span className="text-[13px]">Incluir nombre del docente</span>
+              <button onClick={() => setConDocentes(v => !v)}
+                className={`w-9 h-5 rounded-full transition-colors relative ${conDocentes ? 'bg-primary' : 'bg-border'}`}>
+                <span className={`absolute top-0.5 w-4 h-4 rounded-full bg-white shadow transition-transform ${
+                  conDocentes ? 'translate-x-[18px]' : 'translate-x-0.5'
+                }`} />
+              </button>
+            </div>
+          </div>
+        </div>
+
+        {/* Acciones */}
+        <div className="flex gap-2 pt-1 border-t border-border-s">
+          <Btn type="button" variant="secondary" className="flex-1" onClick={onClose}>Cancelar</Btn>
+          <Btn type="button" className="flex-1" icon={<Download size={14} />} onClick={handleExport}>
+            Exportar PDF
+          </Btn>
+        </div>
+      </div>
+    </div>
+  )
+}
+
+// ─── Page ─────────────────────────────────────────────────────────────────────
+
+export default function HorariosPage() {
+  const [aulaId, setAulaId]       = useState('')
+  const [modal, setModal]         = useState<'create' | 'edit' | null>(null)
+  const [selected, setSelected]   = useState<Horario | null>(null)
+  const [diaVista, setDiaVista]   = useState(1)
+  const [showExport, setShowExport] = useState(false)
+
+  const { data: aulas = [] }           = useAulas()
+  const { data: docentesPage }         = useDocentes({ limit: 100 })
+  const { data: horariosPage, isLoading } = useHorarios({ aula_id: aulaId || undefined })
+  const { data: conflictos = [] }      = useConflictosHorario()
+  const deleteMut                      = useDeleteHorario()
+
+  const docentes = (docentesPage as any)?.data ?? []
   const horarios: Horario[] = (horariosPage as any)?.data ?? horariosPage ?? []
   const slots = getSlots(horarios)
 
+  // pivot view (all aulas): filter by selected day
+  const horariosDelDia = horarios.filter((h) => h.diaSemana === diaVista)
+  const slotsDelDia    = getSlots(horariosDelDia)
+
   function getCell(dia: number, slot: string) {
-    return horarios.filter((h) => {
-      const hSlot = typeof h.horaInicio === 'string' ? h.horaInicio.slice(11, 16) : '00:00'
-      return h.diaSemana === dia && hSlot === slot
-    })
+    return horarios.filter((h) => h.diaSemana === dia && extractTime(h.horaInicio) === slot)
+  }
+  function getCellAula(aid: string, slot: string) {
+    return horariosDelDia.filter((h) => h.aulaId === aid && extractTime(h.horaInicio) === slot)
   }
 
-  const isConflicto = (id: string) => conflictos.some((c) => c.id === id)
+  const isConflicto = (id: string) => conflictos.some((c: Horario) => c.id === id)
+
+  function openCreate() { setSelected(null); setModal('create') }
+  function openEdit(h: Horario) { setSelected(h); setModal('edit') }
+  function closeModal() { setModal(null); setSelected(null) }
+
+  async function handleDelete(h: Horario) {
+    if (!confirm(`¿Eliminar la clase de ${h.curso.nombre} del ${DIA_FULL[h.diaSemana - 1]}?`)) return
+    await deleteMut.mutateAsync(h.id)
+  }
 
   return (
     <>
+      {(modal === 'create' || modal === 'edit') && (
+        <HorarioModal horario={modal === 'edit' ? selected : null} onClose={closeModal} />
+      )}
+      {showExport && (
+        <ExportModal horarios={horarios} aulas={aulas} onClose={() => setShowExport(false)} />
+      )}
+
       <PageHeader
         title="Horarios"
         crumbs={[{ label: 'Horarios' }]}
         action={
           <>
-            <Btn variant="secondary" icon={<Download size={14} />} size="sm">
+            <Btn variant="secondary" icon={<Download size={14} />} size="sm" onClick={() => setShowExport(true)}>
               Exportar PDF
             </Btn>
-            <Btn icon={<Plus size={14} />} size="sm">
+            <Btn icon={<Plus size={14} />} size="sm" onClick={openCreate}>
               Asignar clase
             </Btn>
           </>
@@ -75,7 +554,7 @@ export default function HorariosPage() {
       />
 
       <div className="p-7 grid gap-3.5" style={{ gridTemplateColumns: '1fr 280px' }}>
-        {/* Main grid */}
+        {/* Main */}
         <div className="flex flex-col gap-3">
           {/* Toolbar */}
           <div className="flex gap-2.5 items-center">
@@ -84,8 +563,8 @@ export default function HorariosPage() {
               onChange={(e) => setAulaId(e.target.value)}
               className="px-3 py-1.5 text-[13px] border border-border rounded-2 bg-surface"
             >
-              <option value="">Todas las secciones</option>
-              {secciones.map((s) => (
+              <option value="">Todas las aulas</option>
+              {aulas.map((s) => (
                 <option key={s.id} value={s.id}>{s.nombre}</option>
               ))}
             </select>
@@ -104,7 +583,7 @@ export default function HorariosPage() {
               <AlertTriangle size={16} className="text-danger shrink-0" />
               <div className="flex-1 text-[12.5px]">
                 <strong className="text-danger">Conflicto de horario:</strong>{' '}
-                <span>Hay {conflictos.length} horario{conflictos.length > 1 ? 's' : ''} con superposición. Revise y corrija.</span>
+                Hay {conflictos.length} horario{conflictos.length > 1 ? 's' : ''} con superposición. Revise y corrija.
               </div>
               <Btn variant="secondary" size="sm" style={{ borderColor: 'var(--color-danger)', color: 'var(--color-danger)' }}>
                 Resolver
@@ -113,88 +592,213 @@ export default function HorariosPage() {
           )}
 
           {/* Grid */}
-          <div className="bg-surface border border-border rounded-3 shadow-1 overflow-auto">
-            {isLoading ? (
-              <div className="text-center py-10 text-text-mute text-[13px]">Cargando horarios…</div>
-            ) : slots.length === 0 ? (
-              <div className="text-center py-10 text-text-mute text-[13px]">
-                No hay horarios registrados{aulaId ? ' para esta aula' : ''}.
+          {!aulaId ? (
+            /* ── Vista global: aulas como columnas, selector de día ── */
+            <div className="bg-surface border border-border rounded-3 shadow-1 overflow-auto">
+              <div className="flex gap-1 p-3 border-b border-border-s overflow-x-auto">
+                {DIA_FULL.map((d, i) => (
+                  <button
+                    key={i + 1}
+                    onClick={() => setDiaVista(i + 1)}
+                    className={`px-3 py-1 text-[12px] rounded-2 whitespace-nowrap transition-colors ${
+                      diaVista === i + 1
+                        ? 'bg-primary text-white font-medium'
+                        : 'text-text-mute hover:bg-surface-2'
+                    }`}
+                  >
+                    {d}
+                  </button>
+                ))}
               </div>
-            ) : (
-              <table className="w-full border-collapse">
-                <thead>
-                  <tr className="bg-surface-2 border-b border-border">
-                    <th className="px-2 py-2.5 text-[11px] font-semibold text-text-mute uppercase tracking-[0.05em] w-[70px] text-left">
-                      Hora
-                    </th>
-                    {DIA_FULL.map((d) => (
-                      <th key={d} className="px-2 py-2.5 text-[11px] font-semibold text-text text-center">
-                        {d}
+              {isLoading ? (
+                <div className="text-center py-10 text-text-mute text-[13px]">Cargando horarios…</div>
+              ) : slotsDelDia.length === 0 ? (
+                <div className="text-center py-10 text-text-mute text-[13px]">
+                  No hay horarios para el {DIA_FULL[diaVista - 1]}.<br />
+                  <button onClick={openCreate} className="mt-2 text-primary text-[12px] hover:underline">
+                    + Asignar clase
+                  </button>
+                </div>
+              ) : (
+                <table className="w-full border-collapse">
+                  <thead>
+                    <tr className="bg-surface-2 border-b border-border">
+                      <th className="px-2 py-2.5 text-[11px] font-semibold text-text-mute uppercase tracking-[0.05em] w-[70px] text-left">
+                        Hora
                       </th>
-                    ))}
-                  </tr>
-                </thead>
-                <tbody>
-                  {slots.map((slot) => (
-                    <tr key={slot} className="border-t border-border-s" style={{ minHeight: 96 }}>
-                      <td className="px-2 py-2.5 font-mono text-[11px] font-semibold text-text-mute border-r border-border-s align-top">
-                        {slot}
-                      </td>
-                      {[1, 2, 3, 4, 5, 6].map((dia) => {
-                        const cells = getCell(dia, slot)
-                        return (
-                          <td key={dia} className="p-1 border-r border-border-s align-top" style={{ minWidth: 110, height: 90 }}>
-                            {cells.map((h) => {
-                              const col = cursoColor(h.curso.nombre)
-                              const conflicto = isConflicto(h.id)
-                              return (
-                                <div
-                                  key={h.id}
-                                  className="rounded-2 p-1.5 h-full flex flex-col gap-0.5 cursor-pointer text-[11px]"
-                                  style={{
-                                    background: conflicto ? 'var(--color-danger-l)' : `color-mix(in oklch, ${col} 12%, white)`,
-                                    border: `1px solid ${conflicto ? 'var(--color-danger)' : col}`,
-                                    borderLeft: `3px solid ${conflicto ? 'var(--color-danger)' : col}`,
-                                  }}
-                                >
-                                  <div className="font-semibold text-text leading-tight">{h.curso.nombre}</div>
-                                  <div className="text-text-mute leading-tight">{h.docente.nombre} {h.docente.apellidos}</div>
-                                  <div className="mt-auto flex items-center justify-between gap-1">
-                                    <span
-                                      className="font-mono font-semibold"
-                                      style={{ color: conflicto ? 'var(--color-danger)' : col }}
-                                    >
-                                      {h.aula ?? 'Sin aula'}
-                                    </span>
-                                    {conflicto && <AlertTriangle size={11} className="text-danger" />}
-                                  </div>
-                                </div>
-                              )
-                            })}
-                          </td>
-                        )
-                      })}
+                      {aulas.map((a) => (
+                        <th key={a.id} className="px-2 py-2.5 text-[11px] font-semibold text-text text-center">
+                          {a.nombre}
+                        </th>
+                      ))}
                     </tr>
-                  ))}
-                </tbody>
-              </table>
-            )}
-          </div>
+                  </thead>
+                  <tbody>
+                    {slotsDelDia.map((slot) => (
+                      <tr key={slot} className="border-t border-border-s">
+                        <td className="px-2 py-2.5 font-mono text-[11px] font-semibold text-text-mute border-r border-border-s align-top">
+                          {slot}
+                        </td>
+                        {aulas.map((a) => {
+                          const cells = getCellAula(a.id, slot)
+                          return (
+                            <td key={a.id} className="p-1 border-r border-border-s align-top" style={{ minWidth: 120, height: 90 }}>
+                              {cells.map((h) => {
+                                const col = cursoColor(h.curso.nombre)
+                                const conflicto = isConflicto(h.id)
+                                return (
+                                  <div
+                                    key={h.id}
+                                    className="group rounded-2 p-1.5 h-full flex flex-col gap-0.5 text-[11px]"
+                                    style={{
+                                      background: conflicto ? 'var(--color-danger-l)' : `color-mix(in oklch, ${col} 12%, white)`,
+                                      border: `1px solid ${conflicto ? 'var(--color-danger)' : col}`,
+                                      borderLeft: `3px solid ${conflicto ? 'var(--color-danger)' : col}`,
+                                    }}
+                                  >
+                                    <div className="font-semibold text-text leading-tight">{h.curso.nombre}</div>
+                                    <div className="text-text-mute leading-tight">{h.docente.nombre} {h.docente.apellidos}</div>
+                                    <div className="mt-auto flex items-center justify-between gap-1">
+                                      <span className="font-mono text-[10px] font-semibold" style={{ color: conflicto ? 'var(--color-danger)' : col }}>
+                                        {slot}–{extractTime(h.horaFin)}
+                                      </span>
+                                      <div className="flex items-center gap-0.5">
+                                        {conflicto && <AlertTriangle size={11} className="text-danger" />}
+                                        <CellMenu horario={h} onEdit={openEdit} onDelete={handleDelete} />
+                                      </div>
+                                    </div>
+                                  </div>
+                                )
+                              })}
+                            </td>
+                          )
+                        })}
+                      </tr>
+                    ))}
+                  </tbody>
+                </table>
+              )}
+            </div>
+          ) : (
+            /* ── Vista por aula: días como columnas ── */
+            <div className="bg-surface border border-border rounded-3 shadow-1 overflow-auto">
+              {isLoading ? (
+                <div className="text-center py-10 text-text-mute text-[13px]">Cargando horarios…</div>
+              ) : slots.length === 0 ? (
+                <div className="text-center py-10 text-text-mute text-[13px]">
+                  No hay horarios registrados para esta aula.<br />
+                  <button onClick={openCreate} className="mt-2 text-primary text-[12px] hover:underline">
+                    + Asignar primera clase
+                  </button>
+                </div>
+              ) : (
+                <table className="w-full border-collapse">
+                  <thead>
+                    <tr className="bg-surface-2 border-b border-border">
+                      <th className="px-2 py-2.5 text-[11px] font-semibold text-text-mute uppercase tracking-[0.05em] w-[70px] text-left">
+                        Hora
+                      </th>
+                      {DIA_FULL.map((d) => (
+                        <th key={d} className="px-2 py-2.5 text-[11px] font-semibold text-text text-center">
+                          {d}
+                        </th>
+                      ))}
+                    </tr>
+                  </thead>
+                  <tbody>
+                    {slots.map((slot) => (
+                      <tr key={slot} className="border-t border-border-s">
+                        <td className="px-2 py-2.5 font-mono text-[11px] font-semibold text-text-mute border-r border-border-s align-top">
+                          {slot}
+                        </td>
+                        {DIAS_NUM.map((dia) => {
+                          const cells = getCell(dia, slot)
+                          return (
+                            <td key={dia} className="p-1 border-r border-border-s align-top" style={{ minWidth: 110, height: 90 }}>
+                              {cells.map((h) => {
+                                const col = cursoColor(h.curso.nombre)
+                                const conflicto = isConflicto(h.id)
+                                return (
+                                  <div
+                                    key={h.id}
+                                    className="group rounded-2 p-1.5 h-full flex flex-col gap-0.5 text-[11px]"
+                                    style={{
+                                      background: conflicto ? 'var(--color-danger-l)' : `color-mix(in oklch, ${col} 12%, white)`,
+                                      border: `1px solid ${conflicto ? 'var(--color-danger)' : col}`,
+                                      borderLeft: `3px solid ${conflicto ? 'var(--color-danger)' : col}`,
+                                    }}
+                                  >
+                                    <div className="font-semibold text-text leading-tight">{h.curso.nombre}</div>
+                                    <div className="text-text-mute leading-tight">{h.docente.nombre} {h.docente.apellidos}</div>
+                                    <div className="mt-auto flex items-center justify-between gap-1">
+                                      <span className="font-mono font-semibold" style={{ color: conflicto ? 'var(--color-danger)' : col }}>
+                                        {h.aula?.nombre ?? '—'}
+                                      </span>
+                                      <div className="flex items-center gap-0.5">
+                                        {conflicto && <AlertTriangle size={11} className="text-danger" />}
+                                        <CellMenu horario={h} onEdit={openEdit} onDelete={handleDelete} />
+                                      </div>
+                                    </div>
+                                  </div>
+                                )
+                              })}
+                            </td>
+                          )
+                        })}
+                      </tr>
+                    ))}
+                  </tbody>
+                </table>
+              )}
+            </div>
+          )}
         </div>
 
         {/* Right panel */}
         <div className="flex flex-col gap-3">
-          <Card title="Secciones" subtitle="Resumen">
+          <Card title="Aulas" subtitle="Resumen del ciclo">
             <div className="flex flex-col divide-y divide-border-s">
-              {secciones.slice(0, 6).map((s) => (
-                <div key={s.id} className="flex items-center gap-2.5 py-2">
-                  <Dot tone="success" />
-                  <div className="flex-1 text-[12.5px]">{s.nombre}</div>
-                  <span className="font-mono text-[11.5px] text-text-mute">{s._count?.horarios ?? 0}h</span>
+              {aulas.slice(0, 6).map((a) => {
+                const hCount = horarios.filter((h) => h.aulaId === a.id).length
+                return (
+                  <div key={a.id} className="flex items-center gap-2.5 py-2">
+                    <Dot tone={hCount > 0 ? 'success' : 'neutral'} />
+                    <div className="flex-1 text-[12.5px]">{a.nombre}</div>
+                    <span className="font-mono text-[11.5px] text-text-mute">{hCount}h</span>
+                  </div>
+                )
+              })}
+              {aulas.length === 0 && (
+                <div className="py-4 text-center text-[12px] text-text-mute">Sin aulas</div>
+              )}
+            </div>
+          </Card>
+
+          <Card title="Docentes" subtitle="Disponibles">
+            <div className="flex flex-col divide-y divide-border-s">
+              {docentes.slice(0, 5).map((d: any) => (
+                <div key={d.id} className="flex items-center gap-2.5 py-2">
+                  <div
+                    className="w-7 h-7 rounded-full flex items-center justify-center text-[10px] font-bold text-white shrink-0"
+                    style={{ background: cursoColor(d.especialidad ?? d.nombre) }}
+                  >
+                    {d.nombre[0]}{d.apellidos[0]}
+                  </div>
+                  <div className="flex-1 min-w-0">
+                    <div className="text-[12.5px] font-medium truncate">{d.nombre} {d.apellidos}</div>
+                    <div className="text-[11px] text-text-mute truncate">{d.especialidad ?? '—'}</div>
+                  </div>
+                  <button
+                    onClick={openCreate}
+                    className="text-text-mute hover:text-primary p-0.5"
+                    title="Asignar clase"
+                  >
+                    <Plus size={14} />
+                  </button>
                 </div>
               ))}
-              {secciones.length === 0 && (
-                <div className="py-4 text-center text-[12px] text-text-mute">Sin secciones</div>
+              {docentes.length === 0 && (
+                <div className="py-4 text-center text-[12px] text-text-mute">Sin docentes</div>
               )}
             </div>
           </Card>

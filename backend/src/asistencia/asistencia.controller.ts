@@ -12,6 +12,7 @@ import { AsistenciaService } from './asistencia.service';
 import { RegisterScanDto } from './dto/register-scan.dto';
 import { ManualCorrectionDto } from './dto/manual-correction.dto';
 import { FilterAsistenciaDto } from './dto/filter-asistencia.dto';
+import { CreateManualAsistenciaDto } from './dto/create-manual-asistencia.dto';
 
 @ApiTags('Asistencia')
 @Controller('asistencia')
@@ -27,6 +28,17 @@ export class AsistenciaController {
   @ApiOperation({ summary: 'Registrar asistencia por código de barras (modo HID)' })
   scan(@Body() dto: RegisterScanDto, @CurrentUser() user: { id: string }) {
     return this.service.scan(dto, user.id);
+  }
+
+  /** POST /asistencia/manual — registro manual de asistencia */
+  @Post('manual')
+  @HttpCode(HttpStatus.CREATED)
+  @ApiBearerAuth('access-token')
+  @UseGuards(JwtAuthGuard, RolesGuard)
+  @Roles(Rol.admin, Rol.director)
+  @ApiOperation({ summary: 'Registrar asistencia manualmente (sin código de barras)' })
+  createManual(@Body() dto: CreateManualAsistenciaDto, @CurrentUser() user: { id: string }) {
+    return this.service.createManual(dto, user.id);
   }
 
   /** GET /asistencia/stats — estadísticas del día */

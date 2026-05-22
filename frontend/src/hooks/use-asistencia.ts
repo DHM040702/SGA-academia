@@ -96,11 +96,19 @@ export function useDeleteAsistencia() {
   })
 }
 
-export function useResumenAsistencia(fecha?: string) {
-  return useQuery({
-    queryKey: ['asistencia', 'resumen', fecha],
+export interface StatsAsistencia {
+  presentes: number
+  tardanzas: number
+  total_alumno: number
+  pct_asistencia: number
+  docentes_hoy: number
+}
+
+export function useResumenAsistencia() {
+  return useQuery<StatsAsistencia>({
+    queryKey: ['asistencia', 'stats'],
     queryFn: async () => {
-      const { data } = await api.get('/reportes/asistencia', { params: { fecha } })
+      const { data } = await api.get('/asistencia/stats')
       return data
     },
     refetchInterval: 30_000,
