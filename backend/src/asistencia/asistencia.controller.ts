@@ -13,6 +13,8 @@ import { RegisterScanDto } from './dto/register-scan.dto';
 import { ManualCorrectionDto } from './dto/manual-correction.dto';
 import { FilterAsistenciaDto } from './dto/filter-asistencia.dto';
 import { CreateManualAsistenciaDto } from './dto/create-manual-asistencia.dto';
+import { CerrarTurnoDto } from './dto/cerrar-turno.dto';
+import { JustificarAusenciaDto } from './dto/justificar-ausencia.dto';
 
 @ApiTags('Asistencia')
 @Controller('asistencia')
@@ -28,6 +30,17 @@ export class AsistenciaController {
   @ApiOperation({ summary: 'Registrar asistencia por código de barras (modo HID)' })
   scan(@Body() dto: RegisterScanDto, @CurrentUser() user: { id: string }) {
     return this.service.scan(dto, user.id);
+  }
+
+  /** POST /asistencia/cerrar-turno — registrar ausencias masivas */
+  @Post('cerrar-turno')
+  @HttpCode(HttpStatus.OK)
+  @ApiBearerAuth('access-token')
+  @UseGuards(JwtAuthGuard, RolesGuard)
+  @Roles(Rol.admin, Rol.director)
+  @ApiOperation({ summary: 'Cerrar turno: registrar ausencia para alumnos sin asistencia del día' })
+  cerrarTurno(@Body() dto: CerrarTurnoDto, @CurrentUser() user: { id: string }) {
+    return this.service.cerrarTurno(dto, user.id);
   }
 
   /** POST /asistencia/manual — registro manual de asistencia */
@@ -87,6 +100,19 @@ export class AsistenciaController {
     @CurrentUser() user: { id: string },
   ) {
     return this.service.corregir(id, dto, user.id);
+  }
+
+  /** PATCH /asistencia/:id/justificar — agregar justificación a ausencia */
+  @Patch(':id/justificar')
+  @ApiBearerAuth('access-token')
+  @UseGuards(JwtAuthGuard, RolesGuard)
+  @Roles(Rol.admin, Rol.director)
+  @ApiOperation({ summary: 'Agregar o actualizar justificación de una ausencia' })
+  justificar(
+    @Param('id', ParseUUIDPipe) id: string,
+    @Body() dto: JustificarAusenciaDto,
+  ) {
+    return this.service.justificar(id, dto);
   }
 
   /** DELETE /asistencia/:id — eliminar registro (admin only) */

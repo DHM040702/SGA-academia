@@ -3,7 +3,7 @@ import './globals.css'
 import { Providers } from './providers'
 
 export const metadata: Metadata = {
-  title: 'SGA · CEPREUNASAM',
+  title: 'SGA · Centro Preuniversitario',
   description: 'Sistema de Gestión Académica — Centro Preuniversitario UNASAM',
 }
 

@@ -2,14 +2,14 @@
 
 import { useState, useEffect } from 'react'
 import { useParams, useRouter, useSearchParams } from 'next/navigation'
-import { useAula, type HorarioAula } from '@/hooks/use-ciclos'
+import { useAula, useUpdateAula, type HorarioAula, type AulaDetalle } from '@/hooks/use-ciclos'
 import { Card } from '@/components/ui/card'
 import { Btn } from '@/components/ui/btn'
 import { Pill } from '@/components/ui/pill'
 import { Dot } from '@/components/ui/dot'
 import { KPI } from '@/components/ui/kpi'
 import { PageHeader } from '@/components/layout/page-header'
-import { Edit, Users, Calendar, MapPin } from '@/components/icons'
+import { Edit, Users, Calendar, MapPin, X } from '@/components/icons'
 
 /* ─── Constantes ─────────────────────────────────────────────────── */
 const TURNO_LABEL: Record<string, string> = { manana: 'Mañana', tarde: 'Tarde' }
@@ -40,12 +40,104 @@ function formatTime(iso: string) {
   return new Date(iso).toLocaleTimeString('es-PE', { hour: '2-digit', minute: '2-digit', hour12: false })
 }
 
+/* ─── EditarAulaModal (inline en esta página) ────────────────────── */
+const TURNO_OPTS = [
+  { value: 'manana', label: 'Mañana' },
+  { value: 'tarde',  label: 'Tarde'  },
+]
+const AREA_OPTS = [
+  { value: 'ciencias', label: 'Área A — Ciencias' },
+  { value: 'letras',   label: 'Área B — Letras'   },
+  { value: 'medicas',  label: 'Área C — Médicas'   },
+]
+
+function EditarAulaModal({ aula, onClose }: {
+  aula: AulaDetalle
+  onClose: () => void
+}) {
+  const updateMut = useUpdateAula()
+  const [nombre, setNombre] = useState(aula.nombre)
+  const [turno,  setTurno]  = useState(aula.turno)
+  const [area,   setArea]   = useState(aula.area)
+  const [cupo,   setCupo]   = useState(String(aula.cupoMaximo))
+  const [error,  setError]  = useState('')
+
+  async function handleSubmit(e: React.FormEvent) {
+    e.preventDefault()
+    setError('')
+    try {
+      await updateMut.mutateAsync({
+        id: aula.id,
+        nombre, turno, area,
+        cupo_maximo: Number(cupo),
+        ciclo_id: aula.cicloId,
+      })
+      onClose()
+    } catch (err: any) {
+      const msg = err?.response?.data?.message
+      setError(Array.isArray(msg) ? msg.join(', ') : (msg ?? 'Error al guardar.'))
+    }
+  }
+
+  return (
+    <div
+      className="fixed inset-0 z-50 flex items-center justify-center"
+      style={{ background: 'rgba(0,0,0,0.45)', backdropFilter: 'blur(2px)' }}
+    >
+      <div className="w-[460px] bg-surface rounded-4 shadow-3 border border-border overflow-hidden">
+        <header className="px-5 py-4 border-b border-border flex items-center justify-between">
+          <h2 className="font-serif text-[19px] font-semibold m-0">Editar aula</h2>
+          <Btn variant="ghost" size="sm" onClick={onClose} style={{ padding: 6 }}><X size={16} /></Btn>
+        </header>
+        <form onSubmit={handleSubmit} className="p-5 flex flex-col gap-4">
+          <div className="grid grid-cols-2 gap-3">
+            <label className="flex flex-col gap-1">
+              <span className="text-[12px] font-medium text-text-mute uppercase tracking-[0.05em]">Nombre</span>
+              <input value={nombre} onChange={(e) => setNombre(e.target.value)} required
+                className="px-3 py-2 text-[13px] border border-border rounded-2 bg-surface focus:outline-none focus:ring-1 focus:ring-primary" />
+            </label>
+            <label className="flex flex-col gap-1">
+              <span className="text-[12px] font-medium text-text-mute uppercase tracking-[0.05em]">Cupo máximo</span>
+              <input type="number" min={1} value={cupo} onChange={(e) => setCupo(e.target.value)}
+                className="px-3 py-2 text-[13px] border border-border rounded-2 bg-surface focus:outline-none focus:ring-1 focus:ring-primary" />
+            </label>
+          </div>
+          <div className="grid grid-cols-2 gap-3">
+            <label className="flex flex-col gap-1">
+              <span className="text-[12px] font-medium text-text-mute uppercase tracking-[0.05em]">Turno</span>
+              <select value={turno} onChange={(e) => setTurno(e.target.value as any)}
+                className="px-3 py-2 text-[13px] border border-border rounded-2 bg-surface focus:outline-none focus:ring-1 focus:ring-primary">
+                {TURNO_OPTS.map((o) => <option key={o.value} value={o.value}>{o.label}</option>)}
+              </select>
+            </label>
+            <label className="flex flex-col gap-1">
+              <span className="text-[12px] font-medium text-text-mute uppercase tracking-[0.05em]">Área</span>
+              <select value={area} onChange={(e) => setArea(e.target.value as any)}
+                className="px-3 py-2 text-[13px] border border-border rounded-2 bg-surface focus:outline-none focus:ring-1 focus:ring-primary">
+                {AREA_OPTS.map((o) => <option key={o.value} value={o.value}>{o.label}</option>)}
+              </select>
+            </label>
+          </div>
+          {error && <p className="text-[12px] text-danger bg-danger-l px-3 py-2 rounded-2 m-0">{error}</p>}
+          <div className="flex justify-end gap-2 pt-1 border-t border-border-s">
+            <Btn variant="secondary" size="sm" onClick={onClose} type="button">Cancelar</Btn>
+            <Btn size="sm" type="submit" disabled={updateMut.isPending}>
+              {updateMut.isPending ? 'Guardando…' : 'Guardar cambios'}
+            </Btn>
+          </div>
+        </form>
+      </div>
+    </div>
+  )
+}
+
 /* ─── Página ─────────────────────────────────────────────────────── */
 export default function AulaDetallePage() {
   const { id } = useParams<{ id: string }>()
   const router = useRouter()
   const searchParams = useSearchParams()
   const { data: aula, isLoading } = useAula(id)
+  const [showEdit, setShowEdit] = useState(false)
 
   const initialTab: Tab = searchParams.get('tab') === 'horarios' ? 'Horarios' : 'Alumnos'
   const [tab, setTab] = useState<Tab>(initialTab)
@@ -85,6 +177,8 @@ export default function AulaDetallePage() {
 
   return (
     <>
+      {showEdit && <EditarAulaModal aula={aula} onClose={() => setShowEdit(false)} />}
+
       <PageHeader
         title={`Aula ${aula.nombre}`}
         crumbs={[
@@ -93,7 +187,8 @@ export default function AulaDetallePage() {
           { label: `Aula ${aula.nombre}` },
         ]}
         action={
-          <Btn variant="secondary" size="sm" icon={<Edit size={14} />}>
+          <Btn variant="secondary" size="sm" icon={<Edit size={14} />}
+            onClick={() => setShowEdit(true)}>
             Editar aula
           </Btn>
         }

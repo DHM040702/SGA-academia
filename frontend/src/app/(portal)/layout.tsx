@@ -66,7 +66,7 @@ export default function PortalLayout({ children }: { children: React.ReactNode }
         {/* Brand */}
         <div className="h-[60px] flex items-center px-[18px] border-b border-border-s">
           <span className="font-serif font-bold text-primary text-[17px] tracking-tight leading-tight">
-            CEPREUNASAM<br />
+            Centro Preuniversitario<br />
             <span className="text-[10.5px] font-sans font-normal text-text-mute tracking-[0.07em] uppercase">
               {isApoderado ? 'Portal del apoderado' : 'Portal del alumno'}
             </span>

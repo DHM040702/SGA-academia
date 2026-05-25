@@ -1,52 +1,50 @@
 'use client'
 
 import { useState, useEffect, useRef, useCallback } from 'react'
-import { useAsistencia, useScan } from '@/hooks/use-asistencia'
+import { useAsistencia, useScan, useCorrectAsistencia } from '@/hooks/use-asistencia'
 import { Avatar } from '@/components/ui/avatar'
 import { Dot } from '@/components/ui/dot'
 import { useAuth } from '@/contexts/auth-context'
 
-const TODAY = new Date().toISOString().split('T')[0]
+const _n = new Date()
+const TODAY = `${_n.getFullYear()}-${String(_n.getMonth() + 1).padStart(2, '0')}-${String(_n.getDate()).padStart(2, '0')}`
 
 function clock() {
   return new Date().toLocaleTimeString('es-PE', { hour: '2-digit', minute: '2-digit' })
 }
 function dateStr() {
-  return new Date().toLocaleDateString('es-PE', { weekday: 'long', day: 'numeric', month: 'short' }).toUpperCase()
+  return new Date()
+    .toLocaleDateString('es-PE', { weekday: 'short', day: 'numeric', month: 'short' })
+    .toUpperCase()
 }
 
 type ScanState = 'idle' | 'success' | 'error'
-
 interface LastScan {
-  nombre: string
-  codigo: string
-  seccion: string
-  hora: string
-  esTardanza: boolean
+  id: string; nombre: string; codigo: string
+  seccion: string; hora: string; esTardanza: boolean
 }
 
 export default function VigilantePage() {
   const { user } = useAuth()
-  const scanMut = useScan()
+  const scanMut    = useScan()
+  const correctMut = useCorrectAsistencia()
 
-  const [currentTime, setCurrentTime] = useState(clock())
-  const [buffer, setBuffer] = useState('')
-  const [scanState, setScanState] = useState<ScanState>('idle')
-  const [lastScan, setLastScan] = useState<LastScan | null>(null)
-  const [errorMsg, setErrorMsg] = useState('')
-  const [manualCode, setManualCode] = useState('')
+  const [currentTime, setCurrentTime]   = useState(clock())
+  const [buffer, setBuffer]             = useState('')
+  const [scanState, setScanState]       = useState<ScanState>('idle')
+  const [lastScan, setLastScan]         = useState<LastScan | null>(null)
+  const [errorMsg, setErrorMsg]         = useState('')
+  const [manualCode, setManualCode]     = useState('')
   const [inputFocused, setInputFocused] = useState(false)
-  const bufferTimer = useRef<ReturnType<typeof setTimeout> | undefined>(undefined)
+  const [sidebarOpen, setSidebarOpen]   = useState(false)
+  const bufferTimer    = useRef<ReturnType<typeof setTimeout> | undefined>(undefined)
   const manualInputRef = useRef<HTMLInputElement>(null)
 
-  // Live feed
-  const { data: page } = useAsistencia({ fecha: TODAY, limit: 20 })
-  const feed = page?.data ?? []
+  const { data: pageData } = useAsistencia({ fecha: TODAY, limit: 20 })
+  const feed      = pageData?.data ?? []
   const presentes = feed.filter((r) => !r.esTardanza).length
   const tardanzas = feed.filter((r) => r.esTardanza).length
-  const total = feed.length
 
-  // Clock ticker
   useEffect(() => {
     const id = setInterval(() => setCurrentTime(clock()), 10_000)
     return () => clearInterval(id)
@@ -54,19 +52,17 @@ export default function VigilantePage() {
 
   function processCode(code: string) {
     if (!code || scanMut.isPending) return
-    scanMut
-      .mutateAsync({ codigo: code })
+    scanMut.mutateAsync({ codigo: code })
       .then((result) => {
-        const alumno = result?.alumno
+        const alumno  = result?.alumno
         const docente = result?.docente
         const persona = alumno ?? docente
         setLastScan({
-          nombre: persona
-            ? `${persona.nombre ?? (persona as any).nombres} ${persona.apellidos}`
-            : code,
-          codigo: code,
-          seccion: alumno?.aula?.nombre ?? '—',
-          hora: new Date().toLocaleTimeString('es-PE', { hour: '2-digit', minute: '2-digit' }),
+          id:         result?.id ?? '',
+          nombre:     persona ? `${persona.nombre ?? (persona as any).nombres} ${persona.apellidos}` : code,
+          codigo:     code,
+          seccion:    alumno?.aula?.nombre ?? '—',
+          hora:       new Date().toLocaleTimeString('es-PE', { hour: '2-digit', minute: '2-digit' }),
           esTardanza: result?.esTardanza ?? false,
         })
         setScanState('success')
@@ -80,6 +76,14 @@ export default function VigilantePage() {
       })
   }
 
+  function toggleTardanza() {
+    if (!lastScan?.id) return
+    correctMut.mutate(
+      { id: lastScan.id, es_tardanza: !lastScan.esTardanza },
+      { onSuccess: () => setLastScan((p) => p ? { ...p, esTardanza: !p.esTardanza } : p) },
+    )
+  }
+
   function submitManual() {
     const code = manualCode.trim()
     if (!code) return
@@ -87,134 +91,150 @@ export default function VigilantePage() {
     processCode(code)
   }
 
-  // HID barcode reader: listen for keystrokes, collect 6-char buffer, submit on Enter
-  const handleKeyDown = useCallback(
-    (e: KeyboardEvent) => {
-      if (inputFocused) return  // manual input handles its own keys
-      if (e.key === 'Enter') {
-        const code = buffer.trim()
-        setBuffer('')
-        clearTimeout(bufferTimer.current)
-        if (code.length >= 4) processCode(code)
-      } else if (e.key.length === 1) {
-        setBuffer((b) => b + e.key)
-        clearTimeout(bufferTimer.current)
-        bufferTimer.current = setTimeout(() => setBuffer(''), 300)
-      }
-    },
+  const handleKeyDown = useCallback((e: KeyboardEvent) => {
+    if (inputFocused) return
+    if (e.key === 'Enter') {
+      const code = buffer.trim()
+      setBuffer('')
+      clearTimeout(bufferTimer.current)
+      if (code.length >= 4) processCode(code)
+    } else if (e.key.length === 1) {
+      setBuffer((b) => b + e.key)
+      clearTimeout(bufferTimer.current)
+      bufferTimer.current = setTimeout(() => setBuffer(''), 300)
+    }
     // eslint-disable-next-line react-hooks/exhaustive-deps
-    [buffer, inputFocused],
-  )
+  }, [buffer, inputFocused])
 
   useEffect(() => {
     window.addEventListener('keydown', handleKeyDown)
     return () => window.removeEventListener('keydown', handleKeyDown)
   }, [handleKeyDown])
 
-  const bgColor = scanState === 'success' ? '#0a1a0a' : scanState === 'error' ? '#1a0a0a' : '#1a1612'
-  const accentColor = scanState === 'success' ? '#7be087' : scanState === 'error' ? '#f87171' : '#8aa8ff'
+  const bg     = scanState === 'success' ? '#0a1a0a' : scanState === 'error' ? '#1a0a0a' : '#1a1612'
+  const accent = scanState === 'success' ? '#7be087' : scanState === 'error' ? '#f87171' : '#8aa8ff'
+
+  /* ── color helpers ── */
+  const successStyle = { background: 'rgba(80,170,90,.15)', color: '#7be087', border: '1px solid rgba(80,170,90,.3)' } as const
+  const successStyleStrong = { background: 'rgba(80,170,90,.2)', color: '#7be087', border: '1px solid rgba(80,170,90,.5)' } as const
 
   return (
     <div
-      className="w-full h-full flex overflow-hidden"
-      style={{
-        background: bgColor,
-        color: '#fff',
-        fontFamily: 'Inter, system-ui, sans-serif',
-        transition: 'background 0.4s',
-      }}
+      className="w-full h-full flex overflow-hidden select-none"
+      style={{ background: bg, color: '#fff', fontFamily: 'Inter, system-ui, sans-serif', transition: 'background 0.4s' }}
     >
-      {/* ── Main kiosk ── */}
-      <div className="flex-1 flex flex-col relative overflow-hidden">
-        {/* Top bar */}
+      {/* ════════════════ MAIN KIOSK ════════════════ */}
+      <div className="flex-1 min-w-0 flex flex-col overflow-hidden">
+
+        {/* ── Top bar ── */}
         <div
-          className="flex items-center px-6 py-3.5"
-          style={{ background: 'rgba(255,255,255,0.04)', borderBottom: '1px solid rgba(255,255,255,0.06)' }}
+          className="flex-shrink-0 flex items-center gap-2 px-4 sm:px-6 py-2.5"
+          style={{ background: 'rgba(255,255,255,.04)', borderBottom: '1px solid rgba(255,255,255,.06)' }}
         >
-          <div className="font-serif text-[18px] font-semibold tracking-tight">
-            <span style={{ color: accentColor }}>CEPREUNASAM</span>
-            <span className="text-white/50 mx-1.5">·</span>
-            <span className="text-white/80 text-[14px] font-normal">Registro con lectora HID</span>
+          <div className="font-serif font-semibold tracking-tight leading-none">
+            <span className="text-[15px] sm:text-[17px]" style={{ color: accent }}>Centro Preuniversitario</span>
+            <span className="hidden sm:inline text-white/40 mx-1.5">·</span>
+            <span className="hidden sm:inline text-white/65 text-[12px] font-normal">Registro con lectora HID</span>
           </div>
+
           <div className="flex-1" />
+
+          {/* Lector pill */}
           <div
-            className="flex items-center gap-1.5 px-3 py-1 rounded-full text-[12px] font-medium"
-            style={{ background: 'rgba(80,170,90,.15)', color: '#7be087', border: '1px solid rgba(80,170,90,.3)' }}
+            className="hidden sm:flex items-center gap-1.5 px-2.5 py-1 rounded-full text-[11px] font-medium"
+            style={successStyle}
           >
             <Dot tone="success" size={6} />
-            Lector conectado
+            <span>Lector conectado</span>
           </div>
-          <div className="w-px h-5 mx-3.5" style={{ background: 'rgba(255,255,255,.12)' }} />
+
+          <div className="hidden sm:block w-px h-5 mx-3" style={{ background: 'rgba(255,255,255,.12)' }} />
+
+          {/* User */}
           <div className="flex items-center gap-2">
-            <Avatar name={user?.email ?? 'Vigilante'} size={28} />
-            <div>
-              <div className="text-[12px] font-semibold leading-tight">{user?.email?.split('@')[0] ?? 'Vigilante'}</div>
-              <div className="text-[10.5px] opacity-70">Vigilante · Entrada principal</div>
+            <Avatar name={user?.email ?? 'Vigilante'} size={26} />
+            <div className="hidden md:block leading-tight">
+              <div className="text-[12px] font-semibold">{user?.email?.split('@')[0] ?? 'Vigilante'}</div>
+              <div className="text-[10px] opacity-55">Vigilante · Entrada principal</div>
             </div>
           </div>
+
+          {/* Sidebar toggle — only on smaller than lg */}
+          <button
+            onClick={() => setSidebarOpen((v) => !v)}
+            className="lg:hidden ml-1 w-8 h-8 rounded-lg flex items-center justify-center text-[16px]"
+            style={{ background: 'rgba(255,255,255,.08)', border: '1px solid rgba(255,255,255,.15)' }}
+          >
+            {sidebarOpen ? '✕' : '≡'}
+          </button>
         </div>
 
-        {/* Center */}
-        <div className="flex-1 flex flex-col items-center justify-center px-8 relative">
-          {/* Ambient rings */}
+        {/* ── Center — flex-1, NO scroll, everything shrinks to fit ── */}
+        <div className="flex-1 min-h-0 flex flex-col items-center justify-center px-4 sm:px-8 gap-0 overflow-hidden">
+
+          {/* Ambient rings (decorative, only large screens) */}
           <svg
-            width="600" height="600" viewBox="0 0 600 600"
-            className="absolute pointer-events-none"
-            style={{ opacity: 0.04 }}
+            width="520" height="520" viewBox="0 0 600 600"
+            className="absolute pointer-events-none opacity-[0.035] hidden lg:block"
           >
             <circle cx="300" cy="300" r="280" fill="none" stroke="#fff" strokeWidth="1" />
             <circle cx="300" cy="300" r="200" fill="none" stroke="#fff" strokeWidth="1" />
             <circle cx="300" cy="300" r="120" fill="none" stroke="#fff" strokeWidth="1" />
           </svg>
 
-          <div className="relative text-center max-w-[720px]">
+          <div className="relative w-full max-w-md text-center flex flex-col items-center gap-2 sm:gap-3">
+
+            {/* ── IDLE ── */}
             {scanState === 'idle' && (
               <>
-                <div className="text-[11px] tracking-[0.2em] uppercase opacity-55 mb-3">
+                <p className="text-[10px] sm:text-[11px] tracking-[0.18em] uppercase opacity-50 m-0">
                   {lastScan ? 'Último ingreso registrado' : 'Esperando escaneo…'}
-                </div>
+                </p>
+
                 {lastScan ? (
                   <>
                     <div
-                      className="w-44 h-44 rounded-full mx-auto mb-6 flex items-center justify-center"
-                      style={{ background: 'rgba(255,255,255,.06)', border: '4px solid rgba(255,255,255,.1)' }}
+                      className="w-20 h-20 sm:w-28 sm:h-28 lg:w-36 lg:h-36 rounded-full flex items-center justify-center"
+                      style={{ background: 'rgba(255,255,255,.06)', border: '3px solid rgba(255,255,255,.1)' }}
                     >
-                      <Avatar name={lastScan.nombre} size={160} />
+                      <Avatar name={lastScan.nombre} size={120} />
                     </div>
-                    <h1 className="font-serif text-[44px] font-semibold tracking-[-0.02em] leading-tight m-0">
+
+                    <h1 className="font-serif text-xl sm:text-3xl lg:text-[40px] font-semibold tracking-tight leading-tight m-0 break-words w-full">
                       ✓ {lastScan.nombre}
                     </h1>
-                    <div className="mt-3 text-[16px] opacity-75">
+
+                    <p className="text-[12px] sm:text-[14px] opacity-70 m-0">
                       <span className="font-mono">{lastScan.codigo}</span>
                       {lastScan.seccion !== '—' && (
-                        <>
-                          <span className="mx-2.5 opacity-40">·</span>
-                          <span>Aula {lastScan.seccion}</span>
-                        </>
+                        <><span className="mx-2 opacity-40">·</span>Aula {lastScan.seccion}</>
                       )}
-                    </div>
+                    </p>
+
                     <div
-                      className="inline-flex items-center gap-2.5 mt-6 px-5 py-3 rounded-full text-[16px] font-semibold"
-                      style={{
-                        background: 'rgba(80,170,90,.15)',
-                        color: '#7be087',
-                        border: '1px solid rgba(80,170,90,.3)',
-                      }}
+                      className="inline-flex items-center gap-2 px-4 py-2 rounded-full text-[12px] sm:text-[14px] font-semibold"
+                      style={successStyle}
                     >
-                      <Dot tone="success" size={10} />
+                      <Dot tone="success" size={8} />
                       Asistencia registrada · {lastScan.hora}
                       {lastScan.esTardanza && ' · Tardanza'}
                     </div>
+
+                    <TardanzaToggle
+                      esTardanza={lastScan.esTardanza}
+                      onToggle={toggleTardanza}
+                      pending={correctMut.isPending}
+                    />
                   </>
                 ) : (
                   <>
                     <div
-                      className="w-44 h-44 rounded-full mx-auto mb-6 flex items-center justify-center"
+                      className="w-20 h-20 sm:w-28 sm:h-28 lg:w-36 lg:h-36 rounded-full flex items-center justify-center"
                       style={{ background: 'rgba(255,255,255,.04)', border: '3px dashed rgba(255,255,255,.15)' }}
                     >
-                      <span className="text-[64px] opacity-30">📷</span>
+                      <span className="text-4xl sm:text-5xl opacity-30">📷</span>
                     </div>
-                    <h1 className="font-serif text-[36px] font-semibold tracking-tight opacity-60 m-0">
+                    <h1 className="font-serif text-xl sm:text-3xl font-semibold opacity-55 m-0">
                       Sin escaneos aún
                     </h1>
                   </>
@@ -222,83 +242,92 @@ export default function VigilantePage() {
               </>
             )}
 
+            {/* ── SUCCESS ── */}
             {scanState === 'success' && lastScan && (
               <>
-                <div className="text-[11px] tracking-[0.2em] uppercase mb-3" style={{ color: '#7be087' }}>
+                <p className="text-[10px] sm:text-[11px] tracking-[0.18em] uppercase m-0" style={{ color: '#7be087' }}>
                   ✓ Acceso permitido
-                </div>
+                </p>
                 <div
-                  className="w-44 h-44 rounded-full mx-auto mb-6 flex items-center justify-center"
-                  style={{ background: 'rgba(80,170,90,.12)', border: '4px solid rgba(80,170,90,.4)' }}
+                  className="w-20 h-20 sm:w-28 sm:h-28 lg:w-36 lg:h-36 rounded-full flex items-center justify-center"
+                  style={{ background: 'rgba(80,170,90,.12)', border: '3px solid rgba(80,170,90,.4)' }}
                 >
-                  <Avatar name={lastScan.nombre} size={160} />
+                  <Avatar name={lastScan.nombre} size={120} />
                 </div>
-                <h1 className="font-serif text-[44px] font-semibold tracking-[-0.02em] leading-tight m-0" style={{ color: '#7be087' }}>
+                <h1
+                  className="font-serif text-xl sm:text-3xl lg:text-[40px] font-semibold tracking-tight leading-tight m-0 break-words w-full"
+                  style={{ color: '#7be087' }}
+                >
                   {lastScan.nombre}
                 </h1>
-                <div className="mt-3 text-[16px] opacity-80">
+                <p className="text-[12px] sm:text-[14px] opacity-75 m-0">
                   {lastScan.codigo}{lastScan.seccion !== '—' ? ` · Aula ${lastScan.seccion}` : ''}
-                </div>
+                </p>
                 <div
-                  className="inline-flex items-center gap-2.5 mt-6 px-5 py-3 rounded-full text-[16px] font-semibold"
-                  style={{ background: 'rgba(80,170,90,.2)', color: '#7be087', border: '1px solid rgba(80,170,90,.5)' }}
+                  className="inline-flex items-center gap-2 px-4 py-2 rounded-full text-[12px] sm:text-[14px] font-semibold"
+                  style={successStyleStrong}
                 >
-                  <Dot tone="success" size={10} />
-                  {lastScan.esTardanza ? 'Tardanza · ' : 'Puntual · '}
-                  {lastScan.hora}
+                  <Dot tone="success" size={8} />
+                  {lastScan.esTardanza ? 'Tardanza' : 'Puntual'} · {lastScan.hora}
                 </div>
+                <TardanzaToggle
+                  esTardanza={lastScan.esTardanza}
+                  onToggle={toggleTardanza}
+                  pending={correctMut.isPending}
+                />
               </>
             )}
 
+            {/* ── ERROR ── */}
             {scanState === 'error' && (
               <>
-                <div className="text-[11px] tracking-[0.2em] uppercase mb-3 text-red-400">
+                <p className="text-[10px] sm:text-[11px] tracking-[0.18em] uppercase text-red-400 m-0">
                   ✕ Acceso denegado
-                </div>
+                </p>
                 <div
-                  className="w-44 h-44 rounded-full mx-auto mb-6 flex items-center justify-center"
-                  style={{ background: 'rgba(239,68,68,.12)', border: '4px solid rgba(239,68,68,.4)' }}
+                  className="w-20 h-20 sm:w-28 sm:h-28 lg:w-36 lg:h-36 rounded-full flex items-center justify-center"
+                  style={{ background: 'rgba(239,68,68,.12)', border: '3px solid rgba(239,68,68,.4)' }}
                 >
-                  <span className="text-[80px] opacity-40">?</span>
+                  <span className="text-4xl sm:text-5xl opacity-40">?</span>
                 </div>
-                <h1 className="font-serif text-[40px] font-semibold tracking-tight text-red-400 m-0">
+                <h1 className="font-serif text-xl sm:text-3xl font-semibold text-red-400 m-0">
                   Código no reconocido
                 </h1>
-                <div className="mt-3 text-[15px] opacity-70">{errorMsg}</div>
+                <p className="text-[12px] sm:text-[13px] opacity-65 m-0 break-words w-full">{errorMsg}</p>
               </>
             )}
 
-            {/* Scan prompt */}
+            {/* ── Scan prompt ── */}
             <div
-              className="mx-auto mt-10 px-5 py-4 flex items-center gap-3.5 text-[13px] opacity-75 rounded-3 w-fit"
+              className="flex items-center gap-3 px-4 py-2.5 rounded-xl text-[12px] sm:text-[13px] opacity-70 w-fit mx-auto mt-1"
               style={{ background: 'rgba(255,255,255,.05)', border: '1px dashed rgba(255,255,255,.15)' }}
             >
-              <span className="text-[22px]">⬛</span>
+              <span className="text-lg flex-shrink-0">⬛</span>
               <div className="text-left">
-                <div className="font-semibold text-[14px]">Escanee el código de barras…</div>
-                <div className="mt-0.5 text-[12px] opacity-80">
-                  El lector HID funciona como teclado. No se requiere acción adicional.
+                <div className="font-semibold leading-tight">Escanee el código de barras…</div>
+                <div className="text-[11px] opacity-75 hidden sm:block mt-0.5">
+                  El lector HID funciona como teclado.
                 </div>
               </div>
-              <kbd className="ml-2 px-2 py-1 bg-white/10 rounded text-[11px] font-mono">↵</kbd>
+              <kbd className="px-1.5 py-0.5 bg-white/10 rounded text-[11px] font-mono flex-shrink-0">↵</kbd>
             </div>
 
-            {/* Manual code input — fallback when HID fails */}
-            <div className="mx-auto mt-5 w-full max-w-sm">
-              <div className="text-[11px] tracking-[0.12em] uppercase opacity-50 mb-2 text-center">
-                Ingreso manual de código
+            {/* ── Manual input ── */}
+            <div className="w-full mt-1">
+              <div className="text-[10px] tracking-[0.12em] uppercase opacity-45 mb-1.5 text-center">
+                Ingreso manual
               </div>
               <div className="flex gap-2">
                 <input
                   ref={manualInputRef}
                   type="text"
                   value={manualCode}
-                  onChange={e => setManualCode(e.target.value)}
+                  onChange={(e) => setManualCode(e.target.value)}
                   onFocus={() => setInputFocused(true)}
                   onBlur={() => setInputFocused(false)}
-                  onKeyDown={e => { if (e.key === 'Enter') { e.preventDefault(); submitManual() } }}
+                  onKeyDown={(e) => { if (e.key === 'Enter') { e.preventDefault(); submitManual() } }}
                   placeholder="Código de alumno o DNI docente…"
-                  className="flex-1 px-3 py-2.5 text-[13px] rounded-2 font-mono outline-none"
+                  className="flex-1 min-w-0 px-3 py-2 text-[12px] sm:text-[13px] rounded-lg font-mono outline-none"
                   style={{
                     background: 'rgba(255,255,255,.08)',
                     border: inputFocused ? '1px solid rgba(138,168,255,.6)' : '1px solid rgba(255,255,255,.15)',
@@ -308,117 +337,214 @@ export default function VigilantePage() {
                 <button
                   onClick={submitManual}
                   disabled={!manualCode.trim() || scanMut.isPending}
-                  className="px-4 py-2 text-[13px] font-semibold rounded-2 transition-opacity disabled:opacity-30"
+                  className="px-3 sm:px-4 py-2 text-[12px] sm:text-[13px] font-semibold rounded-lg flex-shrink-0 disabled:opacity-30 transition-opacity"
                   style={{ background: 'rgba(138,168,255,.2)', color: '#8aa8ff', border: '1px solid rgba(138,168,255,.3)' }}
                 >
                   Registrar
                 </button>
               </div>
             </div>
+
           </div>
         </div>
 
-        {/* Bottom bar */}
+        {/* ── Bottom bar ── */}
         <div
-          className="flex items-center gap-5 px-6 py-3.5"
-          style={{ borderTop: '1px solid rgba(255,255,255,0.06)', background: 'rgba(255,255,255,0.03)' }}
+          className="flex-shrink-0 flex items-center gap-3 sm:gap-5 px-4 sm:px-6 py-2 sm:py-3"
+          style={{ borderTop: '1px solid rgba(255,255,255,.06)', background: 'rgba(255,255,255,.03)' }}
         >
-          <div>
-            <div className="font-mono text-[11px] opacity-60 tracking-[0.05em]">{dateStr()}</div>
-            <div className="font-serif text-[26px] font-semibold leading-tight mt-0.5">{currentTime}</div>
+          <div className="flex-shrink-0">
+            <div className="font-mono text-[9px] sm:text-[10px] opacity-55 tracking-[0.05em] hidden sm:block">{dateStr()}</div>
+            <div className="font-serif text-[18px] sm:text-[22px] font-semibold leading-tight">{currentTime}</div>
           </div>
-          <div className="w-px h-9" style={{ background: 'rgba(255,255,255,.12)' }} />
+
+          <div className="w-px h-7 flex-shrink-0" style={{ background: 'rgba(255,255,255,.12)' }} />
+
           <KioskoStat n={presentes + tardanzas} l="Presentes" />
           <KioskoStat n={tardanzas} l="Tardanzas" />
-          <KioskoStat n={total} l="Total hoy" />
-          <KioskoStat n={total > 0 ? `${Math.round(((presentes + tardanzas) / total) * 100)}%` : '—'} l="Asistencia" highlight />
+          <KioskoStat n={feed.length} l="Total" />
+          <KioskoStat
+            n={feed.length > 0 ? `${Math.round(((presentes + tardanzas) / feed.length) * 100)}%` : '—'}
+            l="Asistencia"
+            highlight
+          />
+
           <div className="flex-1" />
+
+          {/* Atajos — solo desktop */}
+          <div className="hidden lg:flex items-center gap-3 text-[11px] opacity-60">
+            <Kbd>↵</Kbd><span>Confirmar</span>
+            <Kbd>Esc</Kbd><span>Limpiar</span>
+          </div>
+
           <a
             href="/inicio"
-            className="px-3 py-1.5 rounded-2 text-[13px] font-medium transition-colors"
-            style={{ background: 'transparent', color: '#fff', border: '1px solid rgba(255,255,255,.2)' }}
+            className="flex-shrink-0 px-3 py-1.5 rounded-lg text-[11px] sm:text-[12px] font-medium"
+            style={{ color: '#fff', border: '1px solid rgba(255,255,255,.2)' }}
           >
-            Volver al panel
+            Panel
           </a>
         </div>
       </div>
 
-      {/* ── Live feed sidebar ── */}
+      {/* ════════════════ SIDEBAR ════════════════ */}
+
+      {/* Desktop — always visible */}
       <aside
-        className="w-[340px] flex flex-col overflow-hidden"
-        style={{ background: 'rgba(255,255,255,.04)', borderLeft: '1px solid rgba(255,255,255,0.06)' }}
+        className="hidden lg:flex w-[260px] xl:w-[300px] flex-shrink-0 flex-col overflow-hidden"
+        style={{ background: 'rgba(255,255,255,.04)', borderLeft: '1px solid rgba(255,255,255,.06)' }}
       >
-        <div className="px-4 pt-4 pb-3" style={{ borderBottom: '1px solid rgba(255,255,255,0.06)' }}>
-          <div className="flex items-center justify-between mb-1">
-            <h3 className="font-serif text-[17px] font-semibold m-0">En vivo</h3>
-            <div
-              className="flex items-center gap-1.5 px-2 py-0.5 rounded-full text-[11px]"
-              style={{ background: 'rgba(80,170,90,.15)', color: '#7be087', border: '1px solid rgba(80,170,90,.25)' }}
-            >
-              <Dot tone="success" size={6} />actualizando
-            </div>
-          </div>
-          <div className="text-[12px] opacity-60">Últimos {feed.length} registros de hoy</div>
-        </div>
-
-        <div className="flex-1 overflow-y-auto py-1">
-          {feed.map((r, i) => {
-            const persona = r.tipoPersona === 'alumno' ? r.alumno : r.docente
-            const nombre = persona
-              ? `${(persona as any).nombre ?? (persona as any).nombres} ${persona.apellidos}`
-              : 'Desconocido'
-            const codigo = r.tipoPersona === 'alumno'
-              ? (r.alumno as any)?.codigoBarras ?? r.alumnoId?.slice(0, 6) ?? '—'
-              : r.docente?.dni ?? '—'
-            const hora = new Date(r.horaIngreso).toLocaleTimeString('es-PE', { hour: '2-digit', minute: '2-digit' })
-            return (
-              <div
-                key={r.id}
-                className="flex gap-3 items-center px-4 py-3"
-                style={{
-                  background: i === 0 ? 'rgba(125,165,255,.08)' : 'transparent',
-                  borderLeft: `3px solid ${i === 0 ? '#8aa8ff' : 'transparent'}`,
-                }}
-              >
-                <div className="font-mono text-[12px] opacity-70 w-10">{hora}</div>
-                <Avatar name={nombre} size={34} />
-                <div className="flex-1 min-w-0">
-                  <div className="text-[12.5px] font-semibold truncate">{nombre}</div>
-                  <div className="text-[11px] opacity-65 font-mono">{codigo}</div>
-                </div>
-                <span style={{ color: r.esTardanza ? '#fbbf24' : '#7be087' }}>
-                  {r.esTardanza ? '⚠' : '✓'}
-                </span>
-              </div>
-            )
-          })}
-          {feed.length === 0 && (
-            <div className="py-8 text-center text-[12px] opacity-50">Sin ingresos hoy</div>
-          )}
-        </div>
-
-        <div className="px-4 py-3.5" style={{ borderTop: '1px solid rgba(255,255,255,0.06)', background: 'rgba(0,0,0,.15)' }}>
-          <div className="text-[11px] opacity-55 tracking-[0.06em] uppercase mb-2">Atajos de teclado</div>
-          <div className="grid gap-1.5 text-[12px]" style={{ gridTemplateColumns: 'auto 1fr' }}>
-            <Kbd>↵</Kbd><span className="opacity-85">Confirmar código escaneado</span>
-            <Kbd>Esc</Kbd><span className="opacity-85">Limpiar pantalla</span>
-          </div>
-        </div>
+        <FeedPanel feed={feed} />
       </aside>
+
+      {/* Mobile/tablet — slide-over */}
+      {sidebarOpen && (
+        <div className="fixed inset-0 z-50 lg:hidden" onClick={() => setSidebarOpen(false)}>
+          <div className="absolute inset-0 bg-black/50" />
+          <aside
+            className="absolute right-0 top-0 bottom-0 w-72 sm:w-80 flex flex-col overflow-hidden"
+            style={{ background: '#1e1e1a', borderLeft: '1px solid rgba(255,255,255,.1)' }}
+            onClick={(e) => e.stopPropagation()}
+          >
+            <FeedPanel feed={feed} onClose={() => setSidebarOpen(false)} />
+          </aside>
+        </div>
+      )}
     </div>
   )
 }
 
+/* ─── Feed panel (shared sidebar content) ─────────────────────── */
+function FeedPanel({ feed, onClose }: { feed: any[]; onClose?: () => void }) {
+  return (
+    <>
+      <div
+        className="flex-shrink-0 px-4 pt-3.5 pb-3"
+        style={{ borderBottom: '1px solid rgba(255,255,255,.06)' }}
+      >
+        <div className="flex items-center justify-between">
+          <h3 className="font-serif text-[15px] font-semibold m-0">En vivo</h3>
+          <div className="flex items-center gap-2">
+            <div
+              className="flex items-center gap-1.5 px-2 py-0.5 rounded-full text-[11px]"
+              style={{ background: 'rgba(80,170,90,.15)', color: '#7be087', border: '1px solid rgba(80,170,90,.25)' }}
+            >
+              <Dot tone="success" size={5} />actualizando
+            </div>
+            {onClose && (
+              <button onClick={onClose} className="text-white/40 hover:text-white text-[15px] leading-none">✕</button>
+            )}
+          </div>
+        </div>
+        <p className="text-[11px] opacity-55 m-0 mt-0.5">Últimos {feed.length} registros de hoy</p>
+      </div>
+
+      <div className="flex-1 overflow-y-auto">
+        {feed.map((r: any, i: number) => {
+          const persona = r.tipoPersona === 'alumno' ? r.alumno : r.docente
+          const nombre  = persona ? `${persona.nombre ?? persona.nombres} ${persona.apellidos}` : 'Desconocido'
+          const codigo  = r.tipoPersona === 'alumno'
+            ? r.alumno?.codigoBarras ?? '—'
+            : r.docente?.dni ?? '—'
+          const hora = new Date(r.horaIngreso).toLocaleTimeString('es-PE', { hour: '2-digit', minute: '2-digit' })
+          return (
+            <div
+              key={r.id}
+              className="flex gap-2.5 items-center px-3 py-2.5"
+              style={{
+                background:  i === 0 ? 'rgba(125,165,255,.08)' : 'transparent',
+                borderLeft: `3px solid ${i === 0 ? '#8aa8ff' : 'transparent'}`,
+              }}
+            >
+              <div className="font-mono text-[10.5px] opacity-60 w-9 flex-shrink-0 leading-tight">{hora}</div>
+              <Avatar name={nombre} size={30} />
+              <div className="flex-1 min-w-0">
+                <div className="text-[12px] font-semibold truncate">{nombre}</div>
+                <div className="text-[10.5px] opacity-55 font-mono">{codigo}</div>
+              </div>
+              <span className="flex-shrink-0 text-[13px]" style={{ color: r.esTardanza ? '#fbbf24' : '#7be087' }}>
+                {r.esTardanza ? '⚠' : '✓'}
+              </span>
+            </div>
+          )
+        })}
+        {feed.length === 0 && (
+          <div className="py-10 text-center text-[12px] opacity-45">Sin ingresos hoy</div>
+        )}
+      </div>
+
+      <div
+        className="flex-shrink-0 px-4 py-3"
+        style={{ borderTop: '1px solid rgba(255,255,255,.06)', background: 'rgba(0,0,0,.15)' }}
+      >
+        <div className="text-[10px] opacity-50 tracking-[0.06em] uppercase mb-1.5">Atajos de teclado</div>
+        <div className="grid gap-1.5 text-[11px]" style={{ gridTemplateColumns: 'auto 1fr' }}>
+          <Kbd>↵</Kbd><span className="opacity-75 self-center">Confirmar código escaneado</span>
+          <Kbd>Esc</Kbd><span className="opacity-75 self-center">Limpiar pantalla</span>
+        </div>
+      </div>
+    </>
+  )
+}
+
+/* ─── Sub-components ──────────────────────────────────────────── */
 function KioskoStat({ n, l, highlight }: { n: string | number; l: string; highlight?: boolean }) {
   return (
-    <div>
+    <div className="flex-shrink-0">
       <div
-        className="font-serif text-[22px] font-semibold leading-none"
+        className="font-serif text-[17px] sm:text-[20px] font-semibold leading-none"
         style={{ color: highlight ? '#a3c7ff' : '#fff' }}
       >
         {n}
       </div>
-      <div className="text-[10.5px] opacity-65 mt-1 uppercase tracking-[0.05em]">{l}</div>
+      <div className="text-[9px] sm:text-[10px] opacity-60 mt-0.5 uppercase tracking-[0.05em]">{l}</div>
+    </div>
+  )
+}
+
+function TardanzaToggle({
+  esTardanza, onToggle, pending,
+}: {
+  esTardanza: boolean; onToggle: () => void; pending: boolean
+}) {
+  return (
+    <div className="flex items-center justify-center gap-3">
+      <span
+        className="text-[12px] sm:text-[13px] transition-opacity"
+        style={{ opacity: esTardanza ? 0.4 : 1, color: '#7be087' }}
+      >
+        Puntual
+      </span>
+
+      {/* Toggle pill — fixed 52×26px so the thumb calc is exact */}
+      <button
+        onClick={onToggle}
+        disabled={pending}
+        aria-label={esTardanza ? 'Cambiar a puntual' : 'Cambiar a tardanza'}
+        className="relative flex-shrink-0 rounded-full transition-all disabled:opacity-40"
+        style={{
+          width: 52, height: 26,
+          background: esTardanza ? 'rgba(251,191,36,.3)' : 'rgba(80,170,90,.3)',
+          border: `1.5px solid ${esTardanza ? 'rgba(251,191,36,.6)' : 'rgba(80,170,90,.55)'}`,
+        }}
+      >
+        {/* Thumb — uses left so it's always correct regardless of outer size */}
+        <span
+          className="absolute top-[3px] rounded-full transition-all shadow-md"
+          style={{
+            width: 18, height: 18,
+            background: esTardanza ? '#fbbf24' : '#7be087',
+            left: esTardanza ? 'calc(100% - 21px)' : '3px',
+          }}
+        />
+      </button>
+
+      <span
+        className="text-[12px] sm:text-[13px] transition-all"
+        style={{ opacity: esTardanza ? 1 : 0.4, color: '#fbbf24' }}
+      >
+        Tardanza
+      </span>
     </div>
   )
 }
@@ -426,7 +552,7 @@ function KioskoStat({ n, l, highlight }: { n: string | number; l: string; highli
 function Kbd({ children }: { children: React.ReactNode }) {
   return (
     <kbd
-      className="px-1.5 py-0.5 rounded text-[11px] font-mono w-fit"
+      className="inline-flex items-center px-1.5 py-0.5 rounded text-[10px] sm:text-[11px] font-mono"
       style={{ background: 'rgba(255,255,255,.1)', border: '1px solid rgba(255,255,255,.2)' }}
     >
       {children}

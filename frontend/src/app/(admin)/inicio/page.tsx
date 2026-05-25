@@ -143,9 +143,11 @@ export default function InicioPage() {
       const dateStr = d.toISOString().split('T')[0]
       const entry = reporte?.tendencia_30d?.find((t: any) => t.fecha === dateStr)
       const isToday = dateStr === todayStr
-      return { day: isToday ? `${day} ${d.getDate()}` : day, v: entry?.pct ?? 0, today: isToday }
+      // Si hoy no tiene entrada en tendencia_30d, usa asistenciaPct del KPI como fallback
+      const v = entry?.pct ?? (isToday && asistenciaPct > 0 ? asistenciaPct : 0)
+      return { day: isToday ? `${day} ${d.getDate()}` : day, v, today: isToday }
     })
-  }, [reporte, todayStr])
+  }, [reporte, todayStr, asistenciaPct])
 
   // Stats de sección
   const porSeccion: any[] = reporte?.por_seccion ?? []
@@ -254,13 +256,13 @@ export default function InicioPage() {
                 tone: vsSemanaPasada !== null && vsSemanaPasada >= 0 ? ('primary' as const) : ('warning' as const),
               },
               {
-                label: 'Sección menor',
+                label: 'Aula menor',
                 value: seccionMenor?.nombre ?? '—',
                 sub: seccionMenor ? `${seccionMenor.pct_asistencia}%` : undefined,
                 tone: 'warning' as const,
               },
               {
-                label: 'Sección mayor',
+                label: 'Aula mayor',
                 value: seccionMayor?.nombre ?? '—',
                 sub: seccionMayor ? `${seccionMayor.pct_asistencia}%` : undefined,
                 tone: 'success' as const,
@@ -322,7 +324,7 @@ export default function InicioPage() {
                       </div>
                       <div className="text-[11.5px] text-text-mute truncate">
                         {c.docente ? `${c.docente.nombre} ${c.docente.apellidos}` : '—'}
-                        {c.aula ? ` · ${c.aula}` : ''}
+                        {c.aula ? ` · ${c.aula?.nombre ?? c.aula}` : ''}
                       </div>
                     </div>
                     {live && (

@@ -4,6 +4,7 @@ import { useState, useRef, useEffect } from 'react'
 import {
   useAsistencia, useResumenAsistencia,
   useManualAsistencia, useCorrectAsistencia, useDeleteAsistencia,
+  useCerrarTurno, useJustificarAusencia,
 } from '@/hooks/use-asistencia'
 import type { AsistenciaRecord } from '@/hooks/use-asistencia'
 import { useAulas } from '@/hooks/use-ciclos'
@@ -16,7 +17,7 @@ import { KPI } from '@/components/ui/kpi'
 import { Card } from '@/components/ui/card'
 import { Btn } from '@/components/ui/btn'
 import { PageHeader } from '@/components/layout/page-header'
-import { Download, Edit, ScanLine, MoreHorizontal, X, Plus } from '@/components/icons'
+import { Download, Edit, ScanLine, MoreHorizontal, X, Plus, Lock, FileText } from '@/components/icons'
 
 // ─── helpers ──────────────────────────────────────────────────────────────────
 
@@ -25,14 +26,18 @@ function formatHora(iso?: string | null) {
   return new Date(iso).toLocaleTimeString('es-PE', { hour: '2-digit', minute: '2-digit' })
 }
 
-function todayStr() { return new Date().toISOString().split('T')[0] }
+function todayStr() {
+  const n = new Date()
+  return `${n.getFullYear()}-${String(n.getMonth() + 1).padStart(2, '0')}-${String(n.getDate()).padStart(2, '0')}`
+}
 
 // ─── RowMenu ──────────────────────────────────────────────────────────────────
 
-function RowMenu({ registro, onCorregir, onEliminar }: {
+function RowMenu({ registro, onCorregir, onEliminar, onJustificar }: {
   registro: AsistenciaRecord
   onCorregir: (r: AsistenciaRecord) => void
   onEliminar: (r: AsistenciaRecord) => void
+  onJustificar: (r: AsistenciaRecord) => void
 }) {
   const [open, setOpen] = useState(false)
   const ref = useRef<HTMLDivElement>(null)
@@ -55,12 +60,22 @@ function RowMenu({ registro, onCorregir, onEliminar }: {
       </button>
       {open && (
         <div className="absolute right-0 top-full mt-1 z-30 bg-surface border border-border rounded-2 shadow-2 py-1 w-40">
-          <button
-            className="w-full text-left px-3 py-1.5 text-[12px] hover:bg-surface-2 flex items-center gap-2"
-            onClick={() => { onCorregir(registro); setOpen(false) }}
-          >
-            <Edit size={12} /> Corregir registro
-          </button>
+          {!registro.esAusente && (
+            <button
+              className="w-full text-left px-3 py-1.5 text-[12px] hover:bg-surface-2 flex items-center gap-2"
+              onClick={() => { onCorregir(registro); setOpen(false) }}
+            >
+              <Edit size={12} /> Corregir registro
+            </button>
+          )}
+          {registro.esAusente && (
+            <button
+              className="w-full text-left px-3 py-1.5 text-[12px] hover:bg-surface-2 flex items-center gap-2"
+              onClick={() => { onJustificar(registro); setOpen(false) }}
+            >
+              <FileText size={12} /> {registro.justificacionRazon ? 'Editar justificación' : 'Justificar falta'}
+            </button>
+          )}
           <button
             className="w-full text-left px-3 py-1.5 text-[12px] text-danger hover:bg-danger-l flex items-center gap-2"
             onClick={() => { onEliminar(registro); setOpen(false) }}
@@ -151,6 +166,146 @@ function CorrectModal({ registro, onClose }: { registro: AsistenciaRecord; onClo
             </Btn>
           </div>
         </form>
+      </div>
+    </div>
+  )
+}
+
+// ─── JustificarModal ──────────────────────────────────────────────────────────
+
+function JustificarModal({ registro, onClose }: { registro: AsistenciaRecord; onClose: () => void }) {
+  const mut = useJustificarAusencia()
+  const persona = registro.alumno
+  const nombre  = persona ? `${persona.nombre} ${persona.apellidos}` : '—'
+
+  const [razon,  setRazon]  = useState(registro.justificacionRazon ?? '')
+  const [docNum, setDocNum] = useState(registro.justificacionDoc ?? '')
+  const [error,  setError]  = useState('')
+
+  async function handleSubmit(e: React.FormEvent) {
+    e.preventDefault()
+    if (!razon.trim()) { setError('La razón es obligatoria'); return }
+    try {
+      await mut.mutateAsync({ id: registro.id, razon: razon.trim(), doc_num: docNum.trim() || undefined })
+      onClose()
+    } catch (err: any) {
+      const msg = err?.response?.data?.message
+      setError(Array.isArray(msg) ? msg.join(', ') : (msg ?? 'Error al guardar'))
+    }
+  }
+
+  return (
+    <div className="fixed inset-0 z-50 flex items-center justify-center" style={{ background: 'rgba(0,0,0,0.35)' }}>
+      <div className="bg-surface border border-border rounded-3 shadow-3 w-full max-w-sm p-6 flex flex-col gap-4">
+        <div className="flex items-center justify-between">
+          <h2 className="text-[15px] font-semibold">Justificar falta</h2>
+          <button onClick={onClose} className="text-text-mute hover:text-text"><X size={18} /></button>
+        </div>
+
+        <div className="flex items-center gap-2.5 p-3 bg-surface-2 rounded-2">
+          <Avatar name={nombre} size={32} />
+          <div>
+            <div className="text-[13px] font-medium">{nombre}</div>
+            <div className="text-[11px] text-text-mute">{persona?.aula?.nombre ?? '—'} · Ausente</div>
+          </div>
+        </div>
+
+        <form onSubmit={handleSubmit} className="flex flex-col gap-3">
+          <label className="flex flex-col gap-1">
+            <span className="text-[12px] font-medium text-text-mute">Razón de la justificación *</span>
+            <textarea value={razon} onChange={e => setRazon(e.target.value)} rows={3} required
+              className="px-3 py-2 text-[13px] border border-border rounded-2 bg-surface resize-none"
+              placeholder="Describe el motivo de la falta justificada…" />
+          </label>
+
+          <label className="flex flex-col gap-1">
+            <span className="text-[12px] font-medium text-text-mute">N.° de documento aprobatorio</span>
+            <input type="text" value={docNum} onChange={e => setDocNum(e.target.value)}
+              className="px-3 py-2 text-[13px] border border-border rounded-2 bg-surface"
+              placeholder="Ej: Certificado médico N.° 12345" />
+          </label>
+
+          {error && <p className="text-[12px] text-danger">{error}</p>}
+
+          <div className="flex gap-2 pt-1">
+            <Btn type="button" variant="secondary" className="flex-1" onClick={onClose}>Cancelar</Btn>
+            <Btn type="submit" className="flex-1" icon={<FileText size={14} />} disabled={mut.isPending}>
+              {mut.isPending ? 'Guardando…' : 'Guardar justificación'}
+            </Btn>
+          </div>
+        </form>
+      </div>
+    </div>
+  )
+}
+
+// ─── CerrarTurnoModal ─────────────────────────────────────────────────────────
+
+function CerrarTurnoModal({ aulas, onClose }: { aulas: { id: string; nombre: string }[]; onClose: () => void }) {
+  const mut = useCerrarTurno()
+  const [aulaId, setAulaId] = useState('')
+  const [result, setResult] = useState<{ created: number; message: string } | null>(null)
+  const [error,  setError]  = useState('')
+
+  async function handleSubmit(e: React.FormEvent) {
+    e.preventDefault()
+    try {
+      const res = await mut.mutateAsync({ aula_id: aulaId || undefined })
+      setResult(res)
+    } catch (err: any) {
+      const msg = err?.response?.data?.message
+      setError(Array.isArray(msg) ? msg.join(', ') : (msg ?? 'Error al cerrar turno'))
+    }
+  }
+
+  return (
+    <div className="fixed inset-0 z-50 flex items-center justify-center" style={{ background: 'rgba(0,0,0,0.35)' }}>
+      <div className="bg-surface border border-border rounded-3 shadow-3 w-full max-w-sm p-6 flex flex-col gap-4">
+        <div className="flex items-center justify-between">
+          <h2 className="text-[15px] font-semibold flex items-center gap-2">
+            <Lock size={16} className="text-warning" /> Cerrar asistencia del turno
+          </h2>
+          <button onClick={onClose} className="text-text-mute hover:text-text"><X size={18} /></button>
+        </div>
+
+        {result ? (
+          <div className="flex flex-col gap-4">
+            <div className="p-4 bg-surface-2 rounded-2 text-center">
+              <div className="text-[28px] font-bold font-serif text-warning">{result.created}</div>
+              <div className="text-[13px] text-text-mute mt-1">{result.message}</div>
+              {result.created > 0 && (
+                <div className="mt-2 text-[12px] text-text-mute">
+                  Los alumnos marcados como ausentes aparecen en la tabla. Puedes agregar justificaciones individualmente.
+                </div>
+              )}
+            </div>
+            <Btn onClick={onClose} className="w-full">Cerrar</Btn>
+          </div>
+        ) : (
+          <form onSubmit={handleSubmit} className="flex flex-col gap-3">
+            <div className="p-3 bg-warning-l rounded-2 text-[12.5px] text-text leading-relaxed">
+              Esta acción registrará como <strong>Falta</strong> a todos los alumnos que no tengan asistencia registrada hoy. Puedes añadir justificaciones después.
+            </div>
+
+            <label className="flex flex-col gap-1">
+              <span className="text-[12px] font-medium text-text-mute">Filtrar por aula (opcional)</span>
+              <select value={aulaId} onChange={e => setAulaId(e.target.value)}
+                className="px-3 py-2 text-[13px] border border-border rounded-2 bg-surface">
+                <option value="">Todos los alumnos</option>
+                {aulas.map(a => <option key={a.id} value={a.id}>{a.nombre}</option>)}
+              </select>
+            </label>
+
+            {error && <p className="text-[12px] text-danger">{error}</p>}
+
+            <div className="flex gap-2 pt-1">
+              <Btn type="button" variant="secondary" className="flex-1" onClick={onClose}>Cancelar</Btn>
+              <Btn type="submit" className="flex-1 bg-warning" disabled={mut.isPending}>
+                {mut.isPending ? 'Procesando…' : 'Confirmar y cerrar turno'}
+              </Btn>
+            </div>
+          </form>
+        )}
       </div>
     </div>
   )
@@ -357,53 +512,51 @@ function ManualModal({ onClose }: { onClose: () => void }) {
 
 // ─── Export helper ────────────────────────────────────────────────────────────
 
-function exportarAsistencia(registros: AsistenciaRecord[], fecha: string) {
-  const css = `
-    @page { size: A4 landscape; margin: 1.2cm; }
-    * { box-sizing: border-box; }
-    body { font-family: Arial, sans-serif; font-size: 11px; color: #1e293b; margin: 0; }
-    h2 { font-size: 14px; font-weight: 700; margin: 0 0 3px; }
-    .sub { font-size: 10px; color: #64748b; margin: 0 0 12px; }
-    table { width: 100%; border-collapse: collapse; }
-    th { background: #f1f5f9; font-size: 9.5px; font-weight: 600; text-transform: uppercase;
-         letter-spacing: 0.04em; padding: 5px 8px; border: 1px solid #cbd5e1; text-align: left; }
-    td { border: 1px solid #e2e8f0; padding: 5px 8px; font-size: 11px; }
-    tr:nth-child(even) td { background: #f8fafc; }
-    .badge { display: inline-block; border-radius: 99px; padding: 1px 7px; font-size: 9.5px; font-weight: 600; }
-    .puntual { background: #dcfce7; color: #166534; }
-    .tardanza { background: #fef9c3; color: #854d0e; }
-    .alumno { background: #dbeafe; color: #1e40af; }
-    .docente { background: #e0e7ff; color: #3730a3; }
-  `
-  const fechaLabel = new Date(fecha + 'T12:00:00').toLocaleDateString('es-PE', { weekday: 'long', day: 'numeric', month: 'long', year: 'numeric' })
+async function exportarAsistencia(
+  registros: AsistenciaRecord[],
+  fecha: string,
+  presentes: number,
+  tardanzas: number,
+  ausentes: number,
+) {
+  const [{ pdf }, { AsistenciaListaPDF }] = await Promise.all([
+    import('@react-pdf/renderer'),
+    import('@/components/reportes/asistencia-lista-pdf'),
+  ])
 
-  const filas = registros.map(r => {
-    const persona = r.tipoPersona === 'alumno' ? r.alumno : r.docente
-    const nombre  = persona ? `${(persona as any).nombre ?? (persona as any).nombres} ${persona.apellidos}` : '—'
-    const hora    = r.horaIngreso ? new Date(r.horaIngreso).toLocaleTimeString('es-PE', { hour: '2-digit', minute: '2-digit' }) : '—'
-    const aula    = r.tipoPersona === 'alumno' ? (r.alumno?.aula?.nombre ?? '—') : '—'
-    const estado  = r.esTardanza ? '<span class="badge tardanza">Tardanza</span>' : '<span class="badge puntual">Puntual</span>'
-    const tipo    = r.tipoPersona === 'alumno' ? '<span class="badge alumno">Alumno</span>' : '<span class="badge docente">Docente</span>'
-    return `<tr><td>${hora}</td><td>${nombre}</td><td>${tipo}</td><td>${aula}</td><td>${estado}</td><td>${r.esManual ? 'Manual' : 'Escáner'}</td></tr>`
-  }).join('')
+  const fechaLabel = new Date(fecha + 'T12:00:00').toLocaleDateString('es-PE', {
+    weekday: 'long', day: 'numeric', month: 'long', year: 'numeric',
+  })
 
-  const html = `<!DOCTYPE html><html lang="es"><head><meta charset="UTF-8">
-    <title>Asistencia ${fecha}</title><style>${css}</style></head>
-    <body>
-      <h2>Registro de Asistencia</h2>
-      <p class="sub">Sistema de Gestión Académica · ${fechaLabel} · ${registros.length} registros</p>
-      <table>
-        <thead><tr><th>Hora</th><th>Nombre</th><th>Tipo</th><th>Aula</th><th>Estado</th><th>Origen</th></tr></thead>
-        <tbody>${filas}</tbody>
-      </table>
-    </body></html>`
+  const logoUrl       = `${window.location.origin}/logo.png`
+  const logoUnasamUrl = `${window.location.origin}/logo-unasam.png`
 
-  const w = window.open('', '_blank', 'width=960,height=720')
-  if (!w) { alert('Habilita las ventanas emergentes para exportar'); return }
-  w.document.write(html)
-  w.document.close()
-  w.focus()
-  setTimeout(() => w.print(), 400)
+  const kpis = [
+    { label: 'Presentes',  value: presentes,       color: '#166534' },
+    { label: 'Tardanzas',  value: tardanzas,       color: '#92400e' },
+    { label: 'Ausentes',   value: ausentes,        color: '#991b1b' },
+    { label: 'Total',      value: registros.length, color: '#1e3a5f' },
+  ]
+
+  const element = AsistenciaListaPDF({
+    titulo:    'Registro de Asistencia',
+    subtitulo: fechaLabel,
+    records:   registros as any,
+    modo:      'admin',
+    kpis,
+    logoUrl,
+    logoUnasamUrl,
+  })
+
+  const blob = await pdf(element).toBlob()
+  const url  = URL.createObjectURL(blob)
+  const a    = document.createElement('a')
+  a.href     = url
+  a.download = `asistencia-${fecha}.pdf`
+  document.body.appendChild(a)
+  a.click()
+  document.body.removeChild(a)
+  URL.revokeObjectURL(url)
 }
 
 // ─── Page ─────────────────────────────────────────────────────────────────────
@@ -412,8 +565,10 @@ export default function AsistenciaPage() {
   const [fecha,        setFecha]        = useState(todayStr())
   const [aulaFilter,   setAulaFilter]   = useState('')
   const [tipoFilter,   setTipoFilter]   = useState<'alumno' | 'docente' | ''>('')
-  const [showManual,   setShowManual]   = useState(false)
-  const [correctTarget, setCorrectTarget] = useState<AsistenciaRecord | null>(null)
+  const [showManual,     setShowManual]     = useState(false)
+  const [showCerrar,     setShowCerrar]     = useState(false)
+  const [correctTarget,  setCorrectTarget]  = useState<AsistenciaRecord | null>(null)
+  const [justificarTarget, setJustificarTarget] = useState<AsistenciaRecord | null>(null)
   const deleteMut = useDeleteAsistencia()
 
   const { data: aulas = [] }    = useAulas()
@@ -442,8 +597,10 @@ export default function AsistenciaPage() {
 
   return (
     <>
-      {showManual   && <ManualModal onClose={() => setShowManual(false)} />}
-      {correctTarget && <CorrectModal registro={correctTarget} onClose={() => setCorrectTarget(null)} />}
+      {showManual       && <ManualModal onClose={() => setShowManual(false)} />}
+      {showCerrar       && <CerrarTurnoModal aulas={aulas} onClose={() => setShowCerrar(false)} />}
+      {correctTarget    && <CorrectModal registro={correctTarget} onClose={() => setCorrectTarget(null)} />}
+      {justificarTarget && <JustificarModal registro={justificarTarget} onClose={() => setJustificarTarget(null)} />}
 
       <PageHeader
         title="Asistencia"
@@ -451,12 +608,17 @@ export default function AsistenciaPage() {
         action={
           <>
             <Btn variant="secondary" icon={<Download size={14} />} size="sm"
-              onClick={() => exportarAsistencia(registros, fecha)}>
+              onClick={() => exportarAsistencia(registros, fecha, presentes, tardanzas, ausentes)}>
               Exportar PDF
             </Btn>
             <Btn variant="secondary" icon={<Edit size={14} />} size="sm"
               onClick={() => setShowManual(true)}>
               Registro manual
+            </Btn>
+            <Btn variant="secondary" icon={<Lock size={14} />} size="sm"
+              className="text-warning border-warning/40 hover:bg-warning-l"
+              onClick={() => setShowCerrar(true)}>
+              Cerrar turno
             </Btn>
             <Btn icon={<ScanLine size={14} />} size="sm"
               onClick={() => window.open('/vigilante', '_blank')}>
@@ -536,15 +698,24 @@ export default function AsistenciaPage() {
                       ? `${(persona as any).nombre ?? (persona as any).nombres} ${persona.apellidos}`
                       : '—'
                     const aulaNombre = r.tipoPersona === 'alumno' ? (r.alumno?.aula?.nombre ?? '—') : '—'
+                    const estado = r.esAusente
+                      ? 'falta'
+                      : r.esTardanza ? 'tardanza' : 'puntual'
                     return (
-                      <tr key={r.id} className="border-t border-border-s hover:bg-surface-2/40">
-                        <td className="px-3.5 py-2.5 font-mono text-[12.5px]">{formatHora(r.horaIngreso)}</td>
+                      <tr key={r.id}
+                        className={`border-t border-border-s hover:bg-surface-2/40 ${r.esAusente ? 'opacity-70' : ''}`}>
+                        <td className="px-3.5 py-2.5 font-mono text-[12.5px]">{r.esAusente ? '—' : formatHora(r.horaIngreso)}</td>
                         <td className="px-3.5 py-2.5">
                           <div className="flex items-center gap-2">
                             <Avatar name={nombre} size={28} />
                             <div>
                               <div className="font-medium leading-tight">{nombre}</div>
-                              {r.esManual && (
+                              {r.esAusente && r.justificacionRazon && (
+                                <div className="text-[10px] text-success truncate max-w-[180px]" title={r.justificacionRazon}>
+                                  ✓ {r.justificacionRazon}
+                                </div>
+                              )}
+                              {r.esManual && !r.esAusente && (
                                 <span className="text-[10px] text-text-mute">Manual</span>
                               )}
                             </div>
@@ -557,16 +728,24 @@ export default function AsistenciaPage() {
                         </td>
                         <td className="px-3.5 py-2.5 text-[12px] text-text-mute">{aulaNombre}</td>
                         <td className="px-3.5 py-2.5">
-                          <Pill tone={r.esTardanza ? 'warning' : 'success'}>
-                            <Dot tone={r.esTardanza ? 'warning' : 'success'} size={6} />
-                            {r.esTardanza ? 'Tardanza' : 'Puntual'}
-                          </Pill>
+                          {estado === 'falta' ? (
+                            <Pill tone="danger">
+                              <Dot tone="danger" size={6} />
+                              {r.justificacionRazon ? 'Justificada' : 'Falta'}
+                            </Pill>
+                          ) : (
+                            <Pill tone={estado === 'tardanza' ? 'warning' : 'success'}>
+                              <Dot tone={estado === 'tardanza' ? 'warning' : 'success'} size={6} />
+                              {estado === 'tardanza' ? 'Tardanza' : 'Puntual'}
+                            </Pill>
+                          )}
                         </td>
                         <td className="px-3.5 py-2.5">
                           <RowMenu
                             registro={r}
                             onCorregir={setCorrectTarget}
                             onEliminar={handleEliminar}
+                            onJustificar={setJustificarTarget}
                           />
                         </td>
                       </tr>
@@ -623,6 +802,10 @@ export default function AsistenciaPage() {
                 <Btn variant="secondary" size="sm" icon={<Download size={13} />}
                   onClick={() => exportarAsistencia(registros, fecha)} className="w-full justify-start">
                   Exportar lista del día
+                </Btn>
+                <Btn variant="secondary" size="sm" icon={<Lock size={13} />}
+                  onClick={() => setShowCerrar(true)} className="w-full justify-start text-warning">
+                  Cerrar asistencia del turno
                 </Btn>
                 <Btn variant="secondary" size="sm" icon={<ScanLine size={13} />}
                   onClick={() => window.open('/vigilante', '_blank')} className="w-full justify-start">

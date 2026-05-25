@@ -5,17 +5,25 @@ export interface Comunicado {
   id: string
   titulo: string
   cuerpo: string
-  destinatarioTipo: string
-  seccionId?: string | null
+  destinatarioTipo: 'todos' | 'alumnos' | 'apoderados' | 'seccion' | 'usuario'
+  aulaId?: string | null
   canalSistema: boolean
   canalWhatsapp: boolean
   publicadoPorId: string
   publicadoAt?: string | null
   createdAt: string
   publicadoPor: { id: string; email: string }
-  seccion?: { id: string; nombre: string } | null
+  aula?: { id: string; nombre: string } | null
   pct_enviado?: number
   _count?: { envios: number }
+  envios?: {
+    id: string
+    usuarioId: string
+    canal: string
+    estado: string
+    enviadoAt?: string | null
+    errorDetalle?: string | null
+  }[]
 }
 
 export interface PaginatedComunicados {
@@ -29,6 +37,25 @@ export interface PaginatedComunicados {
 export interface FilterComunicados {
   page?: number
   limit?: number
+}
+
+export interface CreateComunicadoDto {
+  titulo: string
+  cuerpo: string
+  destinatario_tipo?: 'todos' | 'alumnos' | 'apoderados' | 'seccion' | 'usuario'
+  aula_id?: string
+  canal_sistema?: boolean
+  canal_whatsapp?: boolean
+  publicar_ahora?: boolean
+}
+
+export interface UpdateComunicadoDto {
+  id: string
+  titulo?: string
+  cuerpo?: string
+  canal_sistema?: boolean
+  canal_whatsapp?: boolean
+  publicar_ahora?: boolean
 }
 
 export function useComunicados(filters: FilterComunicados = {}) {
@@ -56,7 +83,7 @@ export function useComunicado(id: string) {
 export function useCreateComunicado() {
   const qc = useQueryClient()
   return useMutation({
-    mutationFn: (dto: Record<string, unknown>) =>
+    mutationFn: (dto: CreateComunicadoDto) =>
       api.post('/comunicados', dto).then((r) => r.data),
     onSuccess: () => qc.invalidateQueries({ queryKey: ['comunicados'] }),
   })
@@ -65,7 +92,7 @@ export function useCreateComunicado() {
 export function useUpdateComunicado() {
   const qc = useQueryClient()
   return useMutation({
-    mutationFn: ({ id, ...dto }: { id: string } & Record<string, unknown>) =>
+    mutationFn: ({ id, ...dto }: UpdateComunicadoDto) =>
       api.patch(`/comunicados/${id}`, dto).then((r) => r.data),
     onSuccess: () => qc.invalidateQueries({ queryKey: ['comunicados'] }),
   })

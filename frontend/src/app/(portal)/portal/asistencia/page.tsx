@@ -10,6 +10,45 @@ import { Dot } from '@/components/ui/dot'
 import { Btn } from '@/components/ui/btn'
 import { ChevL, ChevR, Download } from '@/components/icons'
 
+async function exportarAsistenciaPersonal(
+  records: any[],
+  nombre: string,
+  total: number,
+  puntuales: number,
+  tardanzas: number,
+) {
+  const [{ pdf }, { AsistenciaListaPDF }] = await Promise.all([
+    import('@react-pdf/renderer'),
+    import('@/components/reportes/asistencia-lista-pdf'),
+  ])
+  const logoUrl       = `${window.location.origin}/logo.png`
+  const logoUnasamUrl = `${window.location.origin}/logo-unasam.png`
+  const kpis = [
+    { label: 'Total sesiones', value: total,    color: '#1e3a5f' },
+    { label: 'Puntuales',      value: puntuales, color: '#166534' },
+    { label: 'Tardanzas',      value: tardanzas, color: '#92400e' },
+    { label: 'Asistencia',     value: `${total > 0 ? Math.round((puntuales / total) * 100) : 0}%`, color: '#4a6fa5' },
+  ]
+  const element = AsistenciaListaPDF({
+    titulo:    'Mi Asistencia',
+    subtitulo: `Historial completo — ${nombre}`,
+    records,
+    modo:      'personal',
+    kpis,
+    logoUrl,
+    logoUnasamUrl,
+  })
+  const blob = await pdf(element).toBlob()
+  const url  = URL.createObjectURL(blob)
+  const a    = document.createElement('a')
+  a.href     = url
+  a.download = `mi-asistencia.pdf`
+  document.body.appendChild(a)
+  a.click()
+  document.body.removeChild(a)
+  URL.revokeObjectURL(url)
+}
+
 /* ─── helpers ─────────────────────────────────────────────────── */
 function fmtTime(t?: string | null) {
   if (!t) return '—'
@@ -84,7 +123,16 @@ export default function PortalAsistenciaPage() {
             Mi asistencia
           </h1>
         </div>
-        <Btn variant="secondary" icon={<Download size={14} />} size="sm">Exportar PDF</Btn>
+        <Btn
+          variant="secondary"
+          icon={<Download size={14} />}
+          size="sm"
+          onClick={() => exportarAsistenciaPersonal(
+            records,
+            alumno ? `${alumno.nombre} ${alumno.apellidos}` : 'Alumno',
+            total, puntuales, tardanzas,
+          )}
+        >Exportar PDF</Btn>
       </div>
 
       {/* KPIs */}

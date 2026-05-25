@@ -28,6 +28,25 @@ function estadoTone(pct: number) {
   return 'danger' as const
 }
 
+async function descargarCarnet(alumno: any) {
+  const [{ pdf }, { CarnetPDF }] = await Promise.all([
+    import('@react-pdf/renderer'),
+    import('@/components/reportes/carnet-pdf'),
+  ])
+  const logoUrl       = `${window.location.origin}/logo.png`
+  const logoUnasamUrl = `${window.location.origin}/logo-unasam.png`
+  const element = CarnetPDF({ alumno, logoUrl, logoUnasamUrl })
+  const blob = await pdf(element).toBlob()
+  const url  = URL.createObjectURL(blob)
+  const a    = document.createElement('a')
+  a.href     = url
+  a.download = `carnet-${alumno.codigo_barra ?? alumno.apellidos ?? 'alumno'}.pdf`
+  document.body.appendChild(a)
+  a.click()
+  document.body.removeChild(a)
+  URL.revokeObjectURL(url)
+}
+
 export default function AlumnoDetallePage() {
   const { id } = useParams<{ id: string }>()
   const router = useRouter()
@@ -70,7 +89,8 @@ export default function AlumnoDetallePage() {
         ]}
         action={
           <>
-            <Btn variant="secondary" icon={<Download size={14} />} size="sm">
+            <Btn variant="secondary" icon={<Download size={14} />} size="sm"
+              onClick={() => descargarCarnet(alumno)}>
               Carnet PDF
             </Btn>
             <Btn variant="secondary" icon={<Edit size={14} />} size="sm">
@@ -126,7 +146,7 @@ export default function AlumnoDetallePage() {
               style={{ background: 'var(--color-primary)', color: '#fff' }}
             >
               <div className="text-[9px] tracking-[0.2em] opacity-80 uppercase">
-                CEPREUNASAM · 2026-I
+                Centro Preuniversitario · 2026-I
               </div>
               <div className="font-serif text-[14px] font-semibold mt-1 leading-tight">
                 {nombre} {apellidos}

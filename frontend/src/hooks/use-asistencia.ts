@@ -10,7 +10,10 @@ export interface AsistenciaRecord {
   horaIngreso: string
   esTardanza: boolean
   esManual: boolean
+  esAusente: boolean
   motivoManual?: string | null
+  justificacionRazon?: string | null
+  justificacionDoc?: string | null
   registradoPorId: string
   createdAt: string
   alumno?: {
@@ -83,7 +86,7 @@ export function useCorrectAsistencia() {
   const qc = useQueryClient()
   return useMutation({
     mutationFn: ({ id, ...dto }: { id: string } & Record<string, unknown>) =>
-      api.patch(`/asistencia/${id}/corregir`, dto).then((r) => r.data),
+      api.patch(`/asistencia/${id}`, dto).then((r) => r.data),
     onSuccess: () => qc.invalidateQueries({ queryKey: ['asistencia'] }),
   })
 }
@@ -92,6 +95,24 @@ export function useDeleteAsistencia() {
   const qc = useQueryClient()
   return useMutation({
     mutationFn: (id: string) => api.delete(`/asistencia/${id}`).then((r) => r.data),
+    onSuccess: () => qc.invalidateQueries({ queryKey: ['asistencia'] }),
+  })
+}
+
+export function useCerrarTurno() {
+  const qc = useQueryClient()
+  return useMutation({
+    mutationFn: (dto: { aula_id?: string; turno?: string }) =>
+      api.post('/asistencia/cerrar-turno', dto).then((r) => r.data),
+    onSuccess: () => qc.invalidateQueries({ queryKey: ['asistencia'] }),
+  })
+}
+
+export function useJustificarAusencia() {
+  const qc = useQueryClient()
+  return useMutation({
+    mutationFn: ({ id, ...dto }: { id: string; razon: string; doc_num?: string }) =>
+      api.patch(`/asistencia/${id}/justificar`, dto).then((r) => r.data),
     onSuccess: () => qc.invalidateQueries({ queryKey: ['asistencia'] }),
   })
 }

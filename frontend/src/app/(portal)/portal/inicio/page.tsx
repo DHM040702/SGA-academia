@@ -15,6 +15,70 @@ import { Barcode } from '@/components/ui/barcode'
 import { Download, ChevR, FileText, Play, Link as LinkIcon } from '@/components/icons'
 import Link from 'next/link'
 
+async function descargarCarnetPortal(alumno: {
+  nombre: string; apellidos: string; codigoBarras?: string | null; aulaId?: string | null
+}) {
+  const [{ pdf }, { CarnetPDF }] = await Promise.all([
+    import('@react-pdf/renderer'),
+    import('@/components/reportes/carnet-pdf'),
+  ])
+  const logoUrl       = `${window.location.origin}/logo.png`
+  const logoUnasamUrl = `${window.location.origin}/logo-unasam.png`
+  const element = CarnetPDF({
+    alumno: { nombre: alumno.nombre, apellidos: alumno.apellidos, codigoBarras: alumno.codigoBarras },
+    logoUrl,
+    logoUnasamUrl,
+  })
+  const blob = await pdf(element).toBlob()
+  const url  = URL.createObjectURL(blob)
+  const a    = document.createElement('a')
+  a.href     = url
+  a.download = `carnet-${alumno.codigoBarras ?? alumno.apellidos}.pdf`
+  document.body.appendChild(a)
+  a.click()
+  document.body.removeChild(a)
+  URL.revokeObjectURL(url)
+}
+
+async function descargarReporteCicloApoderado(
+  records: any[],
+  nombre: string,
+  total: number,
+  puntuales: number,
+  tardanzas: number,
+) {
+  const [{ pdf }, { AsistenciaListaPDF }] = await Promise.all([
+    import('@react-pdf/renderer'),
+    import('@/components/reportes/asistencia-lista-pdf'),
+  ])
+  const logoUrl       = `${window.location.origin}/logo.png`
+  const logoUnasamUrl = `${window.location.origin}/logo-unasam.png`
+  const kpis = [
+    { label: 'Total sesiones', value: total,    color: '#1e3a5f' },
+    { label: 'Puntuales',      value: puntuales, color: '#166534' },
+    { label: 'Tardanzas',      value: tardanzas, color: '#92400e' },
+    { label: 'Asistencia',     value: `${total > 0 ? Math.round((puntuales / total) * 100) : 0}%`, color: '#4a6fa5' },
+  ]
+  const element = AsistenciaListaPDF({
+    titulo:    'Reporte de Asistencia del Ciclo',
+    subtitulo: `Seguimiento — ${nombre}`,
+    records,
+    modo:      'personal',
+    kpis,
+    logoUrl,
+    logoUnasamUrl,
+  })
+  const blob = await pdf(element).toBlob()
+  const url  = URL.createObjectURL(blob)
+  const a    = document.createElement('a')
+  a.href     = url
+  a.download = `reporte-ciclo.pdf`
+  document.body.appendChild(a)
+  a.click()
+  document.body.removeChild(a)
+  URL.revokeObjectURL(url)
+}
+
 /* ─── helpers ─────────────────────────────────────────────────── */
 const TODAY_DAY = new Date().getDay() || 7   // JS: 0=Sun → remap to 7
 const TODAY_STR = new Date().toLocaleDateString('es-PE', { weekday: 'long', day: 'numeric', month: 'long' })
@@ -126,7 +190,12 @@ function AlumnoInicio({ user }: { user: ReturnType<typeof useAuth>['user'] }) {
             <p className="mt-1.5 text-[13.5px] text-text-mute">No tienes clases hoy.</p>
           )}
         </div>
-        <Btn variant="secondary" icon={<Download size={14} />} size="sm">Descargar carnet</Btn>
+        <Btn
+          variant="secondary"
+          icon={<Download size={14} />}
+          size="sm"
+          onClick={() => alumno && descargarCarnetPortal(alumno)}
+        >Descargar carnet</Btn>
       </div>
 
       <div className="grid gap-4" style={{ gridTemplateColumns: '1fr 1fr 1fr' }}>
@@ -382,7 +451,15 @@ function ApoderadoInicio({ user }: { user: ReturnType<typeof useAuth>['user'] })
               <p className="mt-1.5 text-[13.5px] text-text-mute">Aún no hay registro de asistencia hoy.</p>
             )}
           </div>
-          <Btn variant="secondary" icon={<Download size={14} />} size="sm">Reporte del ciclo</Btn>
+          <Btn
+            variant="secondary"
+            icon={<Download size={14} />}
+            size="sm"
+            onClick={() => descargarReporteCicloApoderado(
+              records, `${apoderado?.nombre ?? nombre} (apoderado)`,
+              total, puntuales, tardanzas,
+            )}
+          >Reporte del ciclo</Btn>
         </div>
       </div>
 

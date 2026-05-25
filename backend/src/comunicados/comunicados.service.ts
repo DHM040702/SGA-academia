@@ -103,8 +103,17 @@ export class ComunicadosService {
     return this.prisma.comunicado.update({
       where: { id },
       data: {
-        ...(dto.titulo !== undefined && { titulo: dto.titulo }),
-        ...(dto.cuerpo !== undefined && { cuerpo: dto.cuerpo }),
+        ...(dto.titulo         !== undefined && { titulo:        dto.titulo }),
+        ...(dto.cuerpo         !== undefined && { cuerpo:        dto.cuerpo }),
+        ...(dto.canal_sistema  !== undefined && { canalSistema:  dto.canal_sistema }),
+        ...(dto.canal_whatsapp !== undefined && { canalWhatsapp: dto.canal_whatsapp }),
+        // Publicar borrador: solo aplica si aún no fue publicado
+        ...(dto.publicar_ahora === true && !comunicado.publicadoAt && { publicadoAt: new Date() }),
+      },
+      include: {
+        publicadoPor: { select: { id: true, email: true } },
+        aula:         { select: { id: true, nombre: true } },
+        _count:       { select: { envios: true } },
       },
     });
   }
@@ -112,7 +121,13 @@ export class ComunicadosService {
   async remove(id: string) {
     const comunicado = await this.prisma.comunicado.findFirst({ where: { id } });
     if (!comunicado) throw new NotFoundException('Comunicado no encontrado');
-    await this.prisma.comunicado.delete({ where: { id } });
+
+    // Eliminar en transacción: primero los envíos (FK) y luego el comunicado
+    await this.prisma.$transaction([
+      this.prisma.comunicadoEnvio.deleteMany({ where: { comunicadoId: id } }),
+      this.prisma.comunicado.delete({ where: { id } }),
+    ]);
+
     return { success: true };
   }
 

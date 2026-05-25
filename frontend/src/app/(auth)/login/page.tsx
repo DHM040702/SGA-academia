@@ -5,7 +5,7 @@ import { useAuth } from '@/contexts/auth-context'
 import { Btn } from '@/components/ui/btn'
 import { Field } from '@/components/ui/field'
 import { Input } from '@/components/ui/input'
-import { Mail, Lock, Scan, Shield } from '@/components/icons'
+import { Mail, Lock } from '@/components/icons'
 
 export default function LoginPage() {
   const { login, user } = useAuth()
@@ -59,7 +59,7 @@ export default function LoginPage() {
 
         {/* Logo */}
         <div className="font-serif font-bold text-[22px] tracking-tight relative z-10">
-          CEPREUNASAM
+          Centro Preuniversitario
         </div>
 
         {/* Hero text */}
@@ -77,7 +77,7 @@ export default function LoginPage() {
 
         {/* Version */}
         <div className="font-mono text-[11.5px] tracking-[0.05em] opacity-55 relative z-10">
-          UNASAM · CEPREUNASAM
+          UNASAM · Centro Preuniversitario
         </div>
       </div>
 
@@ -141,26 +141,8 @@ export default function LoginPage() {
             </Btn>
           </form>
 
-          {/* Divider */}
-          <div className="flex items-center gap-2.5 my-[22px]">
-            <div className="flex-1 h-px bg-border" />
-            <span className="text-[11px] text-text-soft tracking-[0.05em]">O ACCESO RÁPIDO</span>
-            <div className="flex-1 h-px bg-border" />
-          </div>
-
-          <div className="grid grid-cols-2 gap-2">
-            <Btn variant="secondary" size="sm" className="justify-center">
-              <Scan size={14} />
-              Modo vigilante
-            </Btn>
-            <Btn variant="secondary" size="sm" className="justify-center">
-              <Shield size={14} />
-              Acceso SSO
-            </Btn>
-          </div>
-
           <div className="mt-8 p-3 bg-surface2 border border-border-s rounded-2 text-[11.5px] text-text-mute leading-[1.55]">
-            Acceso restringido a personal autorizado de CEPREUNASAM. Todos los accesos quedan registrados.
+            Acceso restringido a personal autorizado del Centro Preuniversitario UNASAM. Todos los accesos quedan registrados.
           </div>
         </div>
       </div>

@@ -14,7 +14,7 @@ const NAV_ADMIN = [
   { href: '/inicio',      icon: Home,      label: 'Inicio' },
   { href: '/alumnos',     icon: Users,     label: 'Alumnos' },
   { href: '/docentes',    icon: Teacher,   label: 'Docentes' },
-  { href: '/ciclos',      icon: Grid,      label: 'Ciclos y secciones' },
+  { href: '/ciclos',      icon: Grid,      label: 'Ciclos y aulas' },
   { href: '/horarios',    icon: Calendar,  label: 'Horarios' },
   { href: '/asistencia',  icon: Check,     label: 'Asistencia' },
   { href: '/comunicados', icon: Megaphone, label: 'Comunicados' },
@@ -61,7 +61,7 @@ export function Sidebar({ compact = false }: SidebarProps) {
           <span className="font-serif font-bold text-primary text-[20px]">S</span>
         ) : (
           <span className="font-serif font-bold text-primary text-[18px] tracking-tight leading-none">
-            CEPREUNASAM<br />
+            Centro Preuniversitario<br />
             <span className="text-[11px] font-sans font-normal text-text-mute tracking-[0.08em] uppercase">
               Sistema de Gestión
             </span>

@@ -168,10 +168,13 @@ model Asistencia {
   docenteId       String?     @map("docente_id") @db.Uuid
   fecha           DateTime    @db.Date
   horaIngreso     DateTime    @map("hora_ingreso") @db.Timestamptz(6)
-  esTardanza      Boolean     @default(false) @map("es_tardanza")
-  esManual        Boolean     @default(false) @map("es_manual")
-  motivoManual    String?     @map("motivo_manual")
-  registradoPorId String      @map("registrado_por") @db.Uuid
+  esTardanza         Boolean     @default(false) @map("es_tardanza")
+  esManual           Boolean     @default(false) @map("es_manual")
+  esAusente          Boolean     @default(false) @map("es_ausente")
+  motivoManual       String?     @map("motivo_manual")
+  justificacionRazon String?     @map("justificacion_razon")
+  justificacionDoc   String?     @map("justificacion_doc")
+  registradoPorId    String      @map("registrado_por") @db.Uuid
   createdAt       DateTime    @default(now()) @map("created_at") @db.Timestamptz(6)
   alumno          Alumno?     @relation(fields: [alumnoId], references: [id])
   docente         Docente?    @relation(fields: [docenteId], references: [id])

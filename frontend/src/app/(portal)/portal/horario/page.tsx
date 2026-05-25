@@ -9,6 +9,79 @@ import { Pill } from '@/components/ui/pill'
 import { Avatar } from '@/components/ui/avatar'
 import { Download, Calendar, ChevL, ChevR } from '@/components/icons'
 
+const DIA_FULL = ['Lunes', 'Martes', 'Miércoles', 'Jueves', 'Viernes', 'Sábado']
+
+async function exportarHorarioPDF(horarios: Horario[], aulaLabel: string) {
+  const fecha = new Date().toLocaleDateString('es-PE', { day: 'numeric', month: 'long', year: 'numeric' })
+
+  function t(dt: string | Date | undefined | null): string {
+    if (!dt) return '00:00'
+    const s = typeof dt === 'string' ? dt : dt.toISOString()
+    return s.includes('T') ? s.slice(11, 16) : s.slice(0, 5)
+  }
+
+  const slots = Array.from(new Set(horarios.map((h) => t(h.horaInicio)))).sort()
+
+  const encabezado = `
+    <div style="display:flex;align-items:center;margin-bottom:16px;padding-bottom:12px;border-bottom:2px solid #1e3a5f">
+      <div style="background:#7B1D1D;color:#fff;width:44px;height:44px;display:flex;align-items:center;justify-content:center;border-radius:4px;font-weight:bold;font-size:9px;text-align:center;flex-shrink:0">UNASAM</div>
+      <div style="width:1px;height:44px;background:#e5e7eb;margin:0 8px;flex-shrink:0"></div>
+      <div style="background:#1e3a5f;color:#fff;width:44px;height:44px;display:flex;align-items:center;justify-content:center;border-radius:4px;font-weight:bold;font-size:9px;flex-shrink:0">CPre</div>
+      <div style="margin-left:10px;flex:1">
+        <div style="font-weight:bold;font-size:15px;color:#1e3a5f">Centro Preuniversitario</div>
+        <div style="font-size:8px;color:#6b7280;margin-top:2px">Universidad Nacional de San Martín · Sistema de Gestión Académica</div>
+      </div>
+      <div style="text-align:right;flex-shrink:0">
+        <div style="font-size:8px;color:#6b7280">Generado: ${fecha}</div>
+        <div style="background:#4a6fa5;color:#fff;padding:2px 8px;border-radius:10px;font-size:7px;font-weight:bold;display:inline-block;margin-top:4px">HORARIO OFICIAL</div>
+      </div>
+    </div>`
+
+  const rows = slots.map((s) => {
+    const cells = [1, 2, 3, 4, 5, 6].map((d) => {
+      const h = horarios.find((x) => x.diaSemana === d && t(x.horaInicio) === s)
+      if (!h) return '<td></td>'
+      const doc = h.docente ? `<div style="color:#64748b;font-size:10px">${h.docente.nombre} ${h.docente.apellidos}</div>` : ''
+      return `<td><div style="padding:3px 5px"><div style="font-weight:600;font-size:10px">${h.curso?.nombre ?? '—'}</div>${doc}</div></td>`
+    }).join('')
+    return `<tr><td class="hora">${s}</td>${cells}</tr>`
+  }).join('')
+
+  const css = `
+    @page { size: A4 landscape; margin: 1.2cm; }
+    * { box-sizing: border-box; }
+    body { font-family: Arial, sans-serif; font-size: 11px; color: #1e293b; margin: 0; }
+    h2 { font-size: 14px; font-weight: 700; margin: 0 0 3px; }
+    .sub { font-size: 10px; color: #64748b; margin: 0 0 12px; }
+    table { width: 100%; border-collapse: collapse; }
+    th { background: #f1f5f9; font-size: 9.5px; font-weight: 600; text-transform: uppercase;
+         letter-spacing: 0.04em; color: #475569; padding: 5px 6px; border: 1px solid #cbd5e1; text-align: center; }
+    th.hora { text-align: left; width: 52px; }
+    td { border: 1px solid #e2e8f0; padding: 3px; vertical-align: top; min-height: 60px; }
+    td.hora { font-family: monospace; font-size: 10px; font-weight: 600; color: #94a3b8;
+              background: #f8fafc; padding: 5px 6px; border-right: 1px solid #cbd5e1; }
+  `
+
+  const html = `<!DOCTYPE html><html lang="es"><head><meta charset="UTF-8">
+    <title>Mi Horario — Centro Preuniversitario</title><style>${css}</style></head>
+    <body>
+      ${encabezado}
+      <h2>Mi Horario Semanal — ${aulaLabel}</h2>
+      <p class="sub">Ciclo 2026-I · ${fecha}</p>
+      <table>
+        <thead><tr><th class="hora">Hora</th>${DIA_FULL.map((d) => `<th>${d}</th>`).join('')}</tr></thead>
+        <tbody>${rows}</tbody>
+      </table>
+    </body></html>`
+
+  const w = window.open('', '_blank', 'width=960,height=720')
+  if (!w) { alert('Habilita las ventanas emergentes para exportar'); return }
+  w.document.write(html)
+  w.document.close()
+  w.focus()
+  setTimeout(() => w.print(), 400)
+}
+
 /* ─── helpers ─────────────────────────────────────────────────── */
 const DIAS_LABEL = ['', 'Lunes', 'Martes', 'Miércoles', 'Jueves', 'Viernes', 'Sábado']
 const DIAS_SHORT = ['', 'Lun', 'Mar', 'Mié', 'Jue', 'Vie', 'Sáb']
@@ -101,7 +174,12 @@ export default function PortalHorarioPage() {
           </h1>
         </div>
         <div className="flex gap-2">
-          <Btn variant="secondary" icon={<Download size={14} />} size="sm">PDF</Btn>
+          <Btn
+            variant="secondary"
+            icon={<Download size={14} />}
+            size="sm"
+            onClick={() => exportarHorarioPDF(allHorarios, aulaId ? 'Aula activa' : 'Sin aula')}
+          >PDF</Btn>
           <Btn variant="secondary" icon={<Calendar size={14} />} size="sm">Añadir a calendario</Btn>
         </div>
       </div>

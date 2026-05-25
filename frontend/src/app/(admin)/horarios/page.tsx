@@ -364,9 +364,24 @@ function buildPrintHtml(
     }).join('')
   }
 
+  const encabezado = `
+    <div style="display:flex;align-items:center;gap:0;margin-bottom:16px;padding-bottom:12px;border-bottom:2px solid #1e3a5f">
+      <div style="background:#7B1D1D;color:#fff;width:44px;height:44px;display:flex;align-items:center;justify-content:center;border-radius:4px;font-weight:bold;font-size:9px;text-align:center;flex-shrink:0">UNASAM</div>
+      <div style="width:1px;height:44px;background:#e5e7eb;margin:0 8px;flex-shrink:0"></div>
+      <div style="background:#1e3a5f;color:#fff;width:44px;height:44px;display:flex;align-items:center;justify-content:center;border-radius:4px;font-weight:bold;font-size:9px;flex-shrink:0">CPre</div>
+      <div style="margin-left:10px;flex:1">
+        <div style="font-weight:bold;font-size:15px;color:#1e3a5f">Centro Preuniversitario</div>
+        <div style="font-size:8px;color:#6b7280;margin-top:2px">Universidad Nacional de San Martín · Sistema de Gestión Académica</div>
+      </div>
+      <div style="text-align:right;flex-shrink:0">
+        <div style="font-size:8px;color:#6b7280">Generado: ${fecha}</div>
+        <div style="background:#4a6fa5;color:#fff;padding:2px 8px;border-radius:10px;font-size:7px;font-weight:bold;display:inline-block;margin-top:4px">HORARIO OFICIAL</div>
+      </div>
+    </div>`
+
   return `<!DOCTYPE html><html lang="es"><head><meta charset="UTF-8">
-    <title>Horarios SGA</title><style>${css}</style>
-    </head><body>${body}</body></html>`
+    <title>Horarios — Centro Preuniversitario</title><style>${css}</style>
+    </head><body>${encabezado}${body}</body></html>`
 }
 
 function ExportModal({ horarios, aulas, onClose }: ExportModalProps) {

@@ -173,7 +173,7 @@ export default function DocenteDetallePage() {
                               {fmtTime(h.horaInicio)} – {fmtTime(h.horaFin)}
                             </div>
                             {h.aula && (
-                              <div className="text-[10.5px] text-text-mute">{h.aula}</div>
+                              <div className="text-[10.5px] text-text-mute">{h.aula.nombre}</div>
                             )}
                           </div>
                         </div>
@@ -372,7 +372,7 @@ export default function DocenteDetallePage() {
                             <Pill tone="neutral">{h.aula?.nombre ?? '—'}</Pill>
                           </td>
                           <td className="px-3.5 py-2.5 text-[12px] text-text-mute">
-                            {h.aula ?? '—'}
+                            {h.aula?.nombre ?? '—'}
                           </td>
                         </tr>
                       ))

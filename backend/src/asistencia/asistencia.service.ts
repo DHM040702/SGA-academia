@@ -6,6 +6,8 @@ import type { RegisterScanDto } from './dto/register-scan.dto';
 import type { ManualCorrectionDto } from './dto/manual-correction.dto';
 import type { FilterAsistenciaDto } from './dto/filter-asistencia.dto';
 import type { CreateManualAsistenciaDto } from './dto/create-manual-asistencia.dto';
+import type { CerrarTurnoDto } from './dto/cerrar-turno.dto';
+import type { JustificarAusenciaDto } from './dto/justificar-ausencia.dto';
 
 @Injectable()
 export class AsistenciaService {
@@ -148,8 +150,9 @@ export class AsistenciaService {
     const where: any = {};
 
     if (fecha) {
-      const d = new Date(fecha);
-      where.fecha = new Date(d.getFullYear(), d.getMonth(), d.getDate());
+      // Use Date.UTC to avoid timezone offset shifting the date when server != UTC
+      const [y, m, d] = fecha.split('-').map(Number);
+      where.fecha = new Date(Date.UTC(y, m - 1, d));
     }
     if (tipo) where.tipoPersona = tipo;
     if (alumno_id) where.alumnoId = alumno_id;
@@ -252,5 +255,59 @@ export class AsistenciaService {
     const registro = await this.prisma.asistencia.findFirst({ where: { id } });
     if (!registro) throw new NotFoundException('Registro de asistencia no encontrado');
     return this.prisma.asistencia.delete({ where: { id } });
+  }
+
+  async cerrarTurno(dto: CerrarTurnoDto, registradoPorId: string) {
+    const now = new Date();
+    const today = new Date(now.getFullYear(), now.getMonth(), now.getDate());
+
+    const aulaFilter: any = {};
+    if (dto.aula_id) aulaFilter.aulaId = dto.aula_id;
+    if (dto.turno)   aulaFilter.aula = { turno: dto.turno };
+
+    const alumnos = await this.prisma.alumno.findMany({
+      where: { deletedAt: null, ...aulaFilter },
+      select: { id: true },
+    });
+
+    const existentes = await this.prisma.asistencia.findMany({
+      where: { fecha: today, tipoPersona: TipoPersona.alumno },
+      select: { alumnoId: true },
+    });
+    const yaRegistrados = new Set(existentes.map((e) => e.alumnoId));
+
+    const ausentes = alumnos.filter((a) => !yaRegistrados.has(a.id));
+    if (ausentes.length === 0) {
+      return { created: 0, message: 'Todos los alumnos ya tienen registro hoy' };
+    }
+
+    await this.prisma.asistencia.createMany({
+      data: ausentes.map((a) => ({
+        tipoPersona:    TipoPersona.alumno,
+        alumnoId:       a.id,
+        fecha:          today,
+        horaIngreso:    now,
+        esTardanza:     false,
+        esManual:       true,
+        esAusente:      true,
+        registradoPorId,
+      })),
+    });
+
+    return { created: ausentes.length, message: `${ausentes.length} ausencia(s) registrada(s)` };
+  }
+
+  async justificar(id: string, dto: JustificarAusenciaDto) {
+    const registro = await this.prisma.asistencia.findFirst({ where: { id } });
+    if (!registro) throw new NotFoundException('Registro de asistencia no encontrado');
+
+    return this.prisma.asistencia.update({
+      where: { id },
+      data: { justificacionRazon: dto.razon, justificacionDoc: dto.doc_num ?? null },
+      include: {
+        alumno:  { select: { nombre: true, apellidos: true, codigoBarras: true, aula: { select: { id: true, nombre: true } } } },
+        docente: { select: { nombre: true, apellidos: true, dni: true } },
+      },
+    });
   }
 }
