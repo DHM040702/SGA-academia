@@ -9,6 +9,7 @@ import {
   ParseUUIDPipe,
   Patch,
   Post,
+  Query,
   UseGuards,
 } from '@nestjs/common';
 import { ApiBearerAuth, ApiOperation, ApiTags } from '@nestjs/swagger';
@@ -30,8 +31,8 @@ export class CursosController {
   @Get()
   @Roles(Rol.admin, Rol.director)
   @ApiOperation({ summary: 'Listar todos los cursos con conteo de horarios' })
-  findAll() {
-    return this.service.findAll();
+  findAll(@Query('q') q?: string) {
+    return this.service.findAll(q);
   }
 
   @Get(':id')

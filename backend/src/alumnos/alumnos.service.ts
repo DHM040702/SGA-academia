@@ -70,37 +70,48 @@ export class AlumnosService {
       this.prisma.alumno.count({ where }),
     ]);
 
-    // Calcula % asistencia: días con registro / días con al menos un registro en el aula
-    const enriched = await Promise.all(
-      items.map(async (a) => {
-        const asistencias = await this.prisma.asistencia.findMany({
-          where: { alumnoId: a.id, tipoPersona: 'alumno' },
-          select: { fecha: true },
-        });
-        const diasAlumno = new Set(
-          asistencias.map((x) => x.fecha.toISOString().split('T')[0]),
-        ).size;
+    // ── Cálculo de asistencia en batch ────────────────────────────
+    // Una sola query para todos los alumnos de la página — evita el
+    // problema de pg "client already executing a query" que ocurría
+    // con Promise.all + distinct por relación.
+    const alumnoIds = items.map((a) => a.id);
 
-        let diasAula = diasAlumno;
-        if (a.aulaId) {
-          const aulaAsist = await this.prisma.asistencia.findMany({
-            where: { tipoPersona: 'alumno', alumno: { aulaId: a.aulaId } },
-            select: { fecha: true },
-            distinct: ['fecha'],
-          });
-          diasAula = aulaAsist.length;
+    const asistPerAlumno: Record<string, Set<string>> = {};
+    const fechasPorAula:  Record<string, Set<string>> = {};
+
+    if (alumnoIds.length > 0) {
+      const rows = await this.prisma.asistencia.findMany({
+        where: { alumnoId: { in: alumnoIds }, tipoPersona: 'alumno' },
+        select: { alumnoId: true, fecha: true },
+      });
+
+      for (const r of rows) {
+        const key = r.fecha.toISOString().split('T')[0];
+
+        if (!asistPerAlumno[r.alumnoId]) asistPerAlumno[r.alumnoId] = new Set();
+        asistPerAlumno[r.alumnoId].add(key);
+
+        // Agrupar por aula para calcular el denominador
+        const alumno = items.find((a) => a.id === r.alumnoId);
+        if (alumno?.aulaId) {
+          if (!fechasPorAula[alumno.aulaId]) fechasPorAula[alumno.aulaId] = new Set();
+          fechasPorAula[alumno.aulaId].add(key);
         }
+      }
+    }
 
-        const pct = diasAula > 0 ? Math.round((diasAlumno / diasAula) * 100) : 100;
-        return {
-          ...a,
-          nombres: a.nombre,
-          codigo_barra: a.codigoBarras,
-          asistencia_pct: pct,
-          estado: estadoFromPct(pct),
-        };
-      }),
-    );
+    const enriched = items.map((a) => {
+      const diasAlumno = asistPerAlumno[a.id]?.size ?? 0;
+      const diasAula   = a.aulaId ? (fechasPorAula[a.aulaId]?.size ?? diasAlumno) : diasAlumno;
+      const pct        = diasAula > 0 ? Math.round((diasAlumno / diasAula) * 100) : 100;
+      return {
+        ...a,
+        nombres:        a.nombre,
+        codigo_barra:   a.codigoBarras,
+        asistencia_pct: pct,
+        estado:         estadoFromPct(pct),
+      };
+    });
 
     const filtered = (dto as any).estado
       ? enriched.filter((a) => a.estado === (dto as any).estado)
@@ -110,12 +121,25 @@ export class AlumnosService {
   }
 
   async findOne(id: string) {
+    // ── Query principal ───────────────────────────────────────────
+    // Incluye aula.horarios para mostrar los cursos del alumno.
     const alumno = await this.prisma.alumno.findFirst({
       where: { id, deletedAt: null },
       include: {
-        usuario:  { select: { email: true, activo: true, rol: true } },
-        aula:     { include: { ciclo: true } },
-        carrera:  { select: { id: true, nombre: true, area: true } },
+        usuario: { select: { email: true, activo: true, rol: true } },
+        aula: {
+          include: {
+            ciclo: true,
+            horarios: {
+              include: {
+                curso:   { select: { id: true, nombre: true, codigo: true } },
+                docente: { select: { id: true, nombre: true, apellidos: true } },
+              },
+              orderBy: [{ diaSemana: 'asc' }, { horaInicio: 'asc' }],
+            },
+          },
+        },
+        carrera: { select: { id: true, nombre: true, area: true } },
         apoderados: {
           where: { apoderado: { deletedAt: null } },
           include: { apoderado: { include: { usuario: { select: { email: true } } } } },
@@ -128,32 +152,44 @@ export class AlumnosService {
     });
     if (!alumno) throw new NotFoundException('Alumno no encontrado');
 
-    const asistencias = await this.prisma.asistencia.findMany({
+    // ── Cálculo de asistencia secuencial ─────────────────────────
+    // Se ejecutan en serie para evitar que pg reciba queries
+    // concurrentes sobre el mismo cliente (deprecation warning).
+
+    const asistenciasAlumno = await this.prisma.asistencia.findMany({
       where: { alumnoId: alumno.id, tipoPersona: 'alumno' },
       select: { fecha: true },
     });
     const diasAlumno = new Set(
-      asistencias.map((x) => x.fecha.toISOString().split('T')[0]),
+      asistenciasAlumno.map((x) => x.fecha.toISOString().split('T')[0]),
     ).size;
+
     let diasAula = diasAlumno;
     if (alumno.aulaId) {
-      const aulaAsist = await this.prisma.asistencia.findMany({
-        where: { tipoPersona: 'alumno', alumno: { aulaId: alumno.aulaId } },
-        select: { fecha: true },
-        distinct: ['fecha'],
+      // Obtener IDs de compañeros de aula y luego sus fechas —
+      // evita el filtro por relación que causaba el problema con distinct.
+      const companeros = await this.prisma.alumno.findMany({
+        where: { aulaId: alumno.aulaId, deletedAt: null },
+        select: { id: true },
       });
-      diasAula = aulaAsist.length;
+      const companeroIds = companeros.map((c) => c.id);
+      const fechasAula = await this.prisma.asistencia.findMany({
+        where: { alumnoId: { in: companeroIds }, tipoPersona: 'alumno' },
+        select: { fecha: true },
+      });
+      diasAula = new Set(fechasAula.map((x) => x.fecha.toISOString().split('T')[0])).size;
     }
+
     const pct = diasAula > 0 ? Math.round((diasAlumno / diasAula) * 100) : 100;
 
     return {
       ...alumno,
-      nombres: alumno.nombre,
-      codigo_barra: alumno.codigoBarras,
+      nombres:          alumno.nombre,
+      codigo_barra:     alumno.codigoBarras,
       fecha_nacimiento: alumno.fechaNacimiento?.toISOString().split('T')[0] ?? null,
-      created_at: alumno.createdAt.toISOString(),
-      asistencia_pct: pct,
-      estado: estadoFromPct(pct),
+      created_at:       alumno.createdAt.toISOString(),
+      asistencia_pct:   pct,
+      estado:           estadoFromPct(pct),
     };
   }
 
@@ -189,7 +225,7 @@ export class AlumnosService {
         },
         include: {
           usuario: { select: { email: true } },
-          aula:    true,
+          aula:    { include: { ciclo: true, horarios: { include: { curso: true, docente: true } } } },
           carrera: { select: { id: true, nombre: true, area: true } },
         },
       });
@@ -212,17 +248,17 @@ export class AlumnosService {
       return tx.alumno.update({
         where: { id },
         data: {
-          ...(rest.nombres          && { nombre:          rest.nombres }),
-          ...(rest.apellidos        && { apellidos:        rest.apellidos }),
-          ...(rest.dni              && { dni:              rest.dni }),
-          ...(rest.fecha_nacimiento && { fechaNacimiento:  new Date(rest.fecha_nacimiento) }),
-          ...(rest.telefono  !== undefined && { telefono:  rest.telefono }),
-          ...(rest.aula_id   !== undefined && { aulaId:    rest.aula_id }),
+          ...(rest.nombres           && { nombre:          rest.nombres }),
+          ...(rest.apellidos         && { apellidos:        rest.apellidos }),
+          ...(rest.dni               && { dni:              rest.dni }),
+          ...(rest.fecha_nacimiento  && { fechaNacimiento:  new Date(rest.fecha_nacimiento) }),
+          ...(rest.telefono  !== undefined && { telefono:   rest.telefono }),
+          ...(rest.aula_id   !== undefined && { aulaId:     rest.aula_id }),
           ...(rest.carrera_id !== undefined && { carreraId: rest.carrera_id }),
         },
         include: {
           usuario: { select: { email: true } },
-          aula:    true,
+          aula:    { include: { ciclo: true, horarios: { include: { curso: true, docente: true } } } },
           carrera: { select: { id: true, nombre: true, area: true } },
         },
       });

@@ -7,13 +7,14 @@ import { Avatar } from '@/components/ui/avatar'
 import { useAuth } from '@/contexts/auth-context'
 import {
   Home, Users, Teacher, Grid, Calendar, Check,
-  Megaphone, Book, Chart, LogOut,
+  Megaphone, Book, Chart, LogOut, Layers,
 } from '@/components/icons'
 
 const NAV_ADMIN = [
   { href: '/inicio',      icon: Home,      label: 'Inicio' },
   { href: '/alumnos',     icon: Users,     label: 'Alumnos' },
   { href: '/docentes',    icon: Teacher,   label: 'Docentes' },
+  { href: '/cursos',      icon: Layers,    label: 'Cursos' },
   { href: '/ciclos',      icon: Grid,      label: 'Ciclos y aulas' },
   { href: '/horarios',    icon: Calendar,  label: 'Horarios' },
   { href: '/asistencia',  icon: Check,     label: 'Asistencia' },

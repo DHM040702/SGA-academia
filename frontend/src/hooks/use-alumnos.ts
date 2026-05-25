@@ -23,6 +23,15 @@ export interface Alumno {
     nombre: string
     area?: 'ciencias' | 'letras' | 'medicas'
     ciclo: { id: string; nombre: string }
+    horarios?: {
+      id: string
+      diaSemana: number
+      horaInicio: string
+      horaFin: string
+      publicado: boolean
+      curso: { id: string; nombre: string; codigo: string }
+      docente: { id: string; nombre: string; apellidos: string }
+    }[]
   } | null
   carrera?: {
     id: string

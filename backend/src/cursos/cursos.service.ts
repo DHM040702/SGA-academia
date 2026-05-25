@@ -11,9 +11,18 @@ import { UpdateCursoDto } from './dto/update-curso.dto';
 export class CursosService {
   constructor(private prisma: PrismaService) {}
 
-  async findAll() {
+  async findAll(q?: string) {
+    const searchWhere = q
+      ? {
+          OR: [
+            { nombre: { contains: q, mode: 'insensitive' as const } },
+            { codigo: { contains: q, mode: 'insensitive' as const } },
+          ],
+        }
+      : {};
+
     return this.prisma.curso.findMany({
-      where: { activo: true },
+      where: { activo: true, ...searchWhere },
       orderBy: { nombre: 'asc' },
       include: {
         _count: { select: { horarios: true } },

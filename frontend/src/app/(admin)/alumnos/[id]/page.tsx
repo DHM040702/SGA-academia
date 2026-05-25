@@ -14,8 +14,17 @@ import { PageHeader } from '@/components/layout/page-header'
 import { Download, Edit, Mail, Phone, Calendar, MapPin, Book } from '@/components/icons'
 import { useState } from 'react'
 
-const TABS = ['Resumen', 'Asistencia', 'Apoderados', 'Comunicados'] as const
+const TABS = ['Resumen', 'Cursos', 'Asistencia', 'Apoderados', 'Comunicados'] as const
 type Tab = (typeof TABS)[number]
+
+const DIAS = ['', 'Lunes', 'Martes', 'Miércoles', 'Jueves', 'Viernes', 'Sábado', 'Domingo']
+
+function fmtHora(iso: string | null | undefined) {
+  if (!iso) return '—'
+  if (/^\d{2}:\d{2}/.test(iso)) return iso.slice(0, 5)
+  const d = new Date(iso)
+  return isNaN(d.getTime()) ? iso : d.toLocaleTimeString('es-PE', { hour: '2-digit', minute: '2-digit' })
+}
 
 function formatDate(s?: string | null) {
   if (!s) return '—'
@@ -236,22 +245,146 @@ export default function AlumnoDetallePage() {
             </>
           )}
 
+          {tab === 'Cursos' && (() => {
+            const horarios = alumno.aula?.horarios ?? []
+            return (
+              <Card
+                title="Cursos asignados"
+                subtitle={alumno.aula ? `Aula ${alumno.aula.nombre} · ${horarios.length} horario${horarios.length !== 1 ? 's' : ''}` : 'Sin aula asignada'}
+              >
+                {!alumno.aula ? (
+                  <p className="text-[13px] text-text-mute py-8 text-center">
+                    Este alumno no tiene aula asignada. Edítalo para asignarle una.
+                  </p>
+                ) : horarios.length === 0 ? (
+                  <p className="text-[13px] text-text-mute py-8 text-center">
+                    El aula <strong>{alumno.aula.nombre}</strong> aún no tiene cursos/horarios asignados.
+                  </p>
+                ) : (
+                  <table className="w-full border-collapse text-[13px]">
+                    <thead>
+                      <tr className="border-b border-border bg-surface2/50">
+                        {['Día', 'Horario', 'Curso', 'Docente', 'Estado'].map((h) => (
+                          <th key={h} className="text-left px-3.5 py-2.5 text-[11px] text-text-mute uppercase tracking-[0.04em] font-semibold">
+                            {h}
+                          </th>
+                        ))}
+                      </tr>
+                    </thead>
+                    <tbody>
+                      {horarios.map((h) => (
+                        <tr key={h.id} className="border-t border-border-s hover:bg-surface2/40">
+                          <td className="px-3.5 py-2.5 font-medium">
+                            {DIAS[h.diaSemana] ?? `Día ${h.diaSemana}`}
+                          </td>
+                          <td className="px-3.5 py-2.5 font-mono text-[12px] text-text-mute">
+                            {fmtHora(h.horaInicio)} – {fmtHora(h.horaFin)}
+                          </td>
+                          <td className="px-3.5 py-2.5">
+                            <span className="font-medium">{h.curso.nombre}</span>
+                            <span className="ml-1.5 font-mono text-[11px] text-text-mute bg-surface2 px-1.5 py-0.5 rounded">
+                              {h.curso.codigo}
+                            </span>
+                          </td>
+                          <td className="px-3.5 py-2.5 text-text-mute">
+                            {h.docente.nombre} {h.docente.apellidos}
+                          </td>
+                          <td className="px-3.5 py-2.5">
+                            <Pill tone={h.publicado ? 'success' : 'neutral'}>
+                              {h.publicado ? 'Publicado' : 'Borrador'}
+                            </Pill>
+                          </td>
+                        </tr>
+                      ))}
+                    </tbody>
+                  </table>
+                )}
+              </Card>
+            )
+          })()}
+
           {tab === 'Asistencia' && (
             <Card title="Historial de asistencia" subtitle="Todos los registros">
-              <p className="text-[13px] text-text-mute px-1 py-2">Historial completo del alumno.</p>
+              <table className="w-full text-[13px] border-collapse">
+                <thead>
+                  <tr className="border-b border-border bg-surface-2">
+                    {['Fecha', 'Hora ingreso', 'Estado', 'Tipo', 'Observación'].map((h) => (
+                      <th key={h} className="text-left px-3.5 py-2 text-[11px] text-text-mute uppercase tracking-[0.04em] font-semibold">
+                        {h}
+                      </th>
+                    ))}
+                  </tr>
+                </thead>
+                <tbody>
+                  {(asistencias?.data ?? []).map((r) => (
+                    <tr key={r.id} className="border-t border-border-s hover:bg-surface2/40">
+                      <td className="px-3.5 py-2.5 text-text-mute font-mono text-[12px]">
+                        {new Date(r.fecha).toLocaleDateString('es-PE', { weekday: 'short', day: '2-digit', month: 'short', year: 'numeric' })}
+                      </td>
+                      <td className="px-3.5 py-2.5 font-mono text-[12px]">
+                        {r.horaIngreso ? new Date(r.horaIngreso).toLocaleTimeString('es-PE', { hour: '2-digit', minute: '2-digit' }) : '—'}
+                      </td>
+                      <td className="px-3.5 py-2.5">
+                        <Pill tone={r.esTardanza ? 'warning' : 'success'}>
+                          <Dot tone={r.esTardanza ? 'warning' : 'success'} size={6} />
+                          {r.esTardanza ? 'Tardanza' : 'Puntual'}
+                        </Pill>
+                      </td>
+                      <td className="px-3.5 py-2.5">
+                        {r.esManual ? <Pill tone="neutral">Manual</Pill> : '—'}
+                      </td>
+                      <td className="px-3.5 py-2.5 text-[12px] text-text-mute">
+                        {r.motivoManual ?? '—'}
+                      </td>
+                    </tr>
+                  ))}
+                  {(!asistencias?.data || asistencias.data.length === 0) && (
+                    <tr>
+                      <td colSpan={5} className="px-3.5 py-8 text-center text-text-mute text-[13px]">
+                        Sin registros de asistencia
+                      </td>
+                    </tr>
+                  )}
+                </tbody>
+              </table>
             </Card>
           )}
 
-          {tab === 'Apoderados' && (
-            <Card title="Apoderados vinculados">
-              <p className="text-[13px] text-text-mute px-1 py-4 text-center">
-                No hay apoderados vinculados aún.
-              </p>
-              <div className="px-4 pb-4">
-                <Btn variant="ghost" size="sm">+ Vincular apoderado</Btn>
-              </div>
-            </Card>
-          )}
+          {tab === 'Apoderados' && (() => {
+            const apoderados = (alumno as any).apoderados ?? []
+            return (
+              <Card title="Apoderados vinculados" subtitle={`${apoderados.length} apoderado${apoderados.length !== 1 ? 's' : ''}`}>
+                {apoderados.length === 0 ? (
+                  <p className="text-[13px] text-text-mute px-1 py-6 text-center">
+                    No hay apoderados vinculados.
+                  </p>
+                ) : (
+                  <div className="flex flex-col">
+                    {apoderados.map((rel: any, i: number) => {
+                      const ap = rel.apoderado
+                      return (
+                        <div key={ap.id} className={`flex items-center gap-3 py-3 ${i > 0 ? 'border-t border-border-s' : ''}`}>
+                          <Avatar name={`${ap.nombre} ${ap.apellidos}`} size={36} />
+                          <div className="flex-1 min-w-0">
+                            <div className="text-[13px] font-semibold">{ap.nombre} {ap.apellidos}</div>
+                            <div className="text-[11.5px] text-text-mute">
+                              DNI {ap.dni} · {ap.usuario?.email ?? '—'}
+                            </div>
+                            {ap.telefono && (
+                              <div className="text-[11.5px] text-text-mute">{ap.telefono}</div>
+                            )}
+                          </div>
+                          {rel.parentesco && (
+                            <Pill tone="neutral">{rel.parentesco}</Pill>
+                          )}
+                        </div>
+                      )
+                    })}
+                  </div>
+                )}
+              </Card>
+            )
+          })()}
 
           {tab === 'Comunicados' && (
             <Card title="Comunicados recibidos">
