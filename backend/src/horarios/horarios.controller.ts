@@ -44,7 +44,7 @@ export class HorariosController {
   }
 
   @Get(':id')
-  @Roles(Rol.admin, Rol.director, Rol.alumno, Rol.apoderado)
+  @Roles(Rol.admin, Rol.director, Rol.alumno, Rol.apoderado, Rol.vigilante)
   @ApiOperation({ summary: 'Detalle de un horario' })
   findOne(@Param('id', ParseUUIDPipe) id: string) {
     return this.service.findOne(id);

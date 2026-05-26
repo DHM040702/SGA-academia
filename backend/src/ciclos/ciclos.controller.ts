@@ -28,14 +28,14 @@ export class CiclosController {
   constructor(private readonly service: CiclosService) {}
 
   @Get()
-  @Roles(Rol.admin, Rol.director)
+  @Roles(Rol.admin, Rol.director, Rol.vigilante)
   @ApiOperation({ summary: 'Listar todos los ciclos académicos' })
   findAll() {
     return this.service.findAll();
   }
 
   @Get(':id')
-  @Roles(Rol.admin, Rol.director)
+  @Roles(Rol.admin, Rol.director, Rol.vigilante)
   @ApiOperation({ summary: 'Detalle de un ciclo con secciones y alumnos' })
   findOne(@Param('id', ParseUUIDPipe) id: string) {
     return this.service.findOne(id);

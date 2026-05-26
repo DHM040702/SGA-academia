@@ -14,7 +14,8 @@ import { Dot } from '@/components/ui/dot'
 import { Card } from '@/components/ui/card'
 import { Btn } from '@/components/ui/btn'
 import { PageHeader } from '@/components/layout/page-header'
-import { Plus, Download, AlertTriangle, Edit, Trash, X } from '@/components/icons'
+import { Plus, Download, AlertTriangle, Edit, Trash, X, Eye } from '@/components/icons'
+import { useAuth } from '@/contexts/auth-context'
 
 const DIA_FULL = ['Lunes', 'Martes', 'Miércoles', 'Jueves', 'Viernes', 'Sábado']
 const DIAS_NUM = [1, 2, 3, 4, 5, 6]
@@ -222,10 +223,11 @@ function HorarioModal({ horario, onClose }: ModalProps) {
 
 // ─── Cell menu ────────────────────────────────────────────────────────────────
 
-function CellMenu({ horario, onEdit, onDelete }: {
+function CellMenu({ horario, onEdit, onDelete, onPublicar }: {
   horario: Horario
   onEdit: (h: Horario) => void
   onDelete: (h: Horario) => void
+  onPublicar: (h: Horario) => void
 }) {
   const [open, setOpen] = useState(false)
   const ref = useRef<HTMLDivElement>(null)
@@ -247,13 +249,21 @@ function CellMenu({ horario, onEdit, onDelete }: {
         <Edit size={10} />
       </button>
       {open && (
-        <div className="absolute right-0 top-full mt-1 z-30 bg-surface border border-border rounded-2 shadow-2 py-1 w-36">
+        <div className="absolute right-0 top-full mt-1 z-30 bg-surface border border-border rounded-2 shadow-2 py-1 w-40">
           <button
             className="w-full text-left px-3 py-1.5 text-[12px] hover:bg-surface-2 flex items-center gap-2"
             onClick={() => { onEdit(horario); setOpen(false) }}
           >
             <Edit size={12} /> Editar
           </button>
+          {!horario.publicado && (
+            <button
+              className="w-full text-left px-3 py-1.5 text-[12px] text-success hover:bg-success-l flex items-center gap-2"
+              onClick={() => { onPublicar(horario); setOpen(false) }}
+            >
+              <Eye size={12} /> Publicar
+            </button>
+          )}
           <button
             className="w-full text-left px-3 py-1.5 text-[12px] text-danger hover:bg-danger-l flex items-center gap-2"
             onClick={() => { onDelete(horario); setOpen(false) }}
@@ -506,6 +516,8 @@ function ExportModal({ horarios, aulas, onClose }: ExportModalProps) {
 // ─── Page ─────────────────────────────────────────────────────────────────────
 
 export default function HorariosPage() {
+  const { user } = useAuth()
+  const isVigilante = user?.rol === 'vigilante'
   const [aulaId, setAulaId]       = useState('')
   const [modal, setModal]         = useState<'create' | 'edit' | null>(null)
   const [selected, setSelected]   = useState<Horario | null>(null)
@@ -517,6 +529,7 @@ export default function HorariosPage() {
   const { data: horariosPage, isLoading } = useHorarios({ aula_id: aulaId || undefined })
   const { data: conflictos = [] }      = useConflictosHorario()
   const deleteMut                      = useDeleteHorario()
+  const updateMut                      = useUpdateHorario()
 
   const docentes = (docentesPage as any)?.data ?? []
   const horarios: Horario[] = (horariosPage as any)?.data ?? horariosPage ?? []
@@ -544,6 +557,10 @@ export default function HorariosPage() {
     await deleteMut.mutateAsync(h.id)
   }
 
+  async function handlePublicar(h: Horario) {
+    await updateMut.mutateAsync({ id: h.id, publicado: true })
+  }
+
   return (
     <>
       {(modal === 'create' || modal === 'edit') && (
@@ -556,7 +573,7 @@ export default function HorariosPage() {
       <PageHeader
         title="Horarios"
         crumbs={[{ label: 'Horarios' }]}
-        action={
+        action={!isVigilante ? (
           <>
             <Btn variant="secondary" icon={<Download size={14} />} size="sm" onClick={() => setShowExport(true)}>
               Exportar PDF
@@ -565,7 +582,7 @@ export default function HorariosPage() {
               Asignar clase
             </Btn>
           </>
-        }
+        ) : undefined}
       />
 
       <div className="p-7 grid gap-3.5" style={{ gridTemplateColumns: '1fr 280px' }}>
@@ -600,9 +617,11 @@ export default function HorariosPage() {
                 <strong className="text-danger">Conflicto de horario:</strong>{' '}
                 Hay {conflictos.length} horario{conflictos.length > 1 ? 's' : ''} con superposición. Revise y corrija.
               </div>
-              <Btn variant="secondary" size="sm" style={{ borderColor: 'var(--color-danger)', color: 'var(--color-danger)' }}>
-                Resolver
-              </Btn>
+              {!isVigilante && (
+                <Btn variant="secondary" size="sm" style={{ borderColor: 'var(--color-danger)', color: 'var(--color-danger)' }}>
+                  Resolver
+                </Btn>
+              )}
             </div>
           )}
 
@@ -629,10 +648,10 @@ export default function HorariosPage() {
                 <div className="text-center py-10 text-text-mute text-[13px]">Cargando horarios…</div>
               ) : slotsDelDia.length === 0 ? (
                 <div className="text-center py-10 text-text-mute text-[13px]">
-                  No hay horarios para el {DIA_FULL[diaVista - 1]}.<br />
+                  No hay horarios para el {DIA_FULL[diaVista - 1]}.{!isVigilante && (<><br />
                   <button onClick={openCreate} className="mt-2 text-primary text-[12px] hover:underline">
                     + Asignar clase
-                  </button>
+                  </button></>)}
                 </div>
               ) : (
                 <table className="w-full border-collapse">
@@ -679,7 +698,12 @@ export default function HorariosPage() {
                                       </span>
                                       <div className="flex items-center gap-0.5">
                                         {conflicto && <AlertTriangle size={11} className="text-danger" />}
-                                        <CellMenu horario={h} onEdit={openEdit} onDelete={handleDelete} />
+                                        {!h.publicado && !conflicto && (
+                                          <span className="text-[8.5px] px-1 py-0.5 rounded bg-black/10 text-text-mute font-medium leading-none">
+                                            Borrador
+                                          </span>
+                                        )}
+                                        {!isVigilante && <CellMenu horario={h} onEdit={openEdit} onDelete={handleDelete} onPublicar={handlePublicar} />}
                                       </div>
                                     </div>
                                   </div>
@@ -701,10 +725,10 @@ export default function HorariosPage() {
                 <div className="text-center py-10 text-text-mute text-[13px]">Cargando horarios…</div>
               ) : slots.length === 0 ? (
                 <div className="text-center py-10 text-text-mute text-[13px]">
-                  No hay horarios registrados para esta aula.<br />
+                  No hay horarios registrados para esta aula.{!isVigilante && (<><br />
                   <button onClick={openCreate} className="mt-2 text-primary text-[12px] hover:underline">
                     + Asignar primera clase
-                  </button>
+                  </button></>)}
                 </div>
               ) : (
                 <table className="w-full border-collapse">
@@ -751,7 +775,12 @@ export default function HorariosPage() {
                                       </span>
                                       <div className="flex items-center gap-0.5">
                                         {conflicto && <AlertTriangle size={11} className="text-danger" />}
-                                        <CellMenu horario={h} onEdit={openEdit} onDelete={handleDelete} />
+                                        {!h.publicado && !conflicto && (
+                                          <span className="text-[8.5px] px-1 py-0.5 rounded bg-black/10 text-text-mute font-medium leading-none">
+                                            Borrador
+                                          </span>
+                                        )}
+                                        {!isVigilante && <CellMenu horario={h} onEdit={openEdit} onDelete={handleDelete} onPublicar={handlePublicar} />}
                                       </div>
                                     </div>
                                   </div>
@@ -803,13 +832,15 @@ export default function HorariosPage() {
                     <div className="text-[12.5px] font-medium truncate">{d.nombre} {d.apellidos}</div>
                     <div className="text-[11px] text-text-mute truncate">{d.especialidad ?? '—'}</div>
                   </div>
-                  <button
-                    onClick={openCreate}
-                    className="text-text-mute hover:text-primary p-0.5"
-                    title="Asignar clase"
-                  >
-                    <Plus size={14} />
-                  </button>
+                  {!isVigilante && (
+                    <button
+                      onClick={openCreate}
+                      className="text-text-mute hover:text-primary p-0.5"
+                      title="Asignar clase"
+                    >
+                      <Plus size={14} />
+                    </button>
+                  )}
                 </div>
               ))}
               {docentes.length === 0 && (

@@ -10,6 +10,7 @@ import { Input } from '@/components/ui/input'
 import { ImportExcelModal } from '@/components/alumnos/import-excel-modal'
 import { useAlumnos, useDeleteAlumno, type EstadoAlumno, type FilterAlumnos } from '@/hooks/use-alumnos'
 import { useCiclos, useAulas } from '@/hooks/use-ciclos'
+import { useAuth } from '@/contexts/auth-context'
 import { cn } from '@/lib/utils'
 import { Search, Plus, Upload, Scan, Filter, ChevR, ChevL, More, Eye, Edit, Trash } from '@/components/icons'
 
@@ -78,7 +79,7 @@ function Pagination({ page, totalPages, onPage }: { page: number; totalPages: nu
 }
 
 /* ── RowMenu ────────────────────────────────────────────────────── */
-function RowMenu({ id, name, onClose }: { id: string; name: string; onClose: () => void }) {
+function RowMenu({ id, name, onClose, readOnly }: { id: string; name: string; onClose: () => void; readOnly?: boolean }) {
   const router = useRouter()
   const deleteAlumno = useDeleteAlumno()
 
@@ -97,19 +98,23 @@ function RowMenu({ id, name, onClose }: { id: string; name: string; onClose: () 
       >
         <Eye size={13} className="text-text-mute" />Ver detalle
       </button>
-      <button
-        onClick={() => go(`/alumnos/${id}/editar`)}
-        className="w-full text-left flex items-center gap-2 px-3 py-2 text-[12.5px] hover:bg-surface2 transition-colors border-none bg-transparent cursor-pointer font-sans"
-      >
-        <Edit size={13} className="text-text-mute" />Editar
-      </button>
-      <div className="border-t border-border-s my-1" />
-      <button
-        onClick={handleDelete}
-        className="w-full text-left flex items-center gap-2 px-3 py-2 text-[12.5px] text-danger hover:bg-danger-light transition-colors border-none bg-transparent cursor-pointer font-sans"
-      >
-        <Trash size={13} />Eliminar
-      </button>
+      {!readOnly && (
+        <>
+          <button
+            onClick={() => go(`/alumnos/${id}/editar`)}
+            className="w-full text-left flex items-center gap-2 px-3 py-2 text-[12.5px] hover:bg-surface2 transition-colors border-none bg-transparent cursor-pointer font-sans"
+          >
+            <Edit size={13} className="text-text-mute" />Editar
+          </button>
+          <div className="border-t border-border-s my-1" />
+          <button
+            onClick={handleDelete}
+            className="w-full text-left flex items-center gap-2 px-3 py-2 text-[12.5px] text-danger hover:bg-danger-light transition-colors border-none bg-transparent cursor-pointer font-sans"
+          >
+            <Trash size={13} />Eliminar
+          </button>
+        </>
+      )}
     </div>
   )
 }
@@ -117,11 +122,14 @@ function RowMenu({ id, name, onClose }: { id: string; name: string; onClose: () 
 /* ── Main page ──────────────────────────────────────────────────── */
 export default function AlumnosPage() {
   const router = useRouter()
+  const { user } = useAuth()
+  const isVigilante = user?.rol === 'vigilante'
   const [filters, setFilters] = React.useState<FilterAlumnos>({ page: 1, limit: 20 })
   const [q, setQ] = React.useState('')
   const [estado, setEstado] = React.useState('')
   const [cicloId, setCicloId] = React.useState('')
   const [aulaId, setAulaId] = React.useState('')
+  const [turno, setTurno] = React.useState('')
   const [openMenu, setOpenMenu] = React.useState<string | null>(null)
   const [showImport, setShowImport] = React.useState(false)
 
@@ -152,6 +160,9 @@ export default function AlumnosPage() {
     }))
   }, [estado, cicloId, aulaId])
 
+  /* ── Limpiar aula al cambiar turno ── */
+  React.useEffect(() => { setAulaId('') }, [turno])
+
   /* ── Limpiar sección al cambiar ciclo ── */
   React.useEffect(() => { setAulaId('') }, [cicloId])
 
@@ -161,7 +172,13 @@ export default function AlumnosPage() {
 
   const total = data?.total ?? 0
   const totalPages = data?.totalPages ?? 1
-  const items = data?.data ?? []
+  const rawItems = data?.data ?? []
+  // Client-side turno filter (server doesn't support turno param yet)
+  const items = turno
+    ? rawItems.filter((a) => a.aula?.turno === turno)
+    : rawItems
+  // Aulas filtered by selected turno
+  const aulasFiltradas = turno ? secciones.filter((s) => s.turno === turno) : secciones
   const page = filters.page ?? 1
 
   return (
@@ -169,7 +186,7 @@ export default function AlumnosPage() {
       <PageHeader
         title="Alumnos"
         crumbs={['Administración', 'Alumnos']}
-        action={
+        action={!isVigilante ? (
           <>
             <Btn variant="secondary" size="sm" onClick={() => setShowImport(true)}>
               <Upload size={14} />Importar Excel
@@ -181,7 +198,7 @@ export default function AlumnosPage() {
               <Plus size={14} />Nuevo alumno
             </Btn>
           </>
-        }
+        ) : undefined}
       />
 
       {/* ── Filter bar ── */}
@@ -211,7 +228,17 @@ export default function AlumnosPage() {
           disabled={!cicloId}
           options={[
             { label: cicloId ? 'Todas' : 'Elige ciclo', value: '' },
-            ...secciones.map((s) => ({ label: s.nombre, value: s.id })),
+            ...aulasFiltradas.map((s) => ({ label: s.nombre, value: s.id })),
+          ]}
+        />
+        <FilterSelect
+          label="Turno"
+          value={turno}
+          onChange={setTurno}
+          options={[
+            { label: 'Todos', value: '' },
+            { label: 'Mañana', value: 'manana' },
+            { label: 'Tarde', value: 'tarde' },
           ]}
         />
         <FilterSelect
@@ -238,7 +265,7 @@ export default function AlumnosPage() {
         <table className="w-full border-collapse text-[13px]">
           <thead>
             <tr className="bg-surface2 border-b border-border">
-              {['Alumno', 'Código', 'DNI', 'Sección', 'Asistencia', 'Estado', ''].map((h) => (
+              {['Alumno', 'Código', 'DNI', 'Sección / Turno', 'Asistencia', 'Estado', ''].map((h) => (
                 <th key={h} className="text-left text-[11px] font-semibold text-text-mute uppercase tracking-[0.05em] px-3.5 py-2.5">
                   {h}
                 </th>
@@ -279,7 +306,12 @@ export default function AlumnosPage() {
                     <td className="px-3.5 py-3 font-mono text-[12px] text-text-mute">{a.dni}</td>
                     <td className="px-3.5 py-3">
                       {a.aula ? (
-                        <Pill tone="neutral">{a.aula.nombre}</Pill>
+                        <div className="flex items-center gap-1.5">
+                          <Pill tone="neutral">{a.aula.nombre}</Pill>
+                          <Pill tone={a.aula.turno === 'manana' ? 'success' : 'warning'} className="text-[10.5px]">
+                            {a.aula.turno === 'manana' ? 'Mañana' : 'Tarde'}
+                          </Pill>
+                        </div>
                       ) : (
                         <span className="text-text-mute text-[12px]">—</span>
                       )}
@@ -314,7 +346,7 @@ export default function AlumnosPage() {
                           <More size={15} />
                         </Btn>
                         {openMenu === a.id && (
-                          <RowMenu id={a.id} name={name} onClose={() => setOpenMenu(null)} />
+                          <RowMenu id={a.id} name={name} onClose={() => setOpenMenu(null)} readOnly={isVigilante} />
                         )}
                       </div>
                     </td>

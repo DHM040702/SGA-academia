@@ -86,6 +86,7 @@ export class AlumnosService {
       });
 
       for (const r of rows) {
+        if (!r.alumnoId) continue;          // alumnoId es nullable en el schema
         const key = r.fecha.toISOString().split('T')[0];
 
         if (!asistPerAlumno[r.alumnoId]) asistPerAlumno[r.alumnoId] = new Set();

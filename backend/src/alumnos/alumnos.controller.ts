@@ -25,14 +25,14 @@ export class AlumnosController {
   constructor(private readonly service: AlumnosService) {}
 
   @Get()
-  @Roles(Rol.admin, Rol.director)
+  @Roles(Rol.admin, Rol.director, Rol.vigilante)
   @ApiOperation({ summary: 'Listar alumnos paginados con filtros' })
   findAll(@Query() dto: FilterAlumnosDto) {
     return this.service.findAll(dto);
   }
 
   @Get(':id')
-  @Roles(Rol.admin, Rol.director)
+  @Roles(Rol.admin, Rol.director, Rol.vigilante)
   @ApiOperation({ summary: 'Detalle de un alumno' })
   findOne(@Param('id', ParseUUIDPipe) id: string) {
     return this.service.findOne(id);

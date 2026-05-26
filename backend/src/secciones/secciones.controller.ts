@@ -29,7 +29,7 @@ export class SeccionesController {
   constructor(private readonly service: SeccionesService) {}
 
   @Get()
-  @Roles(Rol.admin, Rol.director)
+  @Roles(Rol.admin, Rol.director, Rol.vigilante)
   @ApiOperation({ summary: 'Listar aulas, opcionalmente filtradas por ciclo' })
   @ApiQuery({ name: 'ciclo_id', required: false, type: String, description: 'UUID del ciclo' })
   findAll(@Query('ciclo_id') ciclo_id?: string) {
@@ -37,7 +37,7 @@ export class SeccionesController {
   }
 
   @Get(':id')
-  @Roles(Rol.admin, Rol.director)
+  @Roles(Rol.admin, Rol.director, Rol.vigilante)
   @ApiOperation({ summary: 'Detalle de un aula con alumnos y horarios' })
   findOne(@Param('id', ParseUUIDPipe) id: string) {
     return this.service.findOne(id);

@@ -15,6 +15,8 @@ import { ComunicadosModule } from './comunicados/comunicados.module';
 import { BibliotecaModule } from './biblioteca/biblioteca.module';
 import { ReportesModule } from './reportes/reportes.module';
 import { CarrerasModule } from './carreras/carreras.module';
+import { TurnosModule } from './turnos/turnos.module';
+import { UsuariosModule } from './usuarios/usuarios.module';
 
 @Module({
   imports: [
@@ -22,6 +24,8 @@ import { CarrerasModule } from './carreras/carreras.module';
     PrismaModule,
     AuthModule,
     CarrerasModule,
+    TurnosModule,
+    UsuariosModule,
     AlumnosModule,
     DocentesModule,
     CiclosModule,

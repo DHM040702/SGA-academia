@@ -10,6 +10,7 @@ import { Btn } from '@/components/ui/btn'
 import { Input } from '@/components/ui/input'
 import { PageHeader } from '@/components/layout/page-header'
 import { Search, Plus, Download, More, Eye, Edit, Trash, ChevL, ChevR } from '@/components/icons'
+import { useAuth } from '@/contexts/auth-context'
 import { cn } from '@/lib/utils'
 
 /* ── Pagination ─────────────────────────────────────────────────── */
@@ -48,7 +49,7 @@ function Pagination({ page, totalPages, onPage }: { page: number; totalPages: nu
 }
 
 /* ── RowMenu ────────────────────────────────────────────────────── */
-function RowMenu({ id, name, onClose }: { id: string; name: string; onClose: () => void }) {
+function RowMenu({ id, name, onClose, readOnly }: { id: string; name: string; onClose: () => void; readOnly?: boolean }) {
   const router = useRouter()
   const deleteDocente = useDeleteDocente()
 
@@ -67,19 +68,23 @@ function RowMenu({ id, name, onClose }: { id: string; name: string; onClose: () 
       >
         <Eye size={13} className="text-text-mute" />Ver detalle
       </button>
-      <button
-        onClick={() => go(`/docentes/${id}/editar`)}
-        className="w-full text-left flex items-center gap-2 px-3 py-2 text-[12.5px] hover:bg-surface2 transition-colors border-none bg-transparent cursor-pointer font-sans"
-      >
-        <Edit size={13} className="text-text-mute" />Editar
-      </button>
-      <div className="border-t border-border-s my-1" />
-      <button
-        onClick={handleDelete}
-        className="w-full text-left flex items-center gap-2 px-3 py-2 text-[12.5px] text-danger hover:bg-danger-light transition-colors border-none bg-transparent cursor-pointer font-sans"
-      >
-        <Trash size={13} />Eliminar
-      </button>
+      {!readOnly && (
+        <>
+          <button
+            onClick={() => go(`/docentes/${id}/editar`)}
+            className="w-full text-left flex items-center gap-2 px-3 py-2 text-[12.5px] hover:bg-surface2 transition-colors border-none bg-transparent cursor-pointer font-sans"
+          >
+            <Edit size={13} className="text-text-mute" />Editar
+          </button>
+          <div className="border-t border-border-s my-1" />
+          <button
+            onClick={handleDelete}
+            className="w-full text-left flex items-center gap-2 px-3 py-2 text-[12.5px] text-danger hover:bg-danger-light transition-colors border-none bg-transparent cursor-pointer font-sans"
+          >
+            <Trash size={13} />Eliminar
+          </button>
+        </>
+      )}
     </div>
   )
 }
@@ -87,6 +92,8 @@ function RowMenu({ id, name, onClose }: { id: string; name: string; onClose: () 
 /* ── Main page ──────────────────────────────────────────────────── */
 export default function DocentesPage() {
   const router = useRouter()
+  const { user } = useAuth()
+  const isVigilante = user?.rol === 'vigilante'
   const [q, setQ] = React.useState('')
   const [debouncedQ, setDebouncedQ] = React.useState('')
   const [page, setPage] = React.useState(1)
@@ -116,7 +123,7 @@ export default function DocentesPage() {
       <PageHeader
         title="Docentes"
         crumbs={['Administración', 'Docentes']}
-        action={
+        action={!isVigilante ? (
           <>
             <Btn variant="secondary" size="sm" onClick={() => router.push('/reportes')}>
               <Download size={14} />Reporte asistencia
@@ -125,7 +132,7 @@ export default function DocentesPage() {
               <Plus size={14} />Nuevo docente
             </Btn>
           </>
-        }
+        ) : undefined}
       />
 
       <div className="p-7 flex flex-col gap-3.5">
@@ -241,7 +248,7 @@ export default function DocentesPage() {
                             <More size={15} />
                           </Btn>
                           {openMenu === d.id && (
-                            <RowMenu id={d.id} name={name} onClose={() => setOpenMenu(null)} />
+                            <RowMenu id={d.id} name={name} onClose={() => setOpenMenu(null)} readOnly={isVigilante} />
                           )}
                         </div>
                       </td>

@@ -17,7 +17,9 @@ import { KPI } from '@/components/ui/kpi'
 import { Card } from '@/components/ui/card'
 import { Btn } from '@/components/ui/btn'
 import { PageHeader } from '@/components/layout/page-header'
-import { Download, Edit, ScanLine, MoreHorizontal, X, Plus, Lock, FileText } from '@/components/icons'
+import { Download, Edit, ScanLine, MoreHorizontal, X, Plus, Lock, FileText, Clock } from '@/components/icons'
+import { useTurnos, isoToHHMM } from '@/hooks/use-turnos'
+import { useAuth } from '@/contexts/auth-context'
 
 // ─── helpers ──────────────────────────────────────────────────────────────────
 
@@ -241,16 +243,21 @@ function JustificarModal({ registro, onClose }: { registro: AsistenciaRecord; on
 
 // ─── CerrarTurnoModal ─────────────────────────────────────────────────────────
 
-function CerrarTurnoModal({ aulas, onClose }: { aulas: { id: string; nombre: string }[]; onClose: () => void }) {
+function CerrarTurnoModal({ onClose }: { onClose: () => void }) {
   const mut = useCerrarTurno()
-  const [aulaId, setAulaId] = useState('')
+  const { data: turnosConfig = [] } = useTurnos()
+  const [turno, setTurno] = useState<'manana' | 'tarde' | ''>('')
   const [result, setResult] = useState<{ created: number; message: string } | null>(null)
   const [error,  setError]  = useState('')
 
+  const configSeleccionado = turnosConfig.find((t) => t.turno === turno)
+
   async function handleSubmit(e: React.FormEvent) {
     e.preventDefault()
+    if (!turno) return
+    setError('')
     try {
-      const res = await mut.mutateAsync({ aula_id: aulaId || undefined })
+      const res = await mut.mutateAsync({ turno })
       setResult(res)
     } catch (err: any) {
       const msg = err?.response?.data?.message
@@ -284,23 +291,39 @@ function CerrarTurnoModal({ aulas, onClose }: { aulas: { id: string; nombre: str
         ) : (
           <form onSubmit={handleSubmit} className="flex flex-col gap-3">
             <div className="p-3 bg-warning-l rounded-2 text-[12.5px] text-text leading-relaxed">
-              Esta acción registrará como <strong>Falta</strong> a todos los alumnos que no tengan asistencia registrada hoy. Puedes añadir justificaciones después.
+              Esta acción registrará como <strong>Falta</strong> a todos los alumnos del turno que no tengan asistencia registrada hoy. Solo se puede ejecutar después de que el turno haya finalizado.
             </div>
 
             <label className="flex flex-col gap-1">
-              <span className="text-[12px] font-medium text-text-mute">Filtrar por aula (opcional)</span>
-              <select value={aulaId} onChange={e => setAulaId(e.target.value)}
-                className="px-3 py-2 text-[13px] border border-border rounded-2 bg-surface">
-                <option value="">Todos los alumnos</option>
-                {aulas.map(a => <option key={a.id} value={a.id}>{a.nombre}</option>)}
+              <span className="text-[12px] font-medium text-text-mute">Turno <span className="text-danger">*</span></span>
+              <select
+                value={turno}
+                onChange={(e) => { setTurno(e.target.value as 'manana' | 'tarde' | ''); setError('') }}
+                required
+                className="px-3 py-2 text-[13px] border border-border rounded-2 bg-surface"
+              >
+                <option value="">Selecciona un turno…</option>
+                <option value="manana">Mañana</option>
+                <option value="tarde">Tarde</option>
               </select>
             </label>
+
+            {configSeleccionado && (
+              <div className="flex items-center gap-1.5 text-[12px] text-text-mute px-1">
+                <Clock size={13} />
+                <span>
+                  Entrada: <strong>{isoToHHMM(configSeleccionado.horaEntrada)}</strong>
+                  {' · '}Salida: <strong>{isoToHHMM(configSeleccionado.horaFin)}</strong>
+                  {' · '}Puntualidad hasta: <strong>{isoToHHMM(configSeleccionado.horaLimitePuntual)}</strong>
+                </span>
+              </div>
+            )}
 
             {error && <p className="text-[12px] text-danger">{error}</p>}
 
             <div className="flex gap-2 pt-1">
               <Btn type="button" variant="secondary" className="flex-1" onClick={onClose}>Cancelar</Btn>
-              <Btn type="submit" className="flex-1 bg-warning" disabled={mut.isPending}>
+              <Btn type="submit" className="flex-1 bg-warning" disabled={mut.isPending || !turno}>
                 {mut.isPending ? 'Procesando…' : 'Confirmar y cerrar turno'}
               </Btn>
             </div>
@@ -562,6 +585,8 @@ async function exportarAsistencia(
 // ─── Page ─────────────────────────────────────────────────────────────────────
 
 export default function AsistenciaPage() {
+  const { user } = useAuth()
+  const isVigilante = user?.rol === 'vigilante'
   const [fecha,        setFecha]        = useState(todayStr())
   const [aulaFilter,   setAulaFilter]   = useState('')
   const [tipoFilter,   setTipoFilter]   = useState<'alumno' | 'docente' | ''>('')
@@ -598,7 +623,7 @@ export default function AsistenciaPage() {
   return (
     <>
       {showManual       && <ManualModal onClose={() => setShowManual(false)} />}
-      {showCerrar       && <CerrarTurnoModal aulas={aulas} onClose={() => setShowCerrar(false)} />}
+      {showCerrar       && <CerrarTurnoModal onClose={() => setShowCerrar(false)} />}
       {correctTarget    && <CorrectModal registro={correctTarget} onClose={() => setCorrectTarget(null)} />}
       {justificarTarget && <JustificarModal registro={justificarTarget} onClose={() => setJustificarTarget(null)} />}
 
@@ -611,15 +636,19 @@ export default function AsistenciaPage() {
               onClick={() => exportarAsistencia(registros, fecha, presentes, tardanzas, ausentes)}>
               Exportar PDF
             </Btn>
-            <Btn variant="secondary" icon={<Edit size={14} />} size="sm"
-              onClick={() => setShowManual(true)}>
-              Registro manual
-            </Btn>
-            <Btn variant="secondary" icon={<Lock size={14} />} size="sm"
-              className="text-warning border-warning/40 hover:bg-warning-l"
-              onClick={() => setShowCerrar(true)}>
-              Cerrar turno
-            </Btn>
+            {!isVigilante && (
+              <>
+                <Btn variant="secondary" icon={<Edit size={14} />} size="sm"
+                  onClick={() => setShowManual(true)}>
+                  Registro manual
+                </Btn>
+                <Btn variant="secondary" icon={<Lock size={14} />} size="sm"
+                  className="text-warning border-warning/40 hover:bg-warning-l"
+                  onClick={() => setShowCerrar(true)}>
+                  Cerrar turno
+                </Btn>
+              </>
+            )}
             <Btn icon={<ScanLine size={14} />} size="sm"
               onClick={() => window.open('/vigilante', '_blank')}>
               Pantalla vigilante
@@ -685,10 +714,12 @@ export default function AsistenciaPage() {
                   <tr>
                     <td colSpan={6} className="text-center py-10 text-text-mute">
                       No hay registros para este día.
-                      <br />
-                      <button onClick={() => setShowManual(true)} className="mt-2 text-primary text-[12px] hover:underline">
-                        + Agregar registro manual
-                      </button>
+                      {!isVigilante && (
+                        <><br />
+                        <button onClick={() => setShowManual(true)} className="mt-2 text-primary text-[12px] hover:underline">
+                          + Agregar registro manual
+                        </button></>
+                      )}
                     </td>
                   </tr>
                 ) : (
@@ -741,12 +772,14 @@ export default function AsistenciaPage() {
                           )}
                         </td>
                         <td className="px-3.5 py-2.5">
-                          <RowMenu
-                            registro={r}
-                            onCorregir={setCorrectTarget}
-                            onEliminar={handleEliminar}
-                            onJustificar={setJustificarTarget}
-                          />
+                          {!isVigilante && (
+                            <RowMenu
+                              registro={r}
+                              onCorregir={setCorrectTarget}
+                              onEliminar={handleEliminar}
+                              onJustificar={setJustificarTarget}
+                            />
+                          )}
                         </td>
                       </tr>
                     )
@@ -795,18 +828,22 @@ export default function AsistenciaPage() {
             {/* Acceso rápido */}
             <Card title="Acciones rápidas" subtitle="">
               <div className="flex flex-col gap-2 py-1">
-                <Btn variant="secondary" size="sm" icon={<Plus size={13} />}
-                  onClick={() => setShowManual(true)} className="w-full justify-start">
-                  Registro manual de asistencia
-                </Btn>
+                {!isVigilante && (
+                  <Btn variant="secondary" size="sm" icon={<Plus size={13} />}
+                    onClick={() => setShowManual(true)} className="w-full justify-start">
+                    Registro manual de asistencia
+                  </Btn>
+                )}
                 <Btn variant="secondary" size="sm" icon={<Download size={13} />}
                   onClick={() => exportarAsistencia(registros, fecha)} className="w-full justify-start">
                   Exportar lista del día
                 </Btn>
-                <Btn variant="secondary" size="sm" icon={<Lock size={13} />}
-                  onClick={() => setShowCerrar(true)} className="w-full justify-start text-warning">
-                  Cerrar asistencia del turno
-                </Btn>
+                {!isVigilante && (
+                  <Btn variant="secondary" size="sm" icon={<Lock size={13} />}
+                    onClick={() => setShowCerrar(true)} className="w-full justify-start text-warning">
+                    Cerrar asistencia del turno
+                  </Btn>
+                )}
                 <Btn variant="secondary" size="sm" icon={<ScanLine size={13} />}
                   onClick={() => window.open('/vigilante', '_blank')} className="w-full justify-start">
                   Abrir pantalla de kiosko

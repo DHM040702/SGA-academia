@@ -1,15 +1,9 @@
-import { ApiPropertyOptional } from '@nestjs/swagger';
-import { IsEnum, IsOptional, IsUUID } from 'class-validator';
+import { ApiProperty } from '@nestjs/swagger';
+import { IsEnum } from 'class-validator';
 import { Turno } from '@prisma/client';
 
 export class CerrarTurnoDto {
-  @ApiPropertyOptional({ format: 'uuid', description: 'Filtrar por aula específica' })
-  @IsOptional()
-  @IsUUID()
-  aula_id?: string;
-
-  @ApiPropertyOptional({ enum: Turno, description: 'Filtrar por turno (manana/tarde)' })
-  @IsOptional()
+  @ApiProperty({ enum: Turno, description: 'Turno a cerrar (manana / tarde)' })
   @IsEnum(Turno)
-  turno?: Turno;
+  turno: Turno;
 }

@@ -17,7 +17,6 @@ export default function LoginPage() {
 
   function roleHome(rol?: string) {
     if (rol === 'alumno' || rol === 'apoderado') return '/portal/inicio'
-    if (rol === 'vigilante') return '/vigilante'
     return '/inicio'
   }
 

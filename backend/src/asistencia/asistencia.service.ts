@@ -57,20 +57,23 @@ export class AsistenciaService {
     });
     if (existente) return existente;
 
-    // Determinar si es tardanza comparando con el horario de la sección
+    // Determinar tardanza usando TurnoConfig (horaLimitePuntual del turno del aula).
+    // Si no hay config activa para el turno, el registro se asume puntual (false).
     let esTardanza = false;
     if (alumnoId) {
-      const alumno = await this.prisma.alumno.findUnique({ where: { id: alumnoId } });
-      if (alumno?.aulaId) {
-        const diaSemana = now.getDay(); // 0=Dom, 1=Lun…
-        const horario = await this.prisma.horario.findFirst({
-          where: { aulaId: alumno.aulaId, diaSemana },
-          orderBy: { horaInicio: 'asc' },
+      const alumno = await this.prisma.alumno.findUnique({
+        where: { id: alumnoId },
+        include: { aula: { select: { turno: true } } },
+      });
+      if (alumno?.aula?.turno) {
+        const config = await this.prisma.turnoConfig.findUnique({
+          where: { turno: alumno.aula.turno },
         });
-        if (horario) {
-          const claseMs = horario.horaInicio.getHours() * 3_600_000 + horario.horaInicio.getMinutes() * 60_000;
-          const ahoraMs = now.getHours() * 3_600_000 + now.getMinutes() * 60_000;
-          esTardanza = ahoraMs - claseMs > 15 * 60_000;
+        if (config?.activo) {
+          const limite = config.horaLimitePuntual;
+          const limiteMs = limite.getUTCHours() * 3_600_000 + limite.getUTCMinutes() * 60_000;
+          const ahoraMs  = now.getHours() * 3_600_000 + now.getMinutes() * 60_000;
+          esTardanza = ahoraMs > limiteMs;
         }
       }
     }
@@ -233,22 +236,43 @@ export class AsistenciaService {
     const now = new Date();
     const today = new Date(now.getFullYear(), now.getMonth(), now.getDate());
 
-    const [presentes, tardanzas, docentesHoy] = await Promise.all([
+    const [presentes, tardanzas, ausentes, docentesHoy, totalMatriculados] = await Promise.all([
+      // Presentes: asistieron a tiempo y NO están marcados como ausentes
       this.prisma.asistencia.count({
-        where: { fecha: today, tipoPersona: TipoPersona.alumno, esTardanza: false },
+        where: { fecha: today, tipoPersona: TipoPersona.alumno, esTardanza: false, esAusente: false },
       }),
+      // Tardanzas: llegaron pero fuera de hora
       this.prisma.asistencia.count({
         where: { fecha: today, tipoPersona: TipoPersona.alumno, esTardanza: true },
       }),
+      // Ausentes: registros de falta (generados por cerrarTurno)
+      this.prisma.asistencia.count({
+        where: { fecha: today, tipoPersona: TipoPersona.alumno, esAusente: true },
+      }),
+      // Docentes con algún registro hoy
       this.prisma.asistencia.count({
         where: { fecha: today, tipoPersona: TipoPersona.docente },
       }),
+      // Total matriculados activos en el sistema
+      this.prisma.alumno.count({ where: { deletedAt: null } }),
     ]);
 
-    const total_alumno = presentes + tardanzas;
-    const pct_asistencia = total_alumno > 0 ? Math.round(((presentes + tardanzas) / total_alumno) * 100) : 0;
+    const total_asistieron = presentes + tardanzas;
+    // Alumnos sin ningún registro hoy (ni asistencia ni falta cerrada)
+    const sin_registro = Math.max(0, totalMatriculados - total_asistieron - ausentes);
+    const pct_asistencia = totalMatriculados > 0
+      ? Math.round((total_asistieron / totalMatriculados) * 100)
+      : 0;
 
-    return { presentes, tardanzas, total_alumno, pct_asistencia, docentes_hoy: docentesHoy };
+    return {
+      presentes,
+      tardanzas,
+      ausentes,
+      sin_registro,
+      total_alumno: totalMatriculados,
+      pct_asistencia,
+      docentes_hoy: docentesHoy,
+    };
   }
 
   async remove(id: string) {
@@ -261,12 +285,23 @@ export class AsistenciaService {
     const now = new Date();
     const today = new Date(now.getFullYear(), now.getMonth(), now.getDate());
 
-    const aulaFilter: any = {};
-    if (dto.aula_id) aulaFilter.aulaId = dto.aula_id;
-    if (dto.turno)   aulaFilter.aula = { turno: dto.turno };
+    // Verificar que el turno ya haya finalizado según TurnoConfig
+    const config = await this.prisma.turnoConfig.findUnique({ where: { turno: dto.turno } });
+    if (config?.activo) {
+      const finMs  = config.horaFin.getUTCHours() * 3_600_000 + config.horaFin.getUTCMinutes() * 60_000;
+      const ahoraMs = now.getHours() * 3_600_000 + now.getMinutes() * 60_000;
+      if (ahoraMs < finMs) {
+        const hh = String(config.horaFin.getUTCHours()).padStart(2, '0');
+        const mm = String(config.horaFin.getUTCMinutes()).padStart(2, '0');
+        const label = dto.turno === 'manana' ? 'mañana' : 'tarde';
+        throw new BadRequestException(
+          `El turno ${label} no ha finalizado. Podrás cerrar a partir de las ${hh}:${mm}.`,
+        );
+      }
+    }
 
     const alumnos = await this.prisma.alumno.findMany({
-      where: { deletedAt: null, ...aulaFilter },
+      where: { deletedAt: null, aula: { turno: dto.turno } },
       select: { id: true },
     });
 

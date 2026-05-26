@@ -102,7 +102,7 @@ export function useDeleteAsistencia() {
 export function useCerrarTurno() {
   const qc = useQueryClient()
   return useMutation({
-    mutationFn: (dto: { aula_id?: string; turno?: string }) =>
+    mutationFn: (dto: { turno: 'manana' | 'tarde' }) =>
       api.post('/asistencia/cerrar-turno', dto).then((r) => r.data),
     onSuccess: () => qc.invalidateQueries({ queryKey: ['asistencia'] }),
   })
@@ -120,7 +120,9 @@ export function useJustificarAusencia() {
 export interface StatsAsistencia {
   presentes: number
   tardanzas: number
-  total_alumno: number
+  ausentes: number       // faltas confirmadas por cerrarTurno
+  sin_registro: number   // matriculados sin ningún registro hoy
+  total_alumno: number   // total matriculados activos
   pct_asistencia: number
   docentes_hoy: number
 }

@@ -57,6 +57,8 @@ async function main() {
   await prisma.ciclo.deleteMany()
   await prisma.curso.deleteMany()
   await prisma.usuario.deleteMany()
+  // TurnoConfig is seeded below; clear first so re-running seed is idempotent
+  await prisma.$executeRaw`DELETE FROM "turnos_config"`
   console.log('   ✓ Tablas limpiadas')
 
   // ── 1. Hashes ────────────────────────────────────────────────────────────
@@ -438,6 +440,20 @@ async function main() {
     })),
   })
   console.log(`   ✓ Biblioteca (${recursosDef.length} recursos)`)
+
+  // ── 14. Configuración de turnos ──────────────────────────────────────────
+  await prisma.$executeRaw`
+    INSERT INTO "turnos_config" (turno, hora_entrada, hora_limite_puntual, hora_fin)
+    VALUES
+      ('manana', '07:00:00'::time, '07:15:00'::time, '13:00:00'::time),
+      ('tarde',  '13:00:00'::time, '13:15:00'::time, '20:00:00'::time)
+    ON CONFLICT (turno) DO UPDATE SET
+      hora_entrada        = EXCLUDED.hora_entrada,
+      hora_limite_puntual = EXCLUDED.hora_limite_puntual,
+      hora_fin            = EXCLUDED.hora_fin,
+      activo              = true
+  `
+  console.log('   ✓ TurnoConfig: mañana (07:00 / puntual hasta 07:15) | tarde (13:00 / puntual hasta 13:15)')
 
   // ── Resumen ──────────────────────────────────────────────────────────────
   console.log('\n✅  Seed completado')

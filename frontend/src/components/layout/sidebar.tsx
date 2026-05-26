@@ -7,7 +7,7 @@ import { Avatar } from '@/components/ui/avatar'
 import { useAuth } from '@/contexts/auth-context'
 import {
   Home, Users, Teacher, Grid, Calendar, Check,
-  Megaphone, Book, Chart, LogOut, Layers,
+  Megaphone, Book, Chart, LogOut, Layers, ScanLine, Clock, Shield,
 } from '@/components/icons'
 
 const NAV_ADMIN = [
@@ -21,6 +21,8 @@ const NAV_ADMIN = [
   { href: '/comunicados', icon: Megaphone, label: 'Comunicados' },
   { href: '/biblioteca',  icon: Book,      label: 'Biblioteca' },
   { href: '/reportes',    icon: Chart,     label: 'Reportes' },
+  { href: '/turnos',      icon: Clock,     label: 'Turnos' },
+  { href: '/usuarios',    icon: Shield,    label: 'Usuarios' },
 ]
 
 const NAV_DIRECTOR = [
@@ -29,6 +31,16 @@ const NAV_DIRECTOR = [
   { href: '/asistencia',  icon: Check,     label: 'Asistencia' },
   { href: '/comunicados', icon: Megaphone, label: 'Comunicados' },
   { href: '/reportes',    icon: Chart,     label: 'Reportes' },
+  { href: '/turnos',      icon: Clock,     label: 'Turnos' },
+]
+
+const NAV_VIGILANTE = [
+  { href: '/inicio',      icon: Home,      label: 'Inicio' },
+  { href: '/vigilante',   icon: ScanLine,  label: 'Kiosko asistencia' },
+  { href: '/alumnos',     icon: Users,     label: 'Alumnos' },
+  { href: '/docentes',    icon: Teacher,   label: 'Docentes' },
+  { href: '/horarios',    icon: Calendar,  label: 'Horarios' },
+  { href: '/asistencia',  icon: Check,     label: 'Asistencia' },
 ]
 
 interface SidebarProps { compact?: boolean }
@@ -37,7 +49,9 @@ export function Sidebar({ compact = false }: SidebarProps) {
   const { user, logout } = useAuth()
   const pathname = usePathname()
 
-  const nav = user?.rol === 'director' ? NAV_DIRECTOR : NAV_ADMIN
+  const nav = user?.rol === 'director' ? NAV_DIRECTOR
+    : user?.rol === 'vigilante' ? NAV_VIGILANTE
+    : NAV_ADMIN
   const displayName = user
     ? user.docente
       ? `${user.docente.nombre} ${user.docente.apellidos}`
@@ -74,7 +88,7 @@ export function Sidebar({ compact = false }: SidebarProps) {
       <nav className={cn('flex-1 overflow-y-auto', compact ? 'p-2' : 'px-3 py-3.5')}>
         {!compact && (
           <div className="text-[10px] tracking-[0.1em] uppercase text-text-soft font-semibold px-2 pb-2 pt-1">
-            {user?.rol === 'director' ? 'Dirección' : 'Administración'}
+            {user?.rol === 'director' ? 'Dirección' : user?.rol === 'vigilante' ? 'Vigilancia' : 'Administración'}
           </div>
         )}
         {nav.map(({ href, icon: Icon, label }) => {

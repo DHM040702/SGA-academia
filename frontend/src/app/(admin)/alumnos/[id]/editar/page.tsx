@@ -79,13 +79,12 @@ export default function EditarAlumnoPage() {
 
   // Cascada sección → área → carreras
   const watchSeccion = watch('aula_id')
+  const aulaSeleccionada = secciones.find((s) => s.id === watchSeccion)
   React.useEffect(() => {
-    const sec = secciones.find((s) => s.id === watchSeccion)
-    if (sec) {
-      setAreaActiva(sec.area as AreaCarrera)
-      // Solo limpia carrera si cambió la sección (no en el reset inicial)
+    if (aulaSeleccionada) {
+      setAreaActiva(aulaSeleccionada.area as AreaCarrera)
       const currentCarreraArea = alumno?.carrera?.area
-      if (sec.area !== currentCarreraArea) setValue('carrera_id', '')
+      if (aulaSeleccionada.area !== currentCarreraArea) setValue('carrera_id', '')
     }
   }, [watchSeccion, secciones, alumno, setValue])
 
@@ -199,9 +198,16 @@ export default function EditarAlumnoPage() {
               <select {...register('aula_id')} disabled={!cicloId} className={SELECT_CLS}>
                 <option value="">{cicloId ? 'Sin asignar' : 'Elige ciclo primero'}</option>
                 {secciones.map((s) => (
-                  <option key={s.id} value={s.id}>{s.nombre}</option>
+                  <option key={s.id} value={s.id}>
+                    {s.nombre} — {s.turno === 'manana' ? 'Mañana' : 'Tarde'}
+                  </option>
                 ))}
               </select>
+              {aulaSeleccionada && (
+                <p className="mt-1 text-[11.5px] text-text-mute">
+                  Turno: <strong>{aulaSeleccionada.turno === 'manana' ? 'Mañana' : 'Tarde'}</strong>
+                </p>
+              )}
             </Field>
             <Field label="Carrera profesional" className="col-span-2">
               <select {...register('carrera_id')} disabled={!areaActiva} className={SELECT_CLS}>

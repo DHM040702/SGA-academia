@@ -133,6 +133,17 @@ model Aula {
   @@map("aulas")
 }
 
+model TurnoConfig {
+  id                String   @id @default(dbgenerated("gen_random_uuid()")) @db.Uuid
+  turno             Turno    @unique
+  horaEntrada       DateTime @map("hora_entrada") @db.Time(6)
+  horaLimitePuntual DateTime @map("hora_limite_puntual") @db.Time(6)
+  horaFin           DateTime @map("hora_fin") @db.Time(6)
+  activo            Boolean  @default(true)
+
+  @@map("turnos_config")
+}
+
 model Curso {
   id       String              @id @default(dbgenerated("gen_random_uuid()")) @db.Uuid
   nombre   String              @db.VarChar(100)

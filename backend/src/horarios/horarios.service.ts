@@ -121,6 +121,7 @@ export class HorariosService {
         ...(dto.dia_semana  !== undefined && { diaSemana:  dto.dia_semana }),
         ...(dto.hora_inicio !== undefined && { horaInicio: timeStringToDate(dto.hora_inicio) }),
         ...(dto.hora_fin    !== undefined && { horaFin:    timeStringToDate(dto.hora_fin) }),
+        ...(dto.publicado   !== undefined && { publicado:  dto.publicado }),
       },
       include: {
         docente: { select: { id: true, nombre: true, apellidos: true } },
