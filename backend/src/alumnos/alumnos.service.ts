@@ -8,6 +8,7 @@ import { paginate } from '../common/dto/pagination.dto';
 import { CreateAlumnoDto } from './dto/create-alumno.dto';
 import { UpdateAlumnoDto } from './dto/update-alumno.dto';
 import { FilterAlumnosDto } from './dto/filter-alumnos.dto';
+import { VincularApoderadoDto } from './dto/vincular-apoderado.dto';
 
 /** Estado derivado del porcentaje de asistencia */
 function estadoFromPct(pct: number): string {
@@ -206,13 +207,15 @@ export class AlumnosService {
     return this.prisma.$transaction(async (tx) => {
       const usuario = await tx.usuario.create({
         data: {
-          email: dto.email,
+          email:        dto.email,
           passwordHash: hash,
-          rol: Rol.alumno,
+          rol:          Rol.alumno,
+          // El DNI del alumno también sirve como DNI de acceso al sistema
+          dni:          dto.dni,
         },
       });
 
-      return tx.alumno.create({
+      const alumno = await tx.alumno.create({
         data: {
           usuarioId:       usuario.id,
           nombre:          dto.nombres,
@@ -230,6 +233,59 @@ export class AlumnosService {
           carrera: { select: { id: true, nombre: true, area: true } },
         },
       });
+
+      // ── Vincular/crear apoderado en la misma transacción ─────────
+      if (dto.apoderado) {
+        const { accion, parentesco, es_principal = true } = dto.apoderado;
+        let apoderadoId: string;
+
+        if (accion === 'nuevo') {
+          if (!dto.apoderado.nuevo) throw new BadRequestException('Datos del nuevo apoderado requeridos');
+          const { nombre, apellidos, dni: apDni, telefono_whatsapp, email: apEmail, password: apPassword } = dto.apoderado.nuevo;
+
+          const emailAp = await tx.usuario.findFirst({ where: { email: apEmail } });
+          if (emailAp) throw new BadRequestException('Ya existe un usuario con ese email para el apoderado');
+
+          const dniAp = await tx.apoderado.findFirst({ where: { dni: apDni } });
+          if (dniAp) throw new BadRequestException('Ya existe un apoderado con ese DNI');
+
+          const apHash = await bcrypt.hash(apPassword, 12);
+          const usuarioAp = await tx.usuario.create({
+            data: { email: apEmail, passwordHash: apHash, rol: Rol.apoderado, dni: apDni },
+          });
+          const ap = await tx.apoderado.create({
+            data: { usuarioId: usuarioAp.id, nombre, apellidos, dni: apDni, telefonoWhatsapp: telefono_whatsapp },
+          });
+          apoderadoId = ap.id;
+
+        } else {
+          if (!dto.apoderado.apoderado_id) throw new BadRequestException('ID del apoderado requerido');
+          const ap = await tx.apoderado.findFirst({ where: { id: dto.apoderado.apoderado_id } });
+          if (!ap) throw new NotFoundException('Apoderado no encontrado');
+
+          // Verificar que no esté ya vinculado
+          const linkExistente = await tx.alumnoApoderado.findFirst({
+            where: { alumnoId: alumno.id, apoderadoId: dto.apoderado.apoderado_id },
+          });
+          if (linkExistente) throw new BadRequestException('El apoderado ya está vinculado a este alumno');
+
+          apoderadoId = dto.apoderado.apoderado_id;
+        }
+
+        // Si será el principal, quitar el flag de los demás
+        if (es_principal) {
+          await tx.alumnoApoderado.updateMany({
+            where: { alumnoId: alumno.id, esPrincipal: true },
+            data: { esPrincipal: false },
+          });
+        }
+
+        await tx.alumnoApoderado.create({
+          data: { alumnoId: alumno.id, apoderadoId, parentesco, esPrincipal: es_principal },
+        });
+      }
+
+      return alumno;
     });
   }
 
@@ -280,6 +336,86 @@ export class AlumnosService {
       });
       return { success: true };
     });
+  }
+
+  // ── Gestión de vínculos alumno ↔ apoderado ───────────────────────
+
+  async getApoderados(alumnoId: string) {
+    await this.findOne(alumnoId); // valida existencia
+    return this.prisma.alumnoApoderado.findMany({
+      where: { alumnoId },
+      include: {
+        apoderado: {
+          include: { usuario: { select: { id: true, email: true, activo: true } } },
+        },
+      },
+      orderBy: { esPrincipal: 'desc' },
+    });
+  }
+
+  async vincularApoderado(alumnoId: string, dto: VincularApoderadoDto) {
+    await this.findOne(alumnoId);
+    const { accion, parentesco, es_principal = false } = dto;
+
+    return this.prisma.$transaction(async (tx) => {
+      let apoderadoId: string;
+
+      if (accion === 'nuevo') {
+        if (!dto.nuevo) throw new BadRequestException('Datos del nuevo apoderado requeridos');
+        const { nombre, apellidos, dni, telefono_whatsapp, email, password } = dto.nuevo;
+
+        const emailAp = await tx.usuario.findFirst({ where: { email } });
+        if (emailAp) throw new BadRequestException('Ya existe un usuario con ese email');
+
+        const dniAp = await tx.apoderado.findFirst({ where: { dni } });
+        if (dniAp) throw new BadRequestException('Ya existe un apoderado con ese DNI');
+
+        const apHash = await bcrypt.hash(password, 12);
+        const usuarioAp = await tx.usuario.create({
+          data: { email, passwordHash: apHash, rol: Rol.apoderado, dni },
+        });
+        const ap = await tx.apoderado.create({
+          data: { usuarioId: usuarioAp.id, nombre, apellidos, dni, telefonoWhatsapp: telefono_whatsapp },
+        });
+        apoderadoId = ap.id;
+
+      } else {
+        if (!dto.apoderado_id) throw new BadRequestException('ID del apoderado requerido');
+        const ap = await tx.apoderado.findFirst({ where: { id: dto.apoderado_id } });
+        if (!ap) throw new NotFoundException('Apoderado no encontrado');
+        apoderadoId = dto.apoderado_id;
+      }
+
+      // Verificar que no exista el vínculo
+      const existing = await tx.alumnoApoderado.findFirst({ where: { alumnoId, apoderadoId } });
+      if (existing) throw new BadRequestException('El apoderado ya está vinculado a este alumno');
+
+      // Si es principal, quitar el flag de los demás
+      if (es_principal) {
+        await tx.alumnoApoderado.updateMany({
+          where: { alumnoId, esPrincipal: true },
+          data: { esPrincipal: false },
+        });
+      }
+
+      return tx.alumnoApoderado.create({
+        data: { alumnoId, apoderadoId, parentesco, esPrincipal: es_principal },
+        include: {
+          apoderado: {
+            include: { usuario: { select: { id: true, email: true, activo: true } } },
+          },
+        },
+      });
+    });
+  }
+
+  async desvincularApoderado(alumnoId: string, apoderadoId: string) {
+    const link = await this.prisma.alumnoApoderado.findFirst({ where: { alumnoId, apoderadoId } });
+    if (!link) throw new NotFoundException('Vínculo no encontrado');
+    await this.prisma.alumnoApoderado.delete({
+      where: { alumnoId_apoderadoId: { alumnoId, apoderadoId } },
+    });
+    return { success: true };
   }
 
   async importar(rows: CreateAlumnoDto[]) {

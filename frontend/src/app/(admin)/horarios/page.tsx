@@ -518,6 +518,10 @@ function ExportModal({ horarios, aulas, onClose }: ExportModalProps) {
 export default function HorariosPage() {
   const { user } = useAuth()
   const isVigilante = user?.rol === 'vigilante'
+  const isDocente   = user?.rol === 'docente'
+  const soloLectura = isVigilante || isDocente   // sin crear/editar/eliminar
+  const docenteId   = isDocente ? user?.docente?.id : undefined
+
   const [aulaId, setAulaId]       = useState('')
   const [modal, setModal]         = useState<'create' | 'edit' | null>(null)
   const [selected, setSelected]   = useState<Horario | null>(null)
@@ -526,7 +530,12 @@ export default function HorariosPage() {
 
   const { data: aulas = [] }           = useAulas()
   const { data: docentesPage }         = useDocentes({ limit: 100 })
-  const { data: horariosPage, isLoading } = useHorarios({ aula_id: aulaId || undefined })
+  // Si es docente, filtrar siempre por su docente_id (ignora filtro aulaId)
+  const { data: horariosPage, isLoading } = useHorarios(
+    isDocente
+      ? { docente_id: docenteId, limit: 200 }
+      : { aula_id: aulaId || undefined }
+  )
   const { data: conflictos = [] }      = useConflictosHorario()
   const deleteMut                      = useDeleteHorario()
   const updateMut                      = useUpdateHorario()
@@ -573,7 +582,7 @@ export default function HorariosPage() {
       <PageHeader
         title="Horarios"
         crumbs={[{ label: 'Horarios' }]}
-        action={!isVigilante ? (
+        action={!soloLectura ? (
           <>
             <Btn variant="secondary" icon={<Download size={14} />} size="sm" onClick={() => setShowExport(true)}>
               Exportar PDF
@@ -590,16 +599,22 @@ export default function HorariosPage() {
         <div className="flex flex-col gap-3">
           {/* Toolbar */}
           <div className="flex gap-2.5 items-center">
-            <select
-              value={aulaId}
-              onChange={(e) => setAulaId(e.target.value)}
-              className="px-3 py-1.5 text-[13px] border border-border rounded-2 bg-surface"
-            >
-              <option value="">Todas las aulas</option>
-              {aulas.map((s) => (
-                <option key={s.id} value={s.id}>{s.nombre}</option>
-              ))}
-            </select>
+            {isDocente ? (
+              <span className="text-[13px] font-medium text-text-mute">
+                Mi horario semanal
+              </span>
+            ) : (
+              <select
+                value={aulaId}
+                onChange={(e) => setAulaId(e.target.value)}
+                className="px-3 py-1.5 text-[13px] border border-border rounded-2 bg-surface"
+              >
+                <option value="">Todas las aulas</option>
+                {aulas.map((s) => (
+                  <option key={s.id} value={s.id}>{s.nombre}</option>
+                ))}
+              </select>
+            )}
             <div className="flex-1" />
             {conflictos.length > 0 && (
               <Pill tone="danger">
@@ -617,7 +632,7 @@ export default function HorariosPage() {
                 <strong className="text-danger">Conflicto de horario:</strong>{' '}
                 Hay {conflictos.length} horario{conflictos.length > 1 ? 's' : ''} con superposición. Revise y corrija.
               </div>
-              {!isVigilante && (
+              {!soloLectura && (
                 <Btn variant="secondary" size="sm" style={{ borderColor: 'var(--color-danger)', color: 'var(--color-danger)' }}>
                   Resolver
                 </Btn>
@@ -648,7 +663,7 @@ export default function HorariosPage() {
                 <div className="text-center py-10 text-text-mute text-[13px]">Cargando horarios…</div>
               ) : slotsDelDia.length === 0 ? (
                 <div className="text-center py-10 text-text-mute text-[13px]">
-                  No hay horarios para el {DIA_FULL[diaVista - 1]}.{!isVigilante && (<><br />
+                  No hay horarios para el {DIA_FULL[diaVista - 1]}.{!soloLectura && (<><br />
                   <button onClick={openCreate} className="mt-2 text-primary text-[12px] hover:underline">
                     + Asignar clase
                   </button></>)}
@@ -703,7 +718,7 @@ export default function HorariosPage() {
                                             Borrador
                                           </span>
                                         )}
-                                        {!isVigilante && <CellMenu horario={h} onEdit={openEdit} onDelete={handleDelete} onPublicar={handlePublicar} />}
+                                        {!soloLectura && <CellMenu horario={h} onEdit={openEdit} onDelete={handleDelete} onPublicar={handlePublicar} />}
                                       </div>
                                     </div>
                                   </div>
@@ -725,7 +740,7 @@ export default function HorariosPage() {
                 <div className="text-center py-10 text-text-mute text-[13px]">Cargando horarios…</div>
               ) : slots.length === 0 ? (
                 <div className="text-center py-10 text-text-mute text-[13px]">
-                  No hay horarios registrados para esta aula.{!isVigilante && (<><br />
+                  No hay horarios registrados para esta aula.{!soloLectura && (<><br />
                   <button onClick={openCreate} className="mt-2 text-primary text-[12px] hover:underline">
                     + Asignar primera clase
                   </button></>)}
@@ -780,7 +795,7 @@ export default function HorariosPage() {
                                             Borrador
                                           </span>
                                         )}
-                                        {!isVigilante && <CellMenu horario={h} onEdit={openEdit} onDelete={handleDelete} onPublicar={handlePublicar} />}
+                                        {!soloLectura && <CellMenu horario={h} onEdit={openEdit} onDelete={handleDelete} onPublicar={handlePublicar} />}
                                       </div>
                                     </div>
                                   </div>
@@ -832,7 +847,7 @@ export default function HorariosPage() {
                     <div className="text-[12.5px] font-medium truncate">{d.nombre} {d.apellidos}</div>
                     <div className="text-[11px] text-text-mute truncate">{d.especialidad ?? '—'}</div>
                   </div>
-                  {!isVigilante && (
+                  {!soloLectura && (
                     <button
                       onClick={openCreate}
                       className="text-text-mute hover:text-primary p-0.5"

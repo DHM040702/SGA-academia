@@ -1,10 +1,11 @@
 import { ApiProperty } from '@nestjs/swagger';
-import { IsEmail, IsString, MinLength } from 'class-validator';
+import { IsString, Matches, MinLength } from 'class-validator';
 
 export class LoginDto {
-  @ApiProperty({ example: 'ana.ramirez@unasam.edu.pe' })
-  @IsEmail()
-  email: string;
+  @ApiProperty({ example: '12345678', description: 'DNI del usuario (8–12 dígitos)' })
+  @IsString()
+  @Matches(/^\d{8,12}$/, { message: 'El DNI debe contener entre 8 y 12 dígitos numéricos' })
+  dni: string;
 
   @ApiProperty({ example: '••••••••' })
   @IsString()

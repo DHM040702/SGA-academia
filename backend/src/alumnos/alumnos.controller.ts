@@ -16,6 +16,7 @@ import { AlumnosService } from './alumnos.service';
 import { CreateAlumnoDto } from './dto/create-alumno.dto';
 import { UpdateAlumnoDto } from './dto/update-alumno.dto';
 import { FilterAlumnosDto } from './dto/filter-alumnos.dto';
+import { VincularApoderadoDto } from './dto/vincular-apoderado.dto';
 
 @ApiTags('Alumnos')
 @ApiBearerAuth('access-token')
@@ -58,6 +59,36 @@ export class AlumnosController {
   @ApiOperation({ summary: 'Eliminar alumno (soft delete)' })
   remove(@Param('id', ParseUUIDPipe) id: string) {
     return this.service.remove(id);
+  }
+
+  // ── Apoderados de un alumno ───────────────────────────────────────
+
+  @Get(':id/apoderados')
+  @Roles(Rol.admin, Rol.director)
+  @ApiOperation({ summary: 'Listar apoderados vinculados a un alumno' })
+  getApoderados(@Param('id', ParseUUIDPipe) id: string) {
+    return this.service.getApoderados(id);
+  }
+
+  @Post(':id/apoderados')
+  @Roles(Rol.admin)
+  @ApiOperation({ summary: 'Vincular apoderado a un alumno (nuevo o existente)' })
+  vincularApoderado(
+    @Param('id', ParseUUIDPipe) id: string,
+    @Body() dto: VincularApoderadoDto,
+  ) {
+    return this.service.vincularApoderado(id, dto);
+  }
+
+  @Delete(':id/apoderados/:apoderadoId')
+  @HttpCode(HttpStatus.OK)
+  @Roles(Rol.admin)
+  @ApiOperation({ summary: 'Desvincular apoderado de un alumno' })
+  desvincularApoderado(
+    @Param('id', ParseUUIDPipe) id: string,
+    @Param('apoderadoId', ParseUUIDPipe) apoderadoId: string,
+  ) {
+    return this.service.desvincularApoderado(id, apoderadoId);
   }
 
   @Post('import')

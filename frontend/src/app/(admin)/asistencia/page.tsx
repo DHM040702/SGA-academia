@@ -587,9 +587,15 @@ async function exportarAsistencia(
 export default function AsistenciaPage() {
   const { user } = useAuth()
   const isVigilante = user?.rol === 'vigilante'
+  const isDocente   = user?.rol === 'docente'
+  const soloLectura = isVigilante || isDocente
+
+  // Para docente: fijar filtros a su propio registro
+  const myDocenteId = isDocente ? user?.docente?.id : undefined
+
   const [fecha,        setFecha]        = useState(todayStr())
   const [aulaFilter,   setAulaFilter]   = useState('')
-  const [tipoFilter,   setTipoFilter]   = useState<'alumno' | 'docente' | ''>('')
+  const [tipoFilter,   setTipoFilter]   = useState<'alumno' | 'docente' | ''>(isDocente ? 'docente' : '')
   const [showManual,     setShowManual]     = useState(false)
   const [showCerrar,     setShowCerrar]     = useState(false)
   const [correctTarget,  setCorrectTarget]  = useState<AsistenciaRecord | null>(null)
@@ -600,9 +606,10 @@ export default function AsistenciaPage() {
   const { data: stats }         = useResumenAsistencia()
   const { data: page, isLoading } = useAsistencia({
     fecha,
-    tipo:    tipoFilter  || undefined,
-    aula_id: aulaFilter  || undefined,
-    limit:   100,
+    tipo:       isDocente ? 'docente' : (tipoFilter || undefined),
+    aula_id:    isDocente ? undefined : (aulaFilter || undefined),
+    docente_id: isDocente ? myDocenteId : undefined,
+    limit:      100,
   })
 
   const registros = page?.data ?? []
@@ -628,15 +635,15 @@ export default function AsistenciaPage() {
       {justificarTarget && <JustificarModal registro={justificarTarget} onClose={() => setJustificarTarget(null)} />}
 
       <PageHeader
-        title="Asistencia"
-        crumbs={[{ label: 'Asistencia' }]}
+        title={isDocente ? 'Mi asistencia' : 'Asistencia'}
+        crumbs={[{ label: isDocente ? 'Mi asistencia' : 'Asistencia' }]}
         action={
           <>
             <Btn variant="secondary" icon={<Download size={14} />} size="sm"
               onClick={() => exportarAsistencia(registros, fecha, presentes, tardanzas, ausentes)}>
               Exportar PDF
             </Btn>
-            {!isVigilante && (
+            {!soloLectura && (
               <>
                 <Btn variant="secondary" icon={<Edit size={14} />} size="sm"
                   onClick={() => setShowManual(true)}>
@@ -651,7 +658,7 @@ export default function AsistenciaPage() {
             )}
             <Btn icon={<ScanLine size={14} />} size="sm"
               onClick={() => window.open('/vigilante', '_blank')}>
-              Pantalla vigilante
+              Registro de asistencia
             </Btn>
           </>
         }
@@ -681,19 +688,23 @@ export default function AsistenciaPage() {
                   onChange={e => setFecha(e.target.value)}
                   className="text-[12px] px-2 py-1 border border-border rounded-2 bg-surface"
                 />
-                {/* Filtro por aula */}
-                <select value={aulaFilter} onChange={e => setAulaFilter(e.target.value)}
-                  className="text-[12px] px-2 py-1 border border-border rounded-2 bg-surface">
-                  <option value="">Todas las aulas</option>
-                  {aulas.map(a => <option key={a.id} value={a.id}>{a.nombre}</option>)}
-                </select>
-                {/* Filtro por tipo */}
-                <select value={tipoFilter} onChange={e => setTipoFilter(e.target.value as any)}
-                  className="text-[12px] px-2 py-1 border border-border rounded-2 bg-surface">
-                  <option value="">Todos</option>
-                  <option value="alumno">Alumnos</option>
-                  <option value="docente">Docentes</option>
-                </select>
+                {/* Filtro por aula — oculto para docente */}
+                {!isDocente && (
+                  <select value={aulaFilter} onChange={e => setAulaFilter(e.target.value)}
+                    className="text-[12px] px-2 py-1 border border-border rounded-2 bg-surface">
+                    <option value="">Todas las aulas</option>
+                    {aulas.map(a => <option key={a.id} value={a.id}>{a.nombre}</option>)}
+                  </select>
+                )}
+                {/* Filtro por tipo — oculto para docente (siempre ven solo 'docente') */}
+                {!isDocente && (
+                  <select value={tipoFilter} onChange={e => setTipoFilter(e.target.value as any)}
+                    className="text-[12px] px-2 py-1 border border-border rounded-2 bg-surface">
+                    <option value="">Todos</option>
+                    <option value="alumno">Alumnos</option>
+                    <option value="docente">Docentes</option>
+                  </select>
+                )}
               </div>
             }
           >
@@ -714,7 +725,7 @@ export default function AsistenciaPage() {
                   <tr>
                     <td colSpan={6} className="text-center py-10 text-text-mute">
                       No hay registros para este día.
-                      {!isVigilante && (
+                      {!soloLectura && (
                         <><br />
                         <button onClick={() => setShowManual(true)} className="mt-2 text-primary text-[12px] hover:underline">
                           + Agregar registro manual
@@ -772,7 +783,7 @@ export default function AsistenciaPage() {
                           )}
                         </td>
                         <td className="px-3.5 py-2.5">
-                          {!isVigilante && (
+                          {!soloLectura && (
                             <RowMenu
                               registro={r}
                               onCorregir={setCorrectTarget}
@@ -828,7 +839,7 @@ export default function AsistenciaPage() {
             {/* Acceso rápido */}
             <Card title="Acciones rápidas" subtitle="">
               <div className="flex flex-col gap-2 py-1">
-                {!isVigilante && (
+                {!soloLectura && (
                   <Btn variant="secondary" size="sm" icon={<Plus size={13} />}
                     onClick={() => setShowManual(true)} className="w-full justify-start">
                     Registro manual de asistencia
@@ -838,7 +849,7 @@ export default function AsistenciaPage() {
                   onClick={() => exportarAsistencia(registros, fecha)} className="w-full justify-start">
                   Exportar lista del día
                 </Btn>
-                {!isVigilante && (
+                {!soloLectura && (
                   <Btn variant="secondary" size="sm" icon={<Lock size={13} />}
                     onClick={() => setShowCerrar(true)} className="w-full justify-start text-warning">
                     Cerrar asistencia del turno
@@ -846,7 +857,7 @@ export default function AsistenciaPage() {
                 )}
                 <Btn variant="secondary" size="sm" icon={<ScanLine size={13} />}
                   onClick={() => window.open('/vigilante', '_blank')} className="w-full justify-start">
-                  Abrir pantalla de kiosko
+                  Abrir registro de asistencia
                 </Btn>
               </div>
             </Card>

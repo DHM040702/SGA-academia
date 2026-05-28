@@ -58,4 +58,10 @@ export class UsuariosController {
   ) {
     return this.service.remove(id, user.id);
   }
+
+  @Get(':id/alumnos')
+  @ApiOperation({ summary: 'Alumnos vinculados a un usuario apoderado' })
+  getAlumnosByApoderado(@Param('id', ParseUUIDPipe) id: string) {
+    return this.service.getAlumnosByApoderado(id);
+  }
 }

@@ -188,7 +188,7 @@ function LoginScreen() {
         <div style={{ maxWidth: 420, position: 'relative' }}>
           <div style={{ fontSize: 11, letterSpacing: '0.18em', textTransform: 'uppercase', opacity: .7, marginBottom: 12 }}>Sistema de Gestión Académica</div>
           <h2 style={{ margin: 0, fontFamily: T.serif, fontWeight: 500, fontSize: 38, lineHeight: 1.1, letterSpacing: '-0.02em' }}>
-            La administración del Centro Preuniversitario, en un solo lugar.
+            CentroPreuniversitario.
           </h2>
           <p style={{ marginTop: 18, fontSize: 14, lineHeight: 1.6, opacity: .8 }}>
             Asistencia por código de barras, horarios sin conflictos, comunicados inmediatos y reportes en tiempo real.

@@ -52,7 +52,7 @@ interface ReporteCursosData {
   por_curso: { cursoId: string; nombre: string; codigo: string; total_clases: number; publicadas: number; borradores: number; aulas_distintas: number; docentes_distintos: number; horas_semana: number }[]
 }
 
-type ReportTab = 'asistencia' | 'alumnos' | 'horarios' | 'cursos'
+type ReportTab = 'asistencia' | 'alumnos' | 'horarios' | 'cursos' | 'individual'
 type SortDir   = 'asc' | 'desc'
 
 /* ══════════════════════════════════════════════════════════════════
@@ -302,6 +302,32 @@ export default function ReportesPage() {
   const cicloActivo = ciclos.find((c) => c.activo)
   const [pdfLoading, setPdfLoading] = useState(false)
 
+  /* ── Individual / lote carnets ── */
+  const [indivSearch,      setIndivSearch]      = useState('')
+  const [indivAlumno,      setIndivAlumno]      = useState<any>(null)
+  const [informeLoading,   setInformeLoading]   = useState(false)
+  const [carnetIndLoading, setCarnetIndLoading] = useState(false)
+  const [batchCicloId,     setBatchCicloId]     = useState('')
+  const [batchAulaId,      setBatchAulaId]      = useState('')
+  const [batchLoading,     setBatchLoading]     = useState(false)
+
+  const [sheetCicloId,     setSheetCicloId]     = useState('')
+  const [sheetAulaId,      setSheetAulaId]      = useState('')
+  const [sheetLoading,     setSheetLoading]     = useState(false)
+
+  const { data: batchAulas = [] } = useAulas(batchCicloId || undefined)
+  const { data: sheetAulas = [] } = useAulas(sheetCicloId || undefined)
+
+  const { data: indivResults = [] } = useQuery<any[]>({
+    queryKey: ['alumnos', 'search-report', indivSearch],
+    queryFn:  async () => {
+      const { data } = await api.get('/alumnos', { params: { q: indivSearch, limit: 8, page: 1 } })
+      return data?.data ?? []
+    },
+    enabled:   indivSearch.trim().length >= 2,
+    staleTime: 30_000,
+  })
+
   /* ── Filtros — Asistencia ── */
   const [asisDocenteId, setAsisDocenteId] = useState('')
   const [periodo,    setPeriodo]    = useState<PeriodoLabel>('Últimos 30 días')
@@ -374,6 +400,132 @@ export default function ReportesPage() {
       if (cursoConHorario) base.con_horario = cursoConHorario
       setCurParams(base); setCurEnabled(true)
       setCursoSearch('')
+    }
+  }
+
+  /* ── Funciones de descarga — individual y lote ── */
+  async function descargarReporteIndividual(alumno: any) {
+    setInformeLoading(true)
+    try {
+      const resp = await api.get('/asistencia', { params: { alumno_id: alumno.id, limit: 500, page: 1 } })
+      const registros = resp.data?.data ?? []
+      const [{ pdf }, { ReporteAlumnoPDF }] = await Promise.all([
+        import('@react-pdf/renderer'),
+        import('@/components/reportes/reporte-alumno-pdf'),
+      ])
+      const blob = await pdf(ReporteAlumnoPDF({
+        alumno, registros,
+        logoUrl:       `${window.location.origin}/logo.png`,
+        logoUnasamUrl: `${window.location.origin}/logo-unasam.png`,
+      })).toBlob()
+      const url = URL.createObjectURL(blob)
+      const a = Object.assign(document.createElement('a'), {
+        href: url,
+        download: `reporte-${alumno.apellidos ?? 'alumno'}-${alumno.codigo_barra ?? ''}.pdf`,
+      })
+      document.body.appendChild(a); a.click(); document.body.removeChild(a)
+      URL.revokeObjectURL(url)
+    } catch (err) {
+      console.error('Error al generar informe:', err)
+      alert('No se pudo generar el informe. Intenta nuevamente.')
+    } finally {
+      setInformeLoading(false)
+    }
+  }
+
+  async function descargarCarnetIndividual(alumno: any) {
+    setCarnetIndLoading(true)
+    try {
+      const [{ pdf }, { CarnetPDF }] = await Promise.all([
+        import('@react-pdf/renderer'),
+        import('@/components/reportes/carnet-pdf'),
+      ])
+      const blob = await pdf(CarnetPDF({
+        alumno,
+        cicloLabel: alumno.aula?.ciclo?.nombre ?? cicloActivo?.nombre ?? '2026-I',
+      })).toBlob()
+      const url = URL.createObjectURL(blob)
+      const a = Object.assign(document.createElement('a'), {
+        href: url,
+        download: `carnet-${alumno.apellidos ?? 'alumno'}-${alumno.codigo_barra ?? ''}.pdf`,
+      })
+      document.body.appendChild(a); a.click(); document.body.removeChild(a)
+      URL.revokeObjectURL(url)
+    } catch (err) {
+      console.error('Error al generar carnet:', err)
+      alert('No se pudo generar el carnet.')
+    } finally {
+      setCarnetIndLoading(false)
+    }
+  }
+
+  async function descargarCarnetsBatch() {
+    if (!batchAulaId) return
+    setBatchLoading(true)
+    try {
+      const { data } = await api.get('/alumnos', { params: { aula_id: batchAulaId, limit: 200, page: 1 } })
+      const alumnos = data?.data ?? []
+      if (!alumnos.length) { alert('No hay alumnos en esa aula.'); return }
+      const [{ pdf }, { CarnetBatchPDF }] = await Promise.all([
+        import('@react-pdf/renderer'),
+        import('@/components/reportes/carnet-pdf'),
+      ])
+      const aulaLabel = batchAulas.find((a: any) => a.id === batchAulaId)?.nombre ?? 'aula'
+      const blob = await pdf(CarnetBatchPDF({
+        alumnos,
+        cicloLabel: cicloActivo?.nombre ?? '2026-I',
+      })).toBlob()
+      const url = URL.createObjectURL(blob)
+      const a = Object.assign(document.createElement('a'), {
+        href: url,
+        download: `carnets-${aulaLabel}.pdf`,
+      })
+      document.body.appendChild(a); a.click(); document.body.removeChild(a)
+      URL.revokeObjectURL(url)
+    } catch (err) {
+      console.error('Error al generar carnets:', err)
+      alert('No se pudo generar los carnets.')
+    } finally {
+      setBatchLoading(false)
+    }
+  }
+
+  async function descargarCarnetSheet() {
+    if (!sheetCicloId) return
+    setSheetLoading(true)
+    try {
+      /* Si hay aula filtramos por aula; si no, por ciclo completo */
+      const params: Record<string, string | number> = { limit: 500, page: 1 }
+      if (sheetAulaId) params.aula_id  = sheetAulaId
+      else             params.ciclo_id = sheetCicloId
+
+      const { data } = await api.get('/alumnos', { params })
+      const alumnos = data?.data ?? []
+      if (!alumnos.length) { alert('No hay alumnos para generar carnets.'); return }
+
+      const [{ pdf }, { CarnetSheetPDF }] = await Promise.all([
+        import('@react-pdf/renderer'),
+        import('@/components/reportes/carnet-pdf'),
+      ])
+
+      const cicloNombre = ciclos.find((c) => c.id === sheetCicloId)?.nombre ?? '2026-I'
+      const aulaLabel   = sheetAulaId
+        ? (sheetAulas.find((a: any) => a.id === sheetAulaId)?.nombre ?? 'aula')
+        : cicloNombre
+
+      const blob = await pdf(CarnetSheetPDF({ alumnos, cicloLabel: cicloNombre })).toBlob()
+      const url  = URL.createObjectURL(blob)
+      const a    = Object.assign(document.createElement('a'), {
+        href:     url,
+        download: `carnets-hoja-A4-${aulaLabel}.pdf`,
+      })
+      document.body.appendChild(a); a.click(); document.body.removeChild(a)
+      URL.revokeObjectURL(url)
+    } catch (err) {
+      console.error('Error al generar hoja de carnets:', err)
+      alert('No se pudo generar la hoja de carnets.')
+    } finally {
+      setSheetLoading(false)
     }
   }
 
@@ -478,6 +630,7 @@ export default function ReportesPage() {
             { key: 'alumnos',    label: 'Alumnos',      sub: almEnabled  && almQ.data  ? `${almQ.data.kpis.total} alumnos`  : '' },
             { key: 'horarios',   label: 'Horarios',     sub: horEnabled  && horQ.data  ? `${horQ.data.kpis.total_clases} clases` : '' },
             { key: 'cursos',     label: 'Cursos',       sub: curEnabled  && curQ.data  ? `${curQ.data.kpis.total_cursos} cursos` : '' },
+            { key: 'individual', label: 'Por alumno',   sub: '' },
           ] as { key: ReportTab; label: string; sub: string }[]).map((t) => (
             <button key={t.key} onClick={() => setTab(t.key)}
               className={`px-4 py-2 text-[13px] border-b-2 transition-colors ${
@@ -492,7 +645,7 @@ export default function ReportesPage() {
         </div>
 
         {/* ── Panel de filtros ── */}
-        <div className="bg-surface border border-border rounded-3 p-4 shadow-1 flex flex-col gap-3">
+        {tab !== 'individual' && <div className="bg-surface border border-border rounded-3 p-4 shadow-1 flex flex-col gap-3">
           <div className="flex flex-wrap gap-3 items-end">
 
             {/* Ciclo — siempre */}
@@ -596,10 +749,10 @@ export default function ReportesPage() {
               {isLoading ? 'Generando…' : 'Generar reporte'}
             </Btn>
           </div>
-        </div>
+        </div>}
 
         {/* ── Estado inicial / loading / error ── */}
-        {!triggered && !isLoading && (
+        {tab !== 'individual' && !triggered && !isLoading && (
           <Card>
             <div className="py-14 text-center">
               <div className="text-[44px] mb-3">📊</div>
@@ -609,10 +762,10 @@ export default function ReportesPage() {
             </div>
           </Card>
         )}
-        {isLoading && (
+        {tab !== 'individual' && isLoading && (
           <Card><div className="py-14 text-center text-text-mute text-[13px]"><div className="text-[32px] mb-3 animate-pulse">⏳</div>Generando…</div></Card>
         )}
-        {isError && !isLoading && (
+        {tab !== 'individual' && isError && !isLoading && (
           <Card><div className="py-12 text-center"><div className="text-[32px] mb-3">⚠️</div><p className="text-danger text-[13px] mb-4">Error al generar el reporte.</p><Btn variant="secondary" size="sm" onClick={handleGenerar}>Reintentar</Btn></div></Card>
         )}
 
@@ -968,6 +1121,194 @@ export default function ReportesPage() {
             </>
           )
         })()}
+
+        {/* ════════════════════════════════════════════════════════════
+            TAB: POR ALUMNO — informe individual + carnets en lote
+        ════════════════════════════════════════════════════════════ */}
+        {tab === 'individual' && (
+          <>
+            {/* ── Informe / carnet individual ── */}
+            <Card title="Informe y carnet individual"
+              subtitle="Busca un alumno para generar su informe completo de asistencia o su carnet estudiantil">
+              <div className="p-4 flex flex-col gap-4">
+
+                {/* Buscador */}
+                {!indivAlumno && (
+                  <div className="relative">
+                    <Search size={13} className="absolute left-2.5 top-1/2 -translate-y-1/2 text-text-mute pointer-events-none" />
+                    <input
+                      type="text"
+                      value={indivSearch}
+                      onChange={(e) => setIndivSearch(e.target.value)}
+                      placeholder="Buscar alumno por nombre, apellidos o DNI…"
+                      autoComplete="off"
+                      className="w-full pl-8 pr-3 py-2 text-[13px] border border-border rounded-2 bg-surface focus:outline-none focus:ring-1 focus:ring-primary"
+                    />
+                    {/* Resultados */}
+                    {indivSearch.trim().length >= 2 && (
+                      <div className="absolute z-10 top-full left-0 right-0 mt-1 bg-surface border border-border rounded-2 shadow-2 overflow-hidden">
+                        {indivResults.length === 0 ? (
+                          <p className="text-[12px] text-text-mute text-center py-3">Sin resultados para «{indivSearch}»</p>
+                        ) : indivResults.map((a: any) => (
+                          <button key={a.id}
+                            onClick={() => { setIndivAlumno(a); setIndivSearch('') }}
+                            className="w-full text-left px-3.5 py-2.5 hover:bg-surface-2 text-[13px] flex justify-between items-center gap-3 border-b border-border-s last:border-0">
+                            <div>
+                              <span className="font-semibold">{a.apellidos ?? ''}{a.apellidos ? ', ' : ''}{a.nombres ?? a.nombre ?? ''}</span>
+                              {a.dni && <span className="text-text-mute ml-2 text-[11px]">DNI: {a.dni}</span>}
+                              {a.aula && <span className="text-text-mute ml-2 text-[11px]">· {a.aula.nombre}</span>}
+                            </div>
+                            <span className="font-mono text-[11px] text-primary flex-shrink-0">{a.codigo_barra}</span>
+                          </button>
+                        ))}
+                      </div>
+                    )}
+                  </div>
+                )}
+
+                {/* Alumno seleccionado */}
+                {indivAlumno && (
+                  <div className="rounded-3 border border-border bg-surface-2/40 p-4 flex items-center gap-4">
+                    {/* Avatar */}
+                    <div className="w-12 h-12 rounded-full bg-primary/15 flex items-center justify-center flex-shrink-0 text-primary font-bold text-[16px] select-none">
+                      {[indivAlumno.nombres ?? indivAlumno.nombre ?? '', indivAlumno.apellidos ?? '']
+                        .join(' ').trim().split(/\s+/).slice(0, 2)
+                        .map((w: string) => w[0] ?? '').join('').toUpperCase()}
+                    </div>
+                    {/* Info */}
+                    <div className="flex-1 min-w-0">
+                      <p className="font-semibold text-[15px] leading-tight truncate">
+                        {indivAlumno.apellidos ?? ''}{indivAlumno.apellidos ? ', ' : ''}
+                        {indivAlumno.nombres ?? indivAlumno.nombre ?? ''}
+                      </p>
+                      <p className="text-[12px] text-text-mute mt-0.5">
+                        Cód: <span className="font-mono">{indivAlumno.codigo_barra ?? '—'}</span>
+                        {indivAlumno.dni && <> · DNI: {indivAlumno.dni}</>}
+                        {indivAlumno.aula && <> · Aula: <strong>{indivAlumno.aula.nombre}</strong></>}
+                      </p>
+                    </div>
+                    {/* Acciones */}
+                    <div className="flex gap-2 flex-shrink-0">
+                      <Btn variant="secondary" size="sm" icon={<Download size={14} />}
+                        disabled={informeLoading}
+                        onClick={() => descargarReporteIndividual(indivAlumno)}>
+                        {informeLoading ? 'Generando…' : 'Informe PDF'}
+                      </Btn>
+                      <Btn size="sm" icon={<Download size={14} />}
+                        disabled={carnetIndLoading}
+                        onClick={() => descargarCarnetIndividual(indivAlumno)}>
+                        {carnetIndLoading ? 'Generando…' : 'Carnet PDF'}
+                      </Btn>
+                    </div>
+                    <button onClick={() => setIndivAlumno(null)}
+                      className="ml-1 text-text-mute hover:text-text flex-shrink-0" title="Limpiar selección">
+                      <X size={16} />
+                    </button>
+                  </div>
+                )}
+
+                {!indivAlumno && indivSearch.trim().length < 2 && (
+                  <p className="text-[12px] text-text-mute text-center py-2">
+                    Escribe al menos 2 caracteres para buscar.
+                  </p>
+                )}
+              </div>
+            </Card>
+
+            {/* ── Carnets en lote por aula — un carnet por página ── */}
+            <Card title="Carnets por aula (tarjetón individual)"
+              subtitle="Un carnet por página al tamaño exacto — imprime directo en tarjetón 9.3 × 5.6 cm">
+              <div className="p-4 flex flex-wrap gap-3 items-end">
+                {/* Ciclo */}
+                <div className="flex flex-col gap-1">
+                  <label className="text-[10.5px] text-text-mute uppercase tracking-[0.05em] font-medium">Ciclo</label>
+                  <select value={batchCicloId}
+                    onChange={(e) => { setBatchCicloId(e.target.value); setBatchAulaId('') }}
+                    className="text-[13px] px-2.5 py-1.5 border border-border rounded-2 bg-surface min-w-[180px]">
+                    <option value="">Seleccionar ciclo…</option>
+                    {ciclos.map((c) => (
+                      <option key={c.id} value={c.id}>{c.nombre}{c.activo ? ' ★' : ''}</option>
+                    ))}
+                  </select>
+                </div>
+                {/* Aula */}
+                <div className="flex flex-col gap-1">
+                  <label className="text-[10.5px] text-text-mute uppercase tracking-[0.05em] font-medium">Aula</label>
+                  <select value={batchAulaId} onChange={(e) => setBatchAulaId(e.target.value)}
+                    disabled={!batchCicloId}
+                    className="text-[13px] px-2.5 py-1.5 border border-border rounded-2 bg-surface min-w-[180px] disabled:opacity-50">
+                    <option value="">Seleccionar aula…</option>
+                    {batchAulas.map((a) => (
+                      <option key={a.id} value={a.id}>{a.nombre}</option>
+                    ))}
+                  </select>
+                </div>
+                <Btn size="sm" icon={<Download size={14} />}
+                  disabled={!batchAulaId || batchLoading}
+                  onClick={descargarCarnetsBatch}>
+                  {batchLoading ? 'Generando…' : 'Generar PDF (tarjetón)'}
+                </Btn>
+                {batchAulaId && !batchLoading && (
+                  <p className="text-[11px] text-text-mute self-center">
+                    Página de <span className="font-mono">9.3 × 5.6 cm</span> por alumno
+                  </p>
+                )}
+              </div>
+            </Card>
+
+            {/* ── Hoja A4 con 9 carnets (ciclo completo o aula) ── */}
+            <Card title="Hoja A4 — múltiples carnets por página"
+              subtitle="9 carnets por hoja apaisada (3 × 3) — incluye guías de corte — ideal para guillotinar en tarjetón">
+              <div className="p-4 flex flex-wrap gap-3 items-end">
+
+                {/* Ciclo (obligatorio) */}
+                <div className="flex flex-col gap-1">
+                  <label className="text-[10.5px] text-text-mute uppercase tracking-[0.05em] font-medium">
+                    Ciclo <span className="text-danger">*</span>
+                  </label>
+                  <select value={sheetCicloId}
+                    onChange={(e) => { setSheetCicloId(e.target.value); setSheetAulaId('') }}
+                    className="text-[13px] px-2.5 py-1.5 border border-border rounded-2 bg-surface min-w-[180px]">
+                    <option value="">Seleccionar ciclo…</option>
+                    {ciclos.map((c) => (
+                      <option key={c.id} value={c.id}>{c.nombre}{c.activo ? ' ★' : ''}</option>
+                    ))}
+                  </select>
+                </div>
+
+                {/* Aula (opcional — si se deja vacío, se genera para todo el ciclo) */}
+                <div className="flex flex-col gap-1">
+                  <label className="text-[10.5px] text-text-mute uppercase tracking-[0.05em] font-medium">
+                    Aula <span className="font-normal normal-case text-text-mute">(opcional)</span>
+                  </label>
+                  <select value={sheetAulaId} onChange={(e) => setSheetAulaId(e.target.value)}
+                    disabled={!sheetCicloId}
+                    className="text-[13px] px-2.5 py-1.5 border border-border rounded-2 bg-surface min-w-[200px] disabled:opacity-50">
+                    <option value="">Todas las aulas del ciclo</option>
+                    {sheetAulas.map((a) => (
+                      <option key={a.id} value={a.id}>{a.nombre}</option>
+                    ))}
+                  </select>
+                </div>
+
+                <Btn size="sm" icon={<Download size={14} />}
+                  disabled={!sheetCicloId || sheetLoading}
+                  onClick={descargarCarnetSheet}>
+                  {sheetLoading ? 'Generando…' : 'Generar hoja A4'}
+                </Btn>
+
+                {/* Hint */}
+                <div className="self-center flex flex-col gap-0.5 text-[11px] text-text-mute">
+                  <span className="font-medium text-text">9 carnets por página</span>
+                  <span>A4 apaisado · guías de corte incluidas</span>
+                  {sheetCicloId && !sheetAulaId && (
+                    <span className="text-primary font-medium">Ciclo completo seleccionado</span>
+                  )}
+                </div>
+              </div>
+            </Card>
+          </>
+        )}
 
       </div>
     </>

@@ -13,6 +13,7 @@ import { Barcode } from '@/components/ui/barcode'
 import { PageHeader } from '@/components/layout/page-header'
 import { Download, Edit, Mail, Phone, Calendar, MapPin, Book } from '@/components/icons'
 import { useState } from 'react'
+import api from '@/lib/api'
 
 const TABS = ['Resumen', 'Cursos', 'Asistencia', 'Apoderados', 'Comunicados'] as const
 type Tab = (typeof TABS)[number]
@@ -56,10 +57,44 @@ async function descargarCarnet(alumno: any) {
   URL.revokeObjectURL(url)
 }
 
+async function descargarReporte(alumno: any, setLoading: (v: boolean) => void) {
+  setLoading(true)
+  try {
+    // Obtener todos los registros de asistencia del alumno (sin límite de 30)
+    const resp = await api.get('/asistencia', {
+      params: { alumno_id: alumno.id, limit: 500, page: 1 },
+    })
+    const registros = resp.data?.data ?? []
+
+    const [{ pdf }, { ReporteAlumnoPDF }] = await Promise.all([
+      import('@react-pdf/renderer'),
+      import('@/components/reportes/reporte-alumno-pdf'),
+    ])
+    const logoUrl       = `${window.location.origin}/logo.png`
+    const logoUnasamUrl = `${window.location.origin}/logo-unasam.png`
+    const element = ReporteAlumnoPDF({ alumno, registros, logoUrl, logoUnasamUrl })
+    const blob = await pdf(element).toBlob()
+    const url  = URL.createObjectURL(blob)
+    const a    = document.createElement('a')
+    a.href     = url
+    a.download = `reporte-${alumno.apellidos ?? 'alumno'}-${alumno.codigo_barra ?? ''}.pdf`
+    document.body.appendChild(a)
+    a.click()
+    document.body.removeChild(a)
+    URL.revokeObjectURL(url)
+  } catch (err) {
+    console.error('Error al generar reporte:', err)
+    alert('No se pudo generar el reporte. Intenta nuevamente.')
+  } finally {
+    setLoading(false)
+  }
+}
+
 export default function AlumnoDetallePage() {
   const { id } = useParams<{ id: string }>()
   const router = useRouter()
   const [tab, setTab] = useState<Tab>('Resumen')
+  const [reporteLoading, setReporteLoading] = useState(false)
 
   const { data: alumno, isLoading } = useAlumno(id)
   const { data: asistencias } = useAsistencia({ alumno_id: id, limit: 30 })
@@ -98,11 +133,21 @@ export default function AlumnoDetallePage() {
         ]}
         action={
           <>
+            <Btn
+              variant="secondary"
+              icon={<Download size={14} />}
+              size="sm"
+              onClick={() => descargarReporte(alumno, setReporteLoading)}
+              disabled={reporteLoading}
+            >
+              {reporteLoading ? 'Generando…' : 'Reporte PDF'}
+            </Btn>
             <Btn variant="secondary" icon={<Download size={14} />} size="sm"
               onClick={() => descargarCarnet(alumno)}>
               Carnet PDF
             </Btn>
-            <Btn variant="secondary" icon={<Edit size={14} />} size="sm">
+            <Btn variant="secondary" icon={<Edit size={14} />} size="sm"
+              onClick={() => router.push(`/alumnos/${id}/editar`)}>
               Editar
             </Btn>
           </>

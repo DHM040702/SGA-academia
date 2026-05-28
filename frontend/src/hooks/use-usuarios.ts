@@ -7,6 +7,12 @@ export interface UsuarioRecord {
   id: string
   email: string
   rol: RolUsuario
+  /** Nombre propio del usuario */
+  nombre?: string | null
+  /** Apellidos del usuario */
+  apellidos?: string | null
+  /** DNI de acceso al sistema */
+  dni?: string | null
   activo: boolean
   createdAt: string
   updatedAt: string

@@ -1,5 +1,5 @@
 import { Injectable, NotFoundException } from '@nestjs/common';
-import { CanalEnvio, EstadoEnvio, TipoDestinatario } from '@prisma/client';
+import { CanalEnvio, EstadoEnvio, Rol, TipoDestinatario } from '@prisma/client';
 import { PrismaService } from '../prisma/prisma.service';
 import { paginate, PaginationDto } from '../common/dto/pagination.dto';
 import { CreateComunicadoDto } from './dto/create-comunicado.dto';
@@ -9,12 +9,31 @@ import { UpdateComunicadoDto } from './dto/update-comunicado.dto';
 export class ComunicadosService {
   constructor(private prisma: PrismaService) {}
 
-  async findAll(dto: PaginationDto) {
+  async findAll(dto: PaginationDto, rolUsuario?: string) {
     const { page = 1, limit = 20 } = dto;
     const skip = (page - 1) * limit;
 
+    const esGestion = !rolUsuario || rolUsuario === 'admin' || rolUsuario === 'director';
+
+    // Qué tipos de destinatario puede ver cada rol
+    const rolDestMapping: Partial<Record<string, TipoDestinatario[]>> = {
+      docente:   [TipoDestinatario.todos, TipoDestinatario.docentes],
+      alumno:    [TipoDestinatario.todos, TipoDestinatario.alumnos],
+      apoderado: [TipoDestinatario.todos, TipoDestinatario.apoderados],
+      vigilante: [TipoDestinatario.todos],
+    };
+
+    const allowedTypes = rolDestMapping[rolUsuario ?? ''];
+    const where = {
+      // Solo publicados para usuarios no gestores (no ven borradores)
+      ...(!esGestion ? { publicadoAt: { not: null } } : {}),
+      // Filtrar por destinatario según el rol
+      ...(allowedTypes ? { destinatarioTipo: { in: allowedTypes } } : {}),
+    };
+
     const [items, total] = await Promise.all([
       this.prisma.comunicado.findMany({
+        where,
         skip,
         take: limit,
         orderBy: { createdAt: 'desc' },
@@ -24,7 +43,7 @@ export class ComunicadosService {
           _count:       { select: { envios: true } },
         },
       }),
-      this.prisma.comunicado.count(),
+      this.prisma.comunicado.count({ where }),
     ]);
 
     const enriched = await Promise.all(
@@ -74,10 +93,21 @@ export class ComunicadosService {
         },
       });
 
-      // Crear envíos pendientes para todos los usuarios activos (canal sistema)
+      // Crear envíos pendientes según destinatario_tipo (canal sistema)
       if (dto.canal_sistema !== false) {
+        // Filtrar por rol cuando el destinatario es específico
+        const rolFiltro: Record<string, Rol | undefined> = {
+          docentes:   Rol.docente,
+          alumnos:    Rol.alumno,
+          apoderados: Rol.apoderado,
+        };
+        const rolDestino = rolFiltro[dto.destinatario_tipo ?? ''];
         const destinatarios = await tx.usuario.findMany({
-          where: { activo: true, deletedAt: null },
+          where: {
+            activo: true,
+            deletedAt: null,
+            ...(rolDestino ? { rol: rolDestino } : {}),
+          },
           select: { id: true },
         });
         if (destinatarios.length > 0) {

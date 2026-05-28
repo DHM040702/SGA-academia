@@ -21,10 +21,11 @@ interface FormValues {
   password: string
   rol: RolSistema
   activo: string
-  // Campos de perfil (apoderado)
+  // Datos personales (todos los roles)
   nombre: string
   apellidos: string
   dni: string
+  // Campos extra solo para apoderado
   telefono_whatsapp: string
 }
 
@@ -53,12 +54,19 @@ export default function NuevoUsuarioPage() {
     }
 
     if (esApoderado) {
+      // Para apoderado: los datos personales van en el perfil
+      // El backend deriva usuarios.dni automáticamente del perfil.dni
       dto.perfil = {
         nombre:            values.nombre,
         apellidos:         values.apellidos,
         dni:               values.dni,
         telefono_whatsapp: values.telefono_whatsapp,
       }
+    } else {
+      // Para admin / director / vigilante: datos directamente en el usuario
+      if (values.nombre)    dto.nombre    = values.nombre
+      if (values.apellidos) dto.apellidos = values.apellidos
+      if (values.dni)       dto.dni       = values.dni
     }
 
     try {
@@ -104,32 +112,56 @@ export default function NuevoUsuarioPage() {
           </div>
         </Card>
 
-        {/* Perfil de la persona — solo apoderado */}
-        {esApoderado && (
-          <Card title="Datos del apoderado" className="mt-4">
-            <div className="grid grid-cols-2 gap-4 p-1">
-              <Field label="Nombres" required error={errors.nombre?.message}>
-                <Input
-                  placeholder="Juan Carlos"
-                  {...register('nombre', { required: 'Requerido', minLength: { value: 2, message: 'Mínimo 2 caracteres' } })}
-                />
-              </Field>
-              <Field label="Apellidos" required error={errors.apellidos?.message}>
-                <Input
-                  placeholder="García Mendoza"
-                  {...register('apellidos', { required: 'Requerido', minLength: { value: 2, message: 'Mínimo 2 caracteres' } })}
-                />
-              </Field>
-              <Field label="DNI" required error={errors.dni?.message}>
-                <Input
-                  placeholder="76543210"
-                  maxLength={8}
-                  {...register('dni', {
-                    required: 'Requerido',
-                    pattern: { value: /^\d{8}$/, message: 'DNI debe tener 8 dígitos' },
-                  })}
-                />
-              </Field>
+        {/* Datos personales — todos los roles */}
+        <Card title={esApoderado ? 'Datos del apoderado' : 'Datos personales'} className="mt-4">
+          <div className="grid grid-cols-2 gap-4 p-1">
+            <Field label="Nombres" required={esApoderado} error={errors.nombre?.message}>
+              <Input
+                placeholder="Juan Carlos"
+                {...register('nombre', {
+                  ...(esApoderado ? { required: 'Requerido' } : {}),
+                  minLength: { value: 2, message: 'Mínimo 2 caracteres' },
+                })}
+              />
+            </Field>
+            <Field label="Apellidos" required={esApoderado} error={errors.apellidos?.message}>
+              <Input
+                placeholder="García Mendoza"
+                {...register('apellidos', {
+                  ...(esApoderado ? { required: 'Requerido' } : {}),
+                  minLength: { value: 2, message: 'Mínimo 2 caracteres' },
+                })}
+              />
+            </Field>
+
+            {/* DNI de ingreso — todos los roles */}
+            <Field
+              label="DNI"
+              required
+              error={errors.dni?.message}
+            >
+              <Input
+                placeholder={esApoderado ? '76543210' : '12345678'}
+                inputMode="numeric"
+                maxLength={12}
+                {...register('dni', {
+                  required: 'Requerido',
+                  pattern: {
+                    value: /^\d{8,12}$/,
+                    message: 'DNI debe tener entre 8 y 12 dígitos',
+                  },
+                  onChange: (e) => {
+                    e.target.value = e.target.value.replace(/\D/g, '')
+                  },
+                })}
+              />
+              <p className="mt-1 text-[11.5px] text-text-mute">
+                Con este DNI el usuario iniciará sesión en el sistema.
+              </p>
+            </Field>
+
+            {/* Teléfono solo para apoderado */}
+            {esApoderado && (
               <Field label="Teléfono WhatsApp" required error={errors.telefono_whatsapp?.message}>
                 <Input
                   placeholder="+51 943 221 887"
@@ -139,9 +171,9 @@ export default function NuevoUsuarioPage() {
                   })}
                 />
               </Field>
-            </div>
-          </Card>
-        )}
+            )}
+          </div>
+        </Card>
 
         {/* Credenciales */}
         <Card title="Credenciales de acceso" className="mt-4">

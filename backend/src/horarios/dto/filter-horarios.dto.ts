@@ -1,6 +1,6 @@
 import { ApiPropertyOptional } from '@nestjs/swagger';
-import { IsInt, IsOptional, IsUUID, Max, Min } from 'class-validator';
-import { Type } from 'class-transformer';
+import { IsBoolean, IsInt, IsOptional, IsUUID, Max, Min } from 'class-validator';
+import { Transform, Type } from 'class-transformer';
 import { PaginationDto } from '../../common/dto/pagination.dto';
 
 export class FilterHorariosDto extends PaginationDto {
@@ -21,4 +21,10 @@ export class FilterHorariosDto extends PaginationDto {
   @Min(1)
   @Max(7)
   dia_semana?: number;
+
+  @ApiPropertyOptional({ description: 'Filtrar por estado de publicación' })
+  @IsOptional()
+  @Transform(({ value }) => value === 'true' || value === true)
+  @IsBoolean()
+  publicado?: boolean;
 }

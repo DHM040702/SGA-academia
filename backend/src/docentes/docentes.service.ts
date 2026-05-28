@@ -123,7 +123,8 @@ export class DocentesService {
 
   async update(id: string, dto: UpdateDocenteDto) {
     await this.findOne(id);
-    const { password, email, ...rest } = dto as UpdateDocenteDto & { password?: string; email?: string };
+    type DocenteFields = { dni?: string; nombres?: string; apellidos?: string; telefono?: string; especialidad?: string };
+    const { password, email, ...rest } = dto as DocenteFields & { password?: string; email?: string };
 
     return this.prisma.$transaction(async (tx) => {
       const docente = await tx.docente.findFirst({ where: { id } });

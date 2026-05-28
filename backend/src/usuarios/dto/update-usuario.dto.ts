@@ -44,6 +44,26 @@ export class UpdateUsuarioDto {
   @IsBoolean()
   activo?: boolean;
 
+  /** Nombre directo en usuario (admin / director / vigilante) */
+  @ApiPropertyOptional()
+  @IsOptional()
+  @IsString()
+  @MinLength(2)
+  nombre?: string;
+
+  /** Apellidos directo en usuario (admin / director / vigilante) */
+  @ApiPropertyOptional()
+  @IsOptional()
+  @IsString()
+  @MinLength(2)
+  apellidos?: string;
+
+  /** DNI de acceso al sistema (8–12 dígitos numéricos) */
+  @ApiPropertyOptional({ description: 'DNI de 8–12 dígitos para ingreso al sistema', example: '12345678' })
+  @IsOptional()
+  @Matches(/^\d{8,12}$/, { message: 'El DNI debe tener entre 8 y 12 dígitos numéricos' })
+  dni?: string;
+
   @ApiPropertyOptional({ type: UpdatePerfilApoderadoDto })
   @IsOptional()
   @ValidateNested()

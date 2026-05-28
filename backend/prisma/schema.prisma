@@ -11,6 +11,9 @@ model Usuario {
   email                  String              @unique @db.VarChar(150)
   passwordHash           String              @map("password_hash") @db.VarChar(255)
   rol                    Rol
+  nombre                 String?             @db.VarChar(100)
+  apellidos              String?             @db.VarChar(150)
+  dni                    String?             @unique @db.VarChar(12)
   activo                 Boolean             @default(true)
   createdAt              DateTime            @default(now()) @map("created_at") @db.Timestamptz(6)
   updatedAt              DateTime            @default(now()) @updatedAt @map("updated_at") @db.Timestamptz(6)
@@ -282,6 +285,7 @@ enum TipoDestinatario {
   seccion
   alumnos
   apoderados
+  docentes
   usuario
 }
 

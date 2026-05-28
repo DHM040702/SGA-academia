@@ -5,12 +5,12 @@ import { useAuth } from '@/contexts/auth-context'
 import { Btn } from '@/components/ui/btn'
 import { Field } from '@/components/ui/field'
 import { Input } from '@/components/ui/input'
-import { Mail, Lock } from '@/components/icons'
+import { CreditCard, Lock } from '@/components/icons'
 
 export default function LoginPage() {
   const { login, user } = useAuth()
   const router = useRouter()
-  const [email, setEmail] = React.useState('')
+  const [dni, setDni] = React.useState('')
   const [password, setPassword] = React.useState('')
   const [error, setError] = React.useState('')
   const [loading, setLoading] = React.useState(false)
@@ -29,10 +29,10 @@ export default function LoginPage() {
     setError('')
     setLoading(true)
     try {
-      await login(email, password)
+      await login(dni, password)
       // useEffect above handles redirect after user state updates
     } catch {
-      setError('Credenciales incorrectas. Verifique su usuario y contraseña.')
+      setError('Credenciales incorrectas. Verifique su DNI y contraseña.')
     } finally {
       setLoading(false)
     }
@@ -67,7 +67,7 @@ export default function LoginPage() {
             Sistema de Gestión Académica
           </p>
           <h2 className="m-0 font-serif font-medium text-[38px] leading-[1.1] tracking-[-0.02em]">
-            La administración del Centro Preuniversitario, en un solo lugar.
+            CentroPreuniversitttario.
           </h2>
           <p className="mt-[18px] text-[14px] leading-relaxed opacity-80">
             Asistencia por código de barras, horarios sin conflictos, comunicados inmediatos y reportes en tiempo real.
@@ -87,19 +87,21 @@ export default function LoginPage() {
             Iniciar sesión
           </h1>
           <p className="mt-2 mb-8 text-[13.5px] text-text-mute">
-            Ingrese sus credenciales para acceder al sistema.
+            Ingrese su DNI y contraseña para acceder al sistema.
           </p>
 
           <form onSubmit={handleSubmit} className="flex flex-col gap-4">
-            <Field label="Usuario o correo institucional" required>
+            <Field label="DNI" required>
               <Input
-                icon={<Mail size={14} />}
-                type="email"
-                placeholder="usuario@unasam.edu.pe"
-                value={email}
-                onChange={(e) => setEmail(e.target.value)}
+                icon={<CreditCard size={14} />}
+                type="text"
+                inputMode="numeric"
+                placeholder="12345678"
+                maxLength={12}
+                value={dni}
+                onChange={(e) => setDni(e.target.value.replace(/\D/g, ''))}
                 required
-                autoComplete="email"
+                autoComplete="username"
               />
             </Field>
 

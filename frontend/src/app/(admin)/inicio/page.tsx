@@ -11,7 +11,8 @@ import { Dot } from '@/components/ui/dot'
 import { Avatar } from '@/components/ui/avatar'
 import { useAuth } from '@/contexts/auth-context'
 import api from '@/lib/api'
-import { Download, Plus, ChevR, Calendar, ScanLine, RefreshCw } from '@/components/icons'
+import { Download, Plus, ChevR, Calendar, ScanLine, RefreshCw, AlertTriangle } from '@/components/icons'
+import { useCerrarTurno } from '@/hooks/use-asistencia'
 import { cn } from '@/lib/utils'
 
 /* ── Helpers compartidos ──────────────────────────────────────── */
@@ -29,7 +30,8 @@ function formatHoraLocal(isoTime: string | null | undefined): string {
 
 function isLive(horaInicio: string, horaFin: string): boolean {
   const now = new Date()
-  const cur = now.getHours() * 60 + now.getMinutes()
+  // Las horas se almacenan en la DB como Time(UTC) — comparar todo en UTC para consistencia
+  const cur = now.getUTCHours() * 60 + now.getUTCMinutes()
   const ini = new Date(horaInicio)
   const fin = new Date(horaFin)
   const s = ini.getUTCHours() * 60 + ini.getUTCMinutes()
@@ -88,11 +90,16 @@ function VigilanteInicio() {
   const now = new Date()
   const horaStr = now.getHours() < 12 ? 'Buenos días' : now.getHours() < 19 ? 'Buenas tardes' : 'Buenas noches'
   const fechaStr = now.toLocaleDateString('es-PE', { weekday: 'long', day: 'numeric', month: 'long', year: 'numeric' })
-  const todayIso = now.toISOString().split('T')[0]
+  const todayIso = `${now.getFullYear()}-${String(now.getMonth() + 1).padStart(2, '0')}-${String(now.getDate()).padStart(2, '0')}`
   const todayDia = now.getDay() === 0 ? 7 : now.getDay()
 
   const firstName = user?.email?.split('@')[0]?.split('.')[0] ?? 'vigilante'
   const capitalized = firstName.charAt(0).toUpperCase() + firstName.slice(1)
+
+  // Estado para el modal de cierre de turno
+  const [cierreTurno, setCierreTurno] = React.useState<'manana' | 'tarde' | null>(null)
+  const [cierreResult, setCierreResult] = React.useState<string | null>(null)
+  const cerrarTurnoMut = useCerrarTurno()
 
   /* ── Queries con auto-refresh ─────────────────────────────── */
   const { data: stats, refetch: refetchStats } = useQuery({
@@ -110,10 +117,11 @@ function VigilanteInicio() {
     refetchInterval: 30_000,
   })
 
+  // Sin filtro publicado para mostrar todas las clases del día (publicadas o no)
   const { data: horariosPage } = useQuery({
     queryKey: ['horarios', 'hoy-vigilante', todayDia],
     queryFn: () =>
-      api.get('/horarios', { params: { dia_semana: todayDia, limit: 30, publicado: true } }).then((r) => r.data),
+      api.get('/horarios', { params: { dia_semana: todayDia, limit: 50 } }).then((r) => r.data),
     staleTime: 60_000,
   })
 
@@ -127,8 +135,8 @@ function VigilanteInicio() {
   const pctAsist     = stats?.pct_asistencia ?? 0
 
   const registros: any[] = asistenciaPage?.data ?? []
-  const clasesHoy: any[]  = (horariosPage as any)?.data ?? horariosPage ?? []
-  const clasesEnCurso     = clasesHoy.filter((c: any) => isLive(c.horaInicio, c.horaFin))
+  const clasesHoy: any[] = horariosPage?.data ?? []
+  const clasesEnCurso    = clasesHoy.filter((c: any) => isLive(c.horaInicio, c.horaFin))
 
   const ultimaActualizacion = dataUpdatedAt
     ? new Date(dataUpdatedAt).toLocaleTimeString('es-PE', { hour: '2-digit', minute: '2-digit' })
@@ -137,6 +145,17 @@ function VigilanteInicio() {
   function handleRefresh() {
     refetchStats()
     refetchAsistencia()
+  }
+
+  async function handleCerrarTurno() {
+    if (!cierreTurno) return
+    try {
+      const res = await cerrarTurnoMut.mutateAsync({ turno: cierreTurno })
+      setCierreResult(res.message ?? 'Turno cerrado correctamente')
+      refetchStats()
+    } catch (err: any) {
+      setCierreResult(err?.response?.data?.message ?? 'Error al cerrar el turno')
+    }
   }
 
   return (
@@ -151,7 +170,7 @@ function VigilanteInicio() {
               <RefreshCw size={14} />Actualizar
             </Btn>
             <Btn size="sm" onClick={() => window.open('/vigilante', '_blank')}>
-              <ScanLine size={14} />Abrir kiosko
+              <ScanLine size={14} />Registro de asistencia
             </Btn>
           </>
         }
@@ -273,7 +292,7 @@ function VigilanteInicio() {
           )}
         </Card>
 
-        {/* Panel derecho: últimas marcaciones + kiosko */}
+        {/* Panel derecho */}
         <div className="flex flex-col gap-3.5">
           {/* Últimas marcaciones */}
           <Card
@@ -318,22 +337,94 @@ function VigilanteInicio() {
             )}
           </Card>
 
-          {/* Acceso al kiosko */}
+          {/* Acceso al registro de asistencia */}
           <Card title="Registro de asistencia" subtitle="Modo pantalla completa">
             <div className="flex flex-col gap-2.5 pt-1">
               <Btn
                 className="w-full justify-center py-2.5"
                 onClick={() => window.open('/vigilante', '_blank')}
               >
-                <ScanLine size={15} />Abrir kiosko
+                <ScanLine size={15} />Abrir pantalla de registro
               </Btn>
               <p className="text-[11px] text-text-mute text-center leading-relaxed">
                 Lector de código de barras USB en modo HID. Abre en una ventana nueva.
               </p>
             </div>
           </Card>
+
+          {/* Cierre de turno */}
+          <Card
+            title="Cierre de turno"
+            subtitle="Registra ausentes al finalizar el turno"
+          >
+            <div className="flex flex-col gap-2.5 pt-1">
+              {cierreResult ? (
+                <div className="rounded-2 px-3 py-2.5 text-[12.5px] bg-success-light text-success border border-success/20 text-center">
+                  {cierreResult}
+                  <button
+                    onClick={() => setCierreResult(null)}
+                    className="block w-full mt-2 text-[11px] text-text-mute hover:text-text underline"
+                  >
+                    Cerrar
+                  </button>
+                </div>
+              ) : cierreTurno ? (
+                <div className="rounded-2 px-3 py-3 bg-warning-light border border-warning/20 flex flex-col gap-2.5">
+                  <div className="flex items-start gap-2">
+                    <AlertTriangle size={15} className="text-warning shrink-0 mt-0.5" />
+                    <p className="text-[12px] text-text leading-snug">
+                      Se registrarán como <strong>ausentes</strong> todos los alumnos del turno{' '}
+                      <strong>{cierreTurno === 'manana' ? 'mañana' : 'tarde'}</strong> sin asistencia hoy.
+                      Esta acción no se puede deshacer.
+                    </p>
+                  </div>
+                  <div className="flex gap-2">
+                    <Btn
+                      variant="secondary"
+                      size="sm"
+                      className="flex-1 justify-center"
+                      onClick={() => setCierreTurno(null)}
+                      disabled={cerrarTurnoMut.isPending}
+                    >
+                      Cancelar
+                    </Btn>
+                    <Btn
+                      size="sm"
+                      className="flex-1 justify-center bg-warning hover:bg-warning/90 border-warning"
+                      onClick={handleCerrarTurno}
+                      disabled={cerrarTurnoMut.isPending}
+                    >
+                      {cerrarTurnoMut.isPending ? 'Cerrando…' : 'Confirmar'}
+                    </Btn>
+                  </div>
+                </div>
+              ) : (
+                <>
+                  <Btn
+                    variant="secondary"
+                    className="w-full justify-center"
+                    onClick={() => setCierreTurno('manana')}
+                  >
+                    Cerrar turno mañana
+                  </Btn>
+                  <Btn
+                    variant="secondary"
+                    className="w-full justify-center"
+                    onClick={() => setCierreTurno('tarde')}
+                  >
+                    Cerrar turno tarde
+                  </Btn>
+                  <p className="text-[11px] text-text-mute text-center leading-relaxed">
+                    Marca como ausentes a los alumnos sin registro al terminar el turno.
+                  </p>
+                </>
+              )}
+            </div>
+          </Card>
         </div>
       </div>
+
+      {/* Modal overlay de confirmación — accesible desde cualquier parte de la página si se necesita */}
     </div>
   )
 }
@@ -351,13 +442,22 @@ function AdminInicio() {
   const now = new Date()
   const horaStr = now.getHours() < 12 ? 'Buenos días' : now.getHours() < 19 ? 'Buenas tardes' : 'Buenas noches'
   const fechaStr = now.toLocaleDateString('es-PE', { weekday: 'long', day: 'numeric', month: 'long', year: 'numeric' })
-  const todayStr = now.toISOString().split('T')[0]
+  // Usar fecha local, no UTC, para evitar desfase de zona horaria
+  const todayStr = `${now.getFullYear()}-${String(now.getMonth() + 1).padStart(2, '0')}-${String(now.getDate()).padStart(2, '0')}`
   const todayDia = now.getDay() === 0 ? 7 : now.getDay()
 
   const { data: reporte } = useQuery({
     queryKey: ['reportes', 'asistencia', '30d'],
     queryFn: () => api.get('/reportes/asistencia').then((r) => r.data),
     staleTime: 60_000,
+  })
+
+  // Stats en tiempo real del día de hoy (presentes, tardanzas, %)
+  const { data: statsHoy } = useQuery({
+    queryKey: ['asistencia', 'stats', 'admin-inicio'],
+    queryFn: () => api.get('/asistencia/stats').then((r) => r.data),
+    staleTime: 30_000,
+    refetchInterval: 60_000,
   })
 
   const { data: alumnosData } = useQuery({
@@ -386,8 +486,15 @@ function AdminInicio() {
 
   const totalAlumnos     = alumnosData?.total ?? '—'
   const totalDocentes    = docentesData?.total ?? '—'
-  const asistenciaPct    = reporte?.kpis?.asistencia_media ?? 0
   const totalComunicados = comunicadosData?.total ?? 0
+
+  // % de asistencia de HOY (tiempo real desde /asistencia/stats)
+  const asistenciaHoyPct      = statsHoy?.pct_asistencia ?? 0
+  const presentesHoy          = (statsHoy?.presentes ?? 0) + (statsHoy?.tardanzas ?? 0)
+  const totalMatriculadosHoy  = statsHoy?.total_alumno ?? 0
+
+  // Promedio histórico 30 días (para el gráfico semanal y comparativas)
+  const asistenciaPct = reporte?.kpis?.asistencia_media ?? 0
 
   const alumnosRiesgo: any[] = React.useMemo(
     () =>
@@ -405,13 +512,16 @@ function AdminInicio() {
     return days.map((day, i) => {
       const d = new Date(now)
       d.setDate(now.getDate() + mondayOffset + i)
-      const dateStr = d.toISOString().split('T')[0]
-      const entry = reporte?.tendencia_30d?.find((t: any) => t.fecha === dateStr)
+      // Usar fecha local consistentemente para evitar desfase UTC
+      const dateStr = `${d.getFullYear()}-${String(d.getMonth() + 1).padStart(2, '0')}-${String(d.getDate()).padStart(2, '0')}`
       const isToday = dateStr === todayStr
-      const v = entry?.pct ?? (isToday && asistenciaPct > 0 ? asistenciaPct : 0)
+      // Para hoy: siempre usar stats en tiempo real (no el reporte que puede tener 0 o dato viejo)
+      // Para días pasados: usar tendencia_30d del reporte
+      const entry = isToday ? null : reporte?.tendencia_30d?.find((t: any) => t.fecha === dateStr)
+      const v = isToday ? asistenciaHoyPct : (entry?.pct ?? 0)
       return { day: isToday ? `${day} ${d.getDate()}` : day, v, today: isToday }
     })
-  }, [reporte, todayStr, asistenciaPct])
+  }, [reporte, todayStr, asistenciaHoyPct])
 
   const porSeccion: any[] = reporte?.por_seccion ?? []
   const seccionMenor = porSeccion.length ? porSeccion.reduce((a, b) => (b.pct_asistencia < a.pct_asistencia ? b : a)) : null
@@ -452,12 +562,19 @@ function AdminInicio() {
       </p>
 
       <div className="grid grid-cols-4 gap-3.5">
-        <KPI label="Alumnos activos" value={String(totalAlumnos)} sub={totalAlumnos !== '—' ? `${totalAlumnos} matriculados` : 'Cargando…'} trend={2} accent="var(--color-primary)" />
+        <KPI
+          label="Alumnos activos"
+          value={totalMatriculadosHoy > 0 ? String(totalMatriculadosHoy) : String(totalAlumnos)}
+          sub={totalMatriculadosHoy > 0 ? `${totalMatriculadosHoy} matriculados` : 'Cargando…'}
+          accent="var(--color-primary)"
+        />
         <KPI label="Docentes activos" value={String(totalDocentes)} sub="en el sistema" accent="var(--color-success)" />
         <KPI
           label="Asistencia hoy"
-          value={asistenciaPct > 0 ? `${asistenciaPct}%` : '—'}
-          sub={asistenciaPct > 0 && totalAlumnos !== '—' ? `${Math.round((Number(totalAlumnos) * asistenciaPct) / 100)} presentes` : 'Sin registros hoy'}
+          value={statsHoy ? `${asistenciaHoyPct}%` : '—'}
+          sub={statsHoy
+            ? `${presentesHoy} de ${totalMatriculadosHoy} presentes`
+            : 'Cargando…'}
           trend={vsSemanaPasada ?? undefined}
           accent="var(--color-info)"
         />
@@ -477,7 +594,7 @@ function AdminInicio() {
           <WeeklyBar data={weekData} />
           <div className="flex gap-4 mt-4 pt-3.5 border-t border-border-s">
             {[
-              { label: 'Promedio semana', value: asistenciaPct > 0 ? `${asistenciaPct}%` : '—', tone: 'success' as const },
+              { label: 'Hoy', value: statsHoy ? `${asistenciaHoyPct}%` : '—', tone: 'success' as const },
               { label: 'Vs. semana pasada', value: vsSemanaPasada !== null ? `${vsSemanaPasada > 0 ? '+' : ''}${vsSemanaPasada}pts` : '—', tone: vsSemanaPasada !== null && vsSemanaPasada >= 0 ? ('primary' as const) : ('warning' as const) },
               { label: 'Aula menor', value: seccionMenor?.nombre ?? '—', sub: seccionMenor ? `${seccionMenor.pct_asistencia}%` : undefined, tone: 'warning' as const },
               { label: 'Aula mayor', value: seccionMayor?.nombre ?? '—', sub: seccionMayor ? `${seccionMayor.pct_asistencia}%` : undefined, tone: 'success' as const },
@@ -606,10 +723,220 @@ function AdminInicio() {
 }
 
 /* ═══════════════════════════════════════════════════════════════
+   PANTALLA DOCENTE
+   ═══════════════════════════════════════════════════════════════ */
+function DocenteInicio() {
+  const { user } = useAuth()
+  const router = useRouter()
+
+  const now = new Date()
+  const horaStr = now.getHours() < 12 ? 'Buenos días' : now.getHours() < 19 ? 'Buenas tardes' : 'Buenas noches'
+  const fechaStr = now.toLocaleDateString('es-PE', { weekday: 'long', day: 'numeric', month: 'long', year: 'numeric' })
+  const todayDia = now.getDay() === 0 ? 7 : now.getDay()
+  const todayIso = `${now.getFullYear()}-${String(now.getMonth() + 1).padStart(2, '0')}-${String(now.getDate()).padStart(2, '0')}`
+
+  const docenteId = user?.docente?.id
+  const displayName = user?.docente
+    ? `${user.docente.nombre} ${user.docente.apellidos}`
+    : user?.email?.split('@')[0] ?? 'Docente'
+
+  const { data: horariosHoy } = useQuery({
+    queryKey: ['horarios', 'docente-inicio', todayDia, docenteId],
+    queryFn: () =>
+      api.get('/horarios', { params: { dia_semana: todayDia, docente_id: docenteId, limit: 20 } }).then((r) => r.data),
+    enabled: Boolean(docenteId),
+    staleTime: 60_000,
+  })
+
+  const { data: asistenciaPage } = useQuery({
+    queryKey: ['asistencia', 'docente-inicio', docenteId],
+    queryFn: () =>
+      api.get('/asistencia', { params: { docente_id: docenteId, limit: 10 } }).then((r) => r.data),
+    enabled: Boolean(docenteId),
+    staleTime: 30_000,
+    refetchInterval: 60_000,
+  })
+
+  const { data: comunicadosPage } = useQuery({
+    queryKey: ['comunicados', 'docente-inicio'],
+    queryFn: () => api.get('/comunicados', { params: { limit: 5 } }).then((r) => r.data),
+    staleTime: 60_000,
+  })
+
+  const clasesHoy: any[]    = horariosHoy?.data ?? []
+  const clasesEnCurso       = clasesHoy.filter((c: any) => isLive(c.horaInicio, c.horaFin))
+  const proximaClase        = clasesHoy.find((c: any) => {
+    const s = new Date(c.horaInicio).getUTCHours() * 60 + new Date(c.horaInicio).getUTCMinutes()
+    const cur = now.getUTCHours() * 60 + now.getUTCMinutes()
+    return s >= cur
+  })
+  const registros: any[]    = asistenciaPage?.data ?? []
+  const comunicados: any[]  = comunicadosPage?.data ?? []
+
+  return (
+    <div className="px-7 pt-[22px] pb-7 flex flex-col gap-4">
+      <PageHeader
+        title={`${horaStr}, ${displayName.split(' ')[0]}`}
+        crumbs={['Docente', 'Inicio']}
+      />
+
+      <p className="text-[12.5px] text-text-mute m-0 px-1">
+        <span className="text-text font-medium capitalize">{fechaStr}</span>
+      </p>
+
+      {/* KPIs */}
+      <div className="grid grid-cols-3 gap-3.5">
+        <KPI
+          label="Clases hoy"
+          value={clasesHoy.length}
+          sub={clasesEnCurso.length > 0 ? `${clasesEnCurso.length} en curso ahora` : 'programadas para hoy'}
+          accent="var(--color-primary)"
+        />
+        <KPI
+          label="Próxima clase"
+          value={proximaClase ? formatHora(proximaClase.horaInicio) : '—'}
+          sub={proximaClase ? `${proximaClase.curso?.nombre ?? '—'} · ${proximaClase.aula?.nombre ?? '—'}` : 'sin más clases hoy'}
+          accent="var(--color-info)"
+        />
+        <KPI
+          label="Mis marcaciones"
+          value={registros.length}
+          sub="últimas registradas"
+          accent="var(--color-success)"
+        />
+      </div>
+
+      <div className="grid gap-4" style={{ gridTemplateColumns: '1fr 340px' }}>
+        {/* Clases del día */}
+        <Card
+          title="Mis clases de hoy"
+          subtitle={clasesHoy.length > 0
+            ? `${clasesHoy.length} clase${clasesHoy.length !== 1 ? 's' : ''} · ${clasesEnCurso.length} en curso`
+            : 'Sin clases programadas'}
+          action={
+            <Btn variant="ghost" size="sm" onClick={() => router.push('/horarios')}>
+              <Calendar size={14} />Ver horario completo
+            </Btn>
+          }
+        >
+          {clasesHoy.length === 0 ? (
+            <p className="text-[12.5px] text-text-mute py-6 text-center">No tienes clases hoy.</p>
+          ) : (
+            <div className="flex flex-col">
+              {clasesHoy.map((c: any, i: number) => {
+                const live = isLive(c.horaInicio, c.horaFin)
+                return (
+                  <div
+                    key={c.id}
+                    className={cn(
+                      'flex gap-3 items-center py-2.5 px-2 rounded-2 transition-colors',
+                      i > 0 && 'border-t border-border-s',
+                      live && 'bg-success-light',
+                    )}
+                  >
+                    <div className={cn('font-mono text-[12.5px] font-semibold w-12 shrink-0', live ? 'text-success' : 'text-text')}>
+                      {formatHora(c.horaInicio)}
+                    </div>
+                    <div className="flex-1 min-w-0">
+                      <div className="text-[13px] font-semibold leading-tight truncate">
+                        {c.curso?.nombre ?? '—'}
+                      </div>
+                      <div className="text-[11.5px] text-text-mute truncate mt-0.5">
+                        {c.aula?.nombre ?? '—'}
+                        {c.aula?.ciclo ? ` · ${c.aula.ciclo.nombre}` : ''}
+                      </div>
+                    </div>
+                    <div className="shrink-0">
+                      {live ? (
+                        <Pill tone="success" className="text-[10px] flex items-center gap-1">
+                          <Dot tone="success" size={5} />En curso
+                        </Pill>
+                      ) : (
+                        <span className="font-mono text-[11px] text-text-mute">
+                          {formatHora(c.horaInicio)}–{formatHora(c.horaFin)}
+                        </span>
+                      )}
+                    </div>
+                  </div>
+                )
+              })}
+            </div>
+          )}
+        </Card>
+
+        {/* Panel derecho */}
+        <div className="flex flex-col gap-3.5">
+          {/* Mis últimas marcaciones */}
+          <Card
+            title="Mis marcaciones"
+            subtitle="Historial de asistencia reciente"
+            action={
+              <Btn variant="ghost" size="sm" onClick={() => router.push('/asistencia')}>
+                Ver todo
+              </Btn>
+            }
+          >
+            {registros.length === 0 ? (
+              <p className="text-[12.5px] text-text-mute py-4 text-center">Sin marcaciones registradas.</p>
+            ) : (
+              <div className="flex flex-col">
+                {registros.slice(0, 5).map((r: any, i: number) => (
+                  <div key={r.id} className={cn('flex items-center gap-2.5 py-2', i > 0 && 'border-t border-border-s')}>
+                    <div className="flex-1 min-w-0">
+                      <div className="text-[12px] font-medium text-text">
+                        {new Date(r.fecha).toLocaleDateString('es-PE', { weekday: 'short', day: '2-digit', month: 'short' })}
+                      </div>
+                      <div className="text-[10.5px] text-text-mute font-mono">
+                        {formatHoraLocal(r.horaIngreso)}
+                      </div>
+                    </div>
+                    <Pill
+                      tone={r.esAusente ? 'danger' : r.esTardanza ? 'warning' : 'success'}
+                      className="text-[10px] shrink-0"
+                    >
+                      {r.esAusente ? 'Ausente' : r.esTardanza ? 'Tardanza' : 'Puntual'}
+                    </Pill>
+                  </div>
+                ))}
+              </div>
+            )}
+          </Card>
+
+          {/* Comunicados recientes */}
+          <Card
+            title="Comunicados"
+            subtitle="Últimos publicados"
+            action={
+              <Btn variant="ghost" size="sm" onClick={() => router.push('/comunicados')}>
+                Ver todos
+              </Btn>
+            }
+          >
+            {comunicados.length === 0 ? (
+              <p className="text-[12.5px] text-text-mute py-4 text-center">Sin comunicados.</p>
+            ) : (
+              <div className="flex flex-col">
+                {comunicados.map((c: any, i: number) => (
+                  <div key={c.id} className={cn('py-2', i > 0 && 'border-t border-border-s')}>
+                    <div className="text-[12.5px] font-medium line-clamp-2">{c.titulo}</div>
+                    <div className="text-[11px] text-text-mute mt-0.5">{timeAgo(c.createdAt)}</div>
+                  </div>
+                ))}
+              </div>
+            )}
+          </Card>
+        </div>
+      </div>
+    </div>
+  )
+}
+
+/* ═══════════════════════════════════════════════════════════════
    ROUTER DE ROLES
    ═══════════════════════════════════════════════════════════════ */
 export default function InicioPage() {
   const { user } = useAuth()
   if (user?.rol === 'vigilante') return <VigilanteInicio />
+  if (user?.rol === 'docente')   return <DocenteInicio />
   return <AdminInicio />
 }

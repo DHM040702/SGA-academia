@@ -31,21 +31,21 @@ export class ComunicadosController {
   constructor(private readonly service: ComunicadosService) {}
 
   @Get()
-  @Roles(Rol.admin, Rol.director, Rol.alumno, Rol.apoderado, Rol.vigilante)
+  @Roles(Rol.admin, Rol.director, Rol.docente, Rol.alumno, Rol.apoderado, Rol.vigilante)
   @ApiOperation({ summary: 'Listar comunicados paginados' })
-  findAll(@Query() dto: PaginationDto) {
-    return this.service.findAll(dto);
+  findAll(@Query() dto: PaginationDto, @CurrentUser() user: { id: string; rol: string }) {
+    return this.service.findAll(dto, user.rol);
   }
 
   @Get(':id')
-  @Roles(Rol.admin, Rol.director, Rol.alumno, Rol.apoderado, Rol.vigilante)
+  @Roles(Rol.admin, Rol.director, Rol.docente, Rol.alumno, Rol.apoderado, Rol.vigilante)
   @ApiOperation({ summary: 'Detalle de un comunicado' })
   findOne(@Param('id', ParseUUIDPipe) id: string) {
     return this.service.findOne(id);
   }
 
   @Post()
-  @Roles(Rol.admin, Rol.director)
+  @Roles(Rol.admin, Rol.director, Rol.vigilante)
   @ApiOperation({ summary: 'Crear comunicado y enviar a roles destino' })
   create(@Body() dto: CreateComunicadoDto, @CurrentUser() user: { id: string }) {
     return this.service.create(dto, user.id);
@@ -71,7 +71,7 @@ export class ComunicadosController {
 
   @Post(':id/leer')
   @HttpCode(HttpStatus.OK)
-  @Roles(Rol.admin, Rol.director, Rol.alumno, Rol.apoderado, Rol.vigilante)
+  @Roles(Rol.admin, Rol.director, Rol.docente, Rol.alumno, Rol.apoderado, Rol.vigilante)
   @ApiOperation({ summary: 'Marcar comunicado como leído por el usuario actual' })
   marcarLeido(
     @Param('id', ParseUUIDPipe) id: string,

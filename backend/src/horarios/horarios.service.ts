@@ -23,13 +23,14 @@ export class HorariosService {
   constructor(private prisma: PrismaService) {}
 
   async findAll(dto: FilterHorariosDto) {
-    const { page = 1, limit = 50, aula_id, docente_id, dia_semana } = dto;
+    const { page = 1, limit = 50, aula_id, docente_id, dia_semana, publicado } = dto;
     const skip = (page - 1) * limit;
 
     const where: any = {};
-    if (aula_id)   where.aulaId    = aula_id;
-    if (docente_id) where.docenteId = docente_id;
+    if (aula_id)             where.aulaId    = aula_id;
+    if (docente_id)          where.docenteId = docente_id;
     if (dia_semana !== undefined) where.diaSemana = dia_semana;
+    if (publicado !== undefined)  where.publicado  = publicado;
 
     const [items, total] = await Promise.all([
       this.prisma.horario.findMany({

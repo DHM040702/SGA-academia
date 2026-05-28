@@ -1,11 +1,12 @@
 import { useQuery, useMutation, useQueryClient } from '@tanstack/react-query'
 import api from '@/lib/api'
+import { useAuth } from '@/contexts/auth-context'
 
 export interface Comunicado {
   id: string
   titulo: string
   cuerpo: string
-  destinatarioTipo: 'todos' | 'alumnos' | 'apoderados' | 'seccion' | 'usuario'
+  destinatarioTipo: 'todos' | 'alumnos' | 'apoderados' | 'docentes' | 'seccion' | 'usuario'
   aulaId?: string | null
   canalSistema: boolean
   canalWhatsapp: boolean
@@ -42,7 +43,7 @@ export interface FilterComunicados {
 export interface CreateComunicadoDto {
   titulo: string
   cuerpo: string
-  destinatario_tipo?: 'todos' | 'alumnos' | 'apoderados' | 'seccion' | 'usuario'
+  destinatario_tipo?: 'todos' | 'alumnos' | 'apoderados' | 'docentes' | 'seccion' | 'usuario'
   aula_id?: string
   canal_sistema?: boolean
   canal_whatsapp?: boolean
@@ -59,8 +60,12 @@ export interface UpdateComunicadoDto {
 }
 
 export function useComunicados(filters: FilterComunicados = {}) {
+  // Incluir el rol en la query key para que cada rol tenga su propio bucket
+  // de caché y no se mezclen datos entre usuarios de distintos roles
+  const { user } = useAuth()
+  const rol = user?.rol ?? 'anonymous'
   return useQuery<PaginatedComunicados>({
-    queryKey: ['comunicados', filters],
+    queryKey: ['comunicados', rol, filters],
     queryFn: async () => {
       const { data } = await api.get('/comunicados', { params: filters })
       return data

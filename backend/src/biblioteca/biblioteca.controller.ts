@@ -31,21 +31,21 @@ export class BibliotecaController {
   constructor(private readonly service: BibliotecaService) {}
 
   @Get()
-  @Roles(Rol.admin, Rol.director, Rol.alumno, Rol.apoderado, Rol.vigilante)
+  @Roles(Rol.admin, Rol.director, Rol.docente, Rol.alumno, Rol.apoderado, Rol.vigilante)
   @ApiOperation({ summary: 'Listar recursos de biblioteca con filtros' })
   findAll(@Query() dto: FilterBibliotecaDto) {
     return this.service.findAll(dto);
   }
 
   @Get('stats')
-  @Roles(Rol.admin, Rol.director, Rol.alumno, Rol.apoderado)
+  @Roles(Rol.admin, Rol.director, Rol.docente, Rol.alumno, Rol.apoderado)
   @ApiOperation({ summary: 'Estadísticas de la biblioteca digital' })
   stats() {
     return this.service.stats();
   }
 
   @Get(':id')
-  @Roles(Rol.admin, Rol.director, Rol.alumno, Rol.apoderado, Rol.vigilante)
+  @Roles(Rol.admin, Rol.director, Rol.docente, Rol.alumno, Rol.apoderado, Rol.vigilante)
   @ApiOperation({ summary: 'Detalle de un recurso de biblioteca' })
   findOne(@Param('id', ParseUUIDPipe) id: string) {
     return this.service.findOne(id);

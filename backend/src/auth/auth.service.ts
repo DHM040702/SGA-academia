@@ -12,9 +12,9 @@ export class AuthService {
     private config: ConfigService,
   ) {}
 
-  async validateUser(email: string, password: string) {
+  async validateUser(dni: string, password: string) {
     const user = await this.prisma.usuario.findFirst({
-      where: { email, deletedAt: null },
+      where: { dni, deletedAt: null },
     });
     if (!user || !user.activo) return null;
 
@@ -56,6 +56,9 @@ export class AuthService {
         email: true,
         rol: true,
         activo: true,
+        nombre:    true,
+        apellidos: true,
+        dni:       true,
         alumno:    { select: { id: true, nombre: true, apellidos: true, codigoBarras: true, aulaId: true } },
         docente:   { select: { id: true, nombre: true, apellidos: true } },
         apoderado: { select: { id: true, nombre: true, apellidos: true } },

@@ -9,6 +9,13 @@ import { Field } from '@/components/ui/field'
 import { Input } from '@/components/ui/input'
 import { useUsuario, useUpdateUsuario, ROL_LABELS } from '@/hooks/use-usuarios'
 import { useAuth } from '@/contexts/auth-context'
+import { useAlumnos, type Alumno } from '@/hooks/use-alumnos'
+import {
+  useAlumnosByApoderado,
+  useVincularApoderadoGenerico,
+  useDesvincularApoderadoGenerico,
+  PARENTESCO_OPTS,
+} from '@/hooks/use-apoderados'
 
 const SELECT_CLS =
   'w-full px-3 py-2 text-[13px] border border-border rounded-2 bg-surface text-text focus:outline-none focus:ring-1 focus:ring-primary disabled:opacity-50'
@@ -20,11 +27,15 @@ interface FormValues {
   password: string
   rol: string
   activo: string
-  // Perfil apoderado
+  // Datos personales — admin / director / vigilante (en tabla usuarios)
   nombre: string
   apellidos: string
-  dni: string
-  telefono_whatsapp: string
+  dni: string          // usuarios.dni — DNI de acceso al sistema
+  // Perfil apoderado (tabla apoderados)
+  ap_nombre: string
+  ap_apellidos: string
+  ap_dni: string       // apoderados.dni — se sincroniza con usuarios.dni al guardar
+  ap_telefono_whatsapp: string
 }
 
 export default function EditarUsuarioPage() {
@@ -40,24 +51,30 @@ export default function EditarUsuarioPage() {
     register,
     handleSubmit,
     reset,
-    watch,
     formState: { errors, isSubmitting, isDirty },
   } = useForm<FormValues>()
 
   const rolActual = usuario?.rol
 
+  // Roles que guardan nombre/apellidos/dni en la tabla usuarios directamente
+  const tieneDatosEnUsuario = rolActual === 'admin' || rolActual === 'director' || rolActual === 'vigilante'
+
   React.useEffect(() => {
     if (!usuario) return
-    const ap = usuario.apoderado
     reset({
-      email:              usuario.email,
-      password:           '',
-      rol:                usuario.rol,
-      activo:             String(usuario.activo),
-      nombre:             ap?.nombre   ?? '',
-      apellidos:          ap?.apellidos ?? '',
-      dni:                '',
-      telefono_whatsapp:  '',
+      email:    usuario.email,
+      password: '',
+      rol:      usuario.rol,
+      activo:   String(usuario.activo),
+      // Admin / director / vigilante
+      nombre:    usuario.nombre    ?? '',
+      apellidos: usuario.apellidos ?? '',
+      dni:       usuario.dni       ?? '',
+      // Apoderado — nombre/apellidos del perfil vinculado; DNI en blanco (campo "nuevo valor")
+      ap_nombre:            usuario.apoderado?.nombre    ?? '',
+      ap_apellidos:         usuario.apoderado?.apellidos ?? '',
+      ap_dni:               '',
+      ap_telefono_whatsapp: '',
     })
   }, [usuario, reset])
 
@@ -68,14 +85,24 @@ export default function EditarUsuarioPage() {
     dto.rol    = values.rol
     dto.activo = values.activo === 'true'
 
-    // Enviar cambios de perfil solo para apoderado
+    if (tieneDatosEnUsuario) {
+      // Admin / director / vigilante: nombre, apellidos y DNI van en el usuario directamente
+      if (values.nombre)    dto.nombre    = values.nombre
+      if (values.apellidos) dto.apellidos = values.apellidos
+      if (values.dni)       dto.dni       = values.dni
+    }
+
     if (rolActual === 'apoderado') {
+      // Perfil apoderado
       const perfil: Record<string, string> = {}
-      if (values.nombre)            perfil.nombre            = values.nombre
-      if (values.apellidos)         perfil.apellidos         = values.apellidos
-      if (values.dni)               perfil.dni               = values.dni
-      if (values.telefono_whatsapp) perfil.telefono_whatsapp = values.telefono_whatsapp
-      if (Object.keys(perfil).length) dto.perfil = perfil
+      if (values.ap_nombre)            perfil.nombre            = values.ap_nombre
+      if (values.ap_apellidos)         perfil.apellidos         = values.ap_apellidos
+      if (values.ap_dni)               perfil.dni               = values.ap_dni
+      if (values.ap_telefono_whatsapp) perfil.telefono_whatsapp = values.ap_telefono_whatsapp
+      if (Object.keys(perfil).length)  dto.perfil               = perfil
+
+      // Sincronizar usuarios.dni cuando cambia el DNI del apoderado
+      if (values.ap_dni) dto.dni = values.ap_dni
     }
 
     try {
@@ -85,6 +112,57 @@ export default function EditarUsuarioPage() {
       alert(err?.response?.data?.message ?? 'Error al guardar')
     }
   }
+
+  // ── Alumnos vinculados (solo para apoderado) ─────────────────────
+  const { data: alumnosVinculados = [], isLoading: alLoading } =
+    useAlumnosByApoderado(rolActual === 'apoderado' ? id : '')
+  const vincularAl    = useVincularApoderadoGenerico()
+  const desvincularAl = useDesvincularApoderadoGenerico()
+
+  const [showAddAl,    setShowAddAl]    = React.useState(false)
+  const [alSearchQ,    setAlSearchQ]    = React.useState('')
+  const [alSeleccionado, setAlSeleccionado] = React.useState<Alumno | null>(null)
+  const [alParentesco, setAlParentesco] = React.useState<string>(PARENTESCO_OPTS[0])
+
+  const { data: alSearchPage } = useAlumnos({ q: alSearchQ, limit: 10 })
+  const alResultados = alSearchQ.trim().length >= 2 ? (alSearchPage?.data ?? []) : []
+
+  function resetAlPanel() {
+    setShowAddAl(false)
+    setAlSearchQ('')
+    setAlSeleccionado(null)
+    setAlParentesco(PARENTESCO_OPTS[0])
+  }
+
+  async function handleVincularAlumno() {
+    if (!alSeleccionado) { alert('Selecciona un alumno'); return }
+    if (!usuario?.apoderado) { alert('Este usuario no tiene perfil de apoderado'); return }
+    try {
+      await vincularAl.mutateAsync({
+        alumnoId: alSeleccionado.id,
+        dto: {
+          accion:       'existente',
+          apoderado_id: usuario.apoderado.id,
+          parentesco:   alParentesco,
+          es_principal: false,
+        },
+      })
+      resetAlPanel()
+    } catch (err: any) {
+      alert(err?.response?.data?.message ?? 'Error al vincular')
+    }
+  }
+
+  async function handleDesvincularAlumno(alumnoId: string, apoderadoId: string, nombre: string) {
+    if (!confirm(`¿Desvincular al alumno ${nombre} de este apoderado?`)) return
+    try {
+      await desvincularAl.mutateAsync({ alumnoId, apoderadoId })
+    } catch (err: any) {
+      alert(err?.response?.data?.message ?? 'Error al desvincular')
+    }
+  }
+
+  // ─────────────────────────────────────────────────────────────────
 
   if (isLoading) return (
     <div className="flex items-center justify-center h-64 text-text-mute text-sm">Cargando…</div>
@@ -139,9 +217,9 @@ export default function EditarUsuarioPage() {
           </div>
         </Card>
 
-        {/* Perfil apoderado editable */}
-        {rolActual === 'apoderado' && (
-          <Card title="Datos del apoderado" className="mt-4">
+        {/* Datos personales para admin / director / vigilante */}
+        {tieneDatosEnUsuario && (
+          <Card title="Datos personales" className="mt-4">
             <div className="grid grid-cols-2 gap-4 p-1">
               <Field label="Nombres" error={errors.nombre?.message}>
                 <Input
@@ -155,24 +233,83 @@ export default function EditarUsuarioPage() {
                   {...register('apellidos', { minLength: { value: 2, message: 'Mínimo 2 caracteres' } })}
                 />
               </Field>
-              <Field label="Nuevo DNI" error={errors.dni?.message}>
+              <Field
+                label="DNI de ingreso"
+                error={errors.dni?.message}
+              >
                 <Input
-                  placeholder="Dejar vacío para no cambiar"
-                  maxLength={8}
+                  placeholder="12345678"
+                  inputMode="numeric"
+                  maxLength={12}
                   {...register('dni', {
-                    pattern: { value: /^(\d{8})?$/, message: 'DNI debe tener 8 dígitos' },
+                    pattern: {
+                      value: /^(\d{8,12})?$/,
+                      message: 'DNI debe tener entre 8 y 12 dígitos',
+                    },
+                    onChange: (e) => {
+                      e.target.value = e.target.value.replace(/\D/g, '')
+                    },
                   })}
                 />
+                <p className="mt-1 text-[11.5px] text-text-mute">
+                  Con este DNI el usuario inicia sesión.
+                </p>
               </Field>
-              <Field label="Teléfono WhatsApp" error={errors.telefono_whatsapp?.message}>
+            </div>
+          </Card>
+        )}
+
+        {/* Perfil apoderado editable */}
+        {rolActual === 'apoderado' && (
+          <Card title="Datos del apoderado" className="mt-4">
+            <div className="grid grid-cols-2 gap-4 p-1">
+              <Field label="Nombres" error={errors.ap_nombre?.message}>
+                <Input
+                  placeholder="Juan Carlos"
+                  {...register('ap_nombre', { minLength: { value: 2, message: 'Mínimo 2 caracteres' } })}
+                />
+              </Field>
+              <Field label="Apellidos" error={errors.ap_apellidos?.message}>
+                <Input
+                  placeholder="García Mendoza"
+                  {...register('ap_apellidos', { minLength: { value: 2, message: 'Mínimo 2 caracteres' } })}
+                />
+              </Field>
+              <Field
+                label="Nuevo DNI"
+                error={errors.ap_dni?.message}
+              >
                 <Input
                   placeholder="Dejar vacío para no cambiar"
-                  {...register('telefono_whatsapp', {
+                  inputMode="numeric"
+                  maxLength={8}
+                  {...register('ap_dni', {
+                    pattern: { value: /^(\d{8})?$/, message: 'DNI debe tener 8 dígitos' },
+                    onChange: (e) => {
+                      e.target.value = e.target.value.replace(/\D/g, '')
+                    },
+                  })}
+                />
+                <p className="mt-1 text-[11.5px] text-text-mute">
+                  Actualiza también el DNI de ingreso al sistema.
+                </p>
+              </Field>
+              <Field label="Teléfono WhatsApp" error={errors.ap_telefono_whatsapp?.message}>
+                <Input
+                  placeholder="Dejar vacío para no cambiar"
+                  {...register('ap_telefono_whatsapp', {
                     minLength: { value: 7, message: 'Mínimo 7 caracteres' },
                   })}
                 />
               </Field>
             </div>
+
+            {/* DNI de ingreso actual */}
+            {usuario.dni && (
+              <p className="mt-3 px-1 text-[11.5px] text-text-mute">
+                DNI de ingreso actual: <strong className="text-text font-medium">{usuario.dni}</strong>
+              </p>
+            )}
           </Card>
         )}
 
@@ -228,6 +365,152 @@ export default function EditarUsuarioPage() {
           </Btn>
         </div>
       </form>
+
+      {/* ── Alumnos vinculados (sección independiente, solo para apoderado) ── */}
+      {rolActual === 'apoderado' && (
+        <Card title="Alumnos vinculados">
+          {alLoading ? (
+            <p className="p-3 text-sm text-text-mute">Cargando alumnos…</p>
+          ) : alumnosVinculados.length === 0 ? (
+            <p className="px-3 py-2.5 text-[13px] text-text-mute">Sin alumnos vinculados.</p>
+          ) : (
+            <ul className="divide-y divide-border">
+              {alumnosVinculados.map((av) => (
+                <li key={av.alumnoId} className="flex items-center justify-between py-2.5 px-3">
+                  <div className="min-w-0 flex-1">
+                    <div className="flex items-center gap-2 flex-wrap">
+                      <span className="text-[13px] font-medium text-text">
+                        {av.alumno.nombre} {av.alumno.apellidos}
+                      </span>
+                      {av.esPrincipal && (
+                        <span className="text-[10.5px] font-semibold uppercase tracking-wide bg-primary/10 text-primary px-1.5 py-0.5 rounded">
+                          Principal
+                        </span>
+                      )}
+                    </div>
+                    <p className="text-[11.5px] text-text-mute mt-0.5 truncate">
+                      {av.parentesco}
+                      {av.alumno.aula && (
+                        <><span className="mx-1">·</span>{av.alumno.aula.nombre}</>
+                      )}
+                      {av.alumno.carrera && (
+                        <><span className="mx-1">·</span>{av.alumno.carrera.nombre}</>
+                      )}
+                    </p>
+                  </div>
+                  <button
+                    type="button"
+                    onClick={() =>
+                      handleDesvincularAlumno(
+                        av.alumnoId,
+                        av.apoderadoId,
+                        `${av.alumno.nombre} ${av.alumno.apellidos}`,
+                      )
+                    }
+                    disabled={desvincularAl.isPending}
+                    className="ml-4 shrink-0 text-[12px] text-danger hover:underline disabled:opacity-40"
+                  >
+                    Desvincular
+                  </button>
+                </li>
+              ))}
+            </ul>
+          )}
+
+          {/* Panel para vincular un alumno adicional */}
+          {!showAddAl ? (
+            <div className="px-3 py-2.5">
+              <button
+                type="button"
+                onClick={() => setShowAddAl(true)}
+                className="text-[13px] text-primary hover:underline font-medium"
+              >
+                + Vincular alumno
+              </button>
+            </div>
+          ) : (
+            <div className="border-t border-border p-3 space-y-3">
+              <div className="relative">
+                <Input
+                  placeholder="Buscar alumno por nombre, apellidos o DNI…"
+                  value={alSearchQ}
+                  onChange={(e) => {
+                    setAlSearchQ(e.target.value)
+                    setAlSeleccionado(null)
+                  }}
+                />
+                {alResultados.length > 0 && !alSeleccionado && (
+                  <ul className="absolute z-20 top-full left-0 right-0 mt-1 bg-surface border border-border rounded-2 shadow-lg max-h-44 overflow-y-auto">
+                    {alResultados.map((a) => (
+                      <li
+                        key={a.id}
+                        className="px-3 py-2 text-[13px] cursor-pointer hover:bg-surface-alt"
+                        onClick={() => {
+                          setAlSeleccionado(a)
+                          setAlSearchQ('')
+                        }}
+                      >
+                        <span className="font-medium">{a.nombres} {a.apellidos}</span>
+                        <span className="ml-2 text-text-mute text-[11.5px]">DNI {a.dni}</span>
+                        {a.aula && (
+                          <span className="ml-2 text-text-mute text-[11.5px]">{a.aula.nombre}</span>
+                        )}
+                      </li>
+                    ))}
+                  </ul>
+                )}
+              </div>
+
+              {alSeleccionado && (
+                <div className="flex items-center gap-2 bg-primary/5 border border-primary/20 rounded px-3 py-2">
+                  <div className="flex-1 min-w-0">
+                    <span className="text-[13px] font-medium text-text">
+                      {alSeleccionado.nombres} {alSeleccionado.apellidos}
+                    </span>
+                    <span className="ml-2 text-[11.5px] text-text-mute">
+                      DNI {alSeleccionado.dni}
+                    </span>
+                  </div>
+                  <button
+                    type="button"
+                    onClick={() => setAlSeleccionado(null)}
+                    className="shrink-0 text-text-mute hover:text-text text-[12px] leading-none"
+                  >
+                    ✕
+                  </button>
+                </div>
+              )}
+
+              <div className="flex items-end gap-3 pt-1">
+                <Field label="Parentesco" required className="flex-1">
+                  <select
+                    value={alParentesco}
+                    onChange={(e) => setAlParentesco(e.target.value)}
+                    className={SELECT_CLS}
+                  >
+                    {PARENTESCO_OPTS.map((p) => (
+                      <option key={p} value={p}>{p}</option>
+                    ))}
+                  </select>
+                </Field>
+                <div className="flex gap-2 pb-px">
+                  <Btn variant="secondary" size="sm" type="button" onClick={resetAlPanel}>
+                    Cancelar
+                  </Btn>
+                  <Btn
+                    size="sm"
+                    type="button"
+                    onClick={handleVincularAlumno}
+                    disabled={vincularAl.isPending || !alSeleccionado}
+                  >
+                    {vincularAl.isPending ? 'Vinculando…' : 'Vincular'}
+                  </Btn>
+                </div>
+              </div>
+            </div>
+          )}
+        </Card>
+      )}
     </div>
   )
 }

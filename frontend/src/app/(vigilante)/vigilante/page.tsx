@@ -123,7 +123,7 @@ export default function VigilantePage() {
       className="w-full h-full flex overflow-hidden select-none"
       style={{ background: bg, color: '#fff', fontFamily: 'Inter, system-ui, sans-serif', transition: 'background 0.4s' }}
     >
-      {/* ════════════════ MAIN KIOSK ════════════════ */}
+      {/* ════════════════ REGISTRO DE ASISTENCIA ════════════════ */}
       <div className="flex-1 min-w-0 flex flex-col overflow-hidden">
 
         {/* ── Top bar ── */}
@@ -360,10 +360,10 @@ export default function VigilantePage() {
 
           <div className="w-px h-7 flex-shrink-0" style={{ background: 'rgba(255,255,255,.12)' }} />
 
-          <KioskoStat n={presentes + tardanzas} l="Presentes" />
-          <KioskoStat n={tardanzas} l="Tardanzas" />
-          <KioskoStat n={feed.length} l="Total" />
-          <KioskoStat
+          <RegistroStat n={presentes + tardanzas} l="Presentes" />
+          <RegistroStat n={tardanzas} l="Tardanzas" />
+          <RegistroStat n={feed.length} l="Total" />
+          <RegistroStat
             n={feed.length > 0 ? `${Math.round(((presentes + tardanzas) / feed.length) * 100)}%` : '—'}
             l="Asistencia"
             highlight
@@ -488,7 +488,7 @@ function FeedPanel({ feed, onClose }: { feed: any[]; onClose?: () => void }) {
 }
 
 /* ─── Sub-components ──────────────────────────────────────────── */
-function KioskoStat({ n, l, highlight }: { n: string | number; l: string; highlight?: boolean }) {
+function RegistroStat({ n, l, highlight }: { n: string | number; l: string; highlight?: boolean }) {
   return (
     <div className="flex-shrink-0">
       <div

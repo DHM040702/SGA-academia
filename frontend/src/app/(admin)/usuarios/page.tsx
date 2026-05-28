@@ -129,9 +129,13 @@ export default function UsuariosPage() {
                 <tr key={u.id} className="border-b border-border last:border-0 hover:bg-surface2 transition-colors">
                   <td className="px-4 py-3">
                     <div className="flex items-center gap-2.5">
-                      <Avatar name={u.email} size={28} />
+                      <Avatar name={u.nombre ?? u.email} size={28} />
                       <div>
-                        <div className="font-medium text-text">{u.email}</div>
+                        {(u.nombre || u.apellidos) && (
+                          <div className="font-medium text-text">{u.nombre} {u.apellidos}</div>
+                        )}
+                        <div className={u.nombre ? 'text-[11.5px] text-text-mute' : 'font-medium text-text'}>{u.email}</div>
+                        {u.dni && <div className="text-[11px] text-text-mute font-mono">DNI {u.dni}</div>}
                         {esYo && <div className="text-[11px] text-primary font-medium">Tú</div>}
                       </div>
                     </div>

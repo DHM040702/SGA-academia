@@ -21,7 +21,7 @@ import { JustificarAusenciaDto } from './dto/justificar-ausencia.dto';
 export class AsistenciaController {
   constructor(private readonly service: AsistenciaService) {}
 
-  /** POST /asistencia/scan — kiosko vigilante (Bearer del vigilante) */
+  /** POST /asistencia/scan — registro de asistencia del vigilante (Bearer del vigilante) */
   @Post('scan')
   @HttpCode(HttpStatus.OK)
   @ApiBearerAuth('access-token')
@@ -37,7 +37,7 @@ export class AsistenciaController {
   @HttpCode(HttpStatus.OK)
   @ApiBearerAuth('access-token')
   @UseGuards(JwtAuthGuard, RolesGuard)
-  @Roles(Rol.admin, Rol.director)
+  @Roles(Rol.admin, Rol.director, Rol.vigilante)
   @ApiOperation({ summary: 'Cerrar turno: registrar ausencia para alumnos sin asistencia del día' })
   cerrarTurno(@Body() dto: CerrarTurnoDto, @CurrentUser() user: { id: string }) {
     return this.service.cerrarTurno(dto, user.id);
@@ -58,7 +58,7 @@ export class AsistenciaController {
   @Get('stats')
   @ApiBearerAuth('access-token')
   @UseGuards(JwtAuthGuard, RolesGuard)
-  @Roles(Rol.admin, Rol.director, Rol.vigilante)
+  @Roles(Rol.admin, Rol.director, Rol.docente, Rol.vigilante)
   @ApiOperation({ summary: 'Estadísticas de asistencia del día actual' })
   stats() {
     return this.service.stats();
@@ -68,7 +68,7 @@ export class AsistenciaController {
   @Get()
   @ApiBearerAuth('access-token')
   @UseGuards(JwtAuthGuard, RolesGuard)
-  @Roles(Rol.admin, Rol.director, Rol.alumno, Rol.apoderado, Rol.vigilante)
+  @Roles(Rol.admin, Rol.director, Rol.docente, Rol.alumno, Rol.apoderado, Rol.vigilante)
   @ApiOperation({ summary: 'Listar asistencias paginadas con filtros' })
   findAll(@Query() dto: FilterAsistenciaDto) {
     return this.service.findAll(dto);

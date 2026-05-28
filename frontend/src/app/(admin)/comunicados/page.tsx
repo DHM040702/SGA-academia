@@ -11,20 +11,24 @@ import {
   type CreateComunicadoDto,
 } from '@/hooks/use-comunicados'
 import { useAulas } from '@/hooks/use-ciclos'
+import { useAuth } from '@/contexts/auth-context'
 import { Pill } from '@/components/ui/pill'
 import { Dot } from '@/components/ui/dot'
 import { Card } from '@/components/ui/card'
 import { Btn } from '@/components/ui/btn'
+import { Field } from '@/components/ui/field'
+import { Input } from '@/components/ui/input'
 import { PageHeader } from '@/components/layout/page-header'
 import { Plus, Search, Edit, Trash, Bell, Phone, Send, X, MoreHorizontal } from '@/components/icons'
 
 /* ─── types ──────────────────────────────────────────────────────── */
-type Tab = 'Todos' | 'Enviados' | 'Borradores'
+type Tab = 'Todos' | 'Enviados' | 'Borradores' | 'Recibidos'
 
 const DESTINATARIO_OPTS = [
-  { value: 'todos',      label: 'Todos (alumnos + apoderados)' },
+  { value: 'todos',      label: 'Todos (alumnos + apoderados + docentes)' },
   { value: 'alumnos',    label: 'Solo alumnos' },
   { value: 'apoderados', label: 'Solo apoderados' },
+  { value: 'docentes',   label: 'Solo docentes' },
   { value: 'seccion',    label: 'Aula específica' },
 ]
 
@@ -32,6 +36,7 @@ const DESTINATARIO_LABEL: Record<string, string> = {
   todos:      'Todos',
   alumnos:    'Alumnos',
   apoderados: 'Apoderados',
+  docentes:   'Docentes',
   seccion:    'Aula específica',
   usuario:    'Usuario específico',
 }
@@ -162,7 +167,7 @@ function DeleteConfirmModal({
 function NuevoComunicadoModal({ onClose }: { onClose: () => void }) {
   const [titulo, setTitulo]           = useState('')
   const [cuerpo, setCuerpo]           = useState('')
-  const [destinatario, setDestinatario] = useState<CreateComunicadoDto['destinatario_tipo']>('todos')
+  const [destinatario, setDestinatario] = useState<NonNullable<CreateComunicadoDto['destinatario_tipo']>>('todos')
   const [aulaId, setAulaId]           = useState('')
   const [canalSistema, setCanalSistema] = useState(true)
   const [canalWhatsapp, setCanalWhatsapp] = useState(false)
@@ -417,9 +422,90 @@ function EditarComunicadoModal({
   )
 }
 
+/* ─── Modal simplificado para vigilante ──────────────────────────── */
+function NuevoAvisoModal({ onClose }: { onClose: () => void }) {
+  const [titulo, setTitulo] = useState('')
+  const [cuerpo, setCuerpo] = useState('')
+  const createMut = useCreateComunicado()
+
+  async function handleSubmit() {
+    if (!titulo.trim() || !cuerpo.trim()) return
+    await createMut.mutateAsync({
+      titulo:           titulo.trim(),
+      cuerpo:           cuerpo.trim(),
+      destinatario_tipo: 'todos',
+      canal_sistema:    true,
+      canal_whatsapp:   false,
+      publicar_ahora:   true,
+    })
+    onClose()
+  }
+
+  return (
+    <div
+      className="fixed inset-0 z-50 flex items-center justify-center"
+      style={{ background: 'rgba(0,0,0,0.45)', backdropFilter: 'blur(2px)' }}
+    >
+      <div className="w-[500px] bg-surface rounded-4 shadow-3 border border-border overflow-hidden">
+        <header className="px-5 py-4 border-b border-border flex items-center justify-between">
+          <h2 className="font-serif text-[20px] font-semibold">Nuevo aviso</h2>
+          <button onClick={onClose} className="p-1 bg-transparent border-none cursor-pointer text-text-mute hover:text-text">
+            <X size={16} />
+          </button>
+        </header>
+        <div className="p-5 flex flex-col gap-4">
+          <Field label="Título" required>
+            <Input
+              value={titulo}
+              onChange={(e) => setTitulo(e.target.value)}
+              placeholder="Ej: Corte de luz en pabellón B"
+            />
+          </Field>
+          <Field label="Mensaje" required>
+            <textarea
+              value={cuerpo}
+              onChange={(e) => setCuerpo(e.target.value)}
+              rows={4}
+              className="w-full px-3 py-2 text-[13px] border border-border rounded-2 bg-surface resize-none focus:outline-none focus:ring-1 focus:ring-primary"
+              placeholder="Describa el incidente o aviso…"
+            />
+          </Field>
+          <p className="text-[11.5px] text-text-mute -mt-2">
+            El aviso se publicará inmediatamente en el panel interno para todos.
+          </p>
+          <div className="flex justify-end gap-2 pt-2 border-t border-border-s">
+            <Btn variant="secondary" size="sm" onClick={onClose} type="button">Cancelar</Btn>
+            <Btn
+              size="sm"
+              type="button"
+              disabled={createMut.isPending || !titulo.trim() || !cuerpo.trim()}
+              onClick={handleSubmit}
+            >
+              <Send size={13} />
+              {createMut.isPending ? 'Publicando…' : 'Publicar aviso'}
+            </Btn>
+          </div>
+        </div>
+      </div>
+    </div>
+  )
+}
+
 /* ─── Page ────────────────────────────────────────────────────────── */
 export default function ComunicadosPage() {
-  const [tab, setTab]             = useState<Tab>('Todos')
+  const { user } = useAuth()
+  const esAdmin     = user?.rol === 'admin' || user?.rol === 'director'
+  const esVigilante = user?.rol === 'vigilante'
+  const esDocente   = user?.rol === 'docente'
+  const soloLectura = !esAdmin && !esVigilante  // docente, alumno, apoderado: solo lectura
+  const creadoBasico = esVigilante              // vigilante: crea avisos simples
+
+  // Admin/director ven tabs de gestión; el resto solo ve su bandeja de recibidos
+  const TABS_GESTION: Tab[] = ['Todos', 'Enviados', 'Borradores', 'Recibidos']
+  const TABS_RECEPTOR: Tab[] = ['Recibidos']
+  const tabsDisponibles = esAdmin ? TABS_GESTION : TABS_RECEPTOR
+
+  const [tab, setTab]             = useState<Tab>(esAdmin ? 'Todos' : 'Recibidos')
   const [q, setQ]                 = useState('')
   const [selectedId, setSelectedId] = useState<string | null>(null)
   const [showNew, setShowNew]     = useState(false)
@@ -437,6 +523,7 @@ export default function ComunicadosPage() {
     if (q && !c.titulo.toLowerCase().includes(q.toLowerCase())) return false
     if (tab === 'Enviados'   && !c.publicadoAt)  return false
     if (tab === 'Borradores' &&  c.publicadoAt)  return false
+    if (tab === 'Recibidos'  && !c.publicadoAt)  return false  // solo publicados
     return true
   })
 
@@ -460,12 +547,14 @@ export default function ComunicadosPage() {
   return (
     <>
       <PageHeader
-        title="Comunicados"
-        crumbs={[{ label: 'Comunicados' }]}
+        title={soloLectura ? 'Mis comunicados' : 'Comunicados'}
+        crumbs={[{ label: soloLectura ? 'Mis comunicados' : 'Comunicados' }]}
         action={
-          <Btn icon={<Plus size={14} />} size="sm" onClick={() => setShowNew(true)}>
-            Nuevo comunicado
-          </Btn>
+          soloLectura ? undefined : (
+            <Btn icon={<Plus size={14} />} size="sm" onClick={() => setShowNew(true)}>
+              {creadoBasico ? 'Nuevo aviso' : 'Nuevo comunicado'}
+            </Btn>
+          )
         }
       />
 
@@ -487,7 +576,7 @@ export default function ComunicadosPage() {
               />
             </div>
             <div className="flex gap-1 mt-2">
-              {(['Todos', 'Enviados', 'Borradores'] as Tab[]).map((t) => (
+              {tabsDisponibles.map((t) => (
                 <button
                   key={t}
                   onClick={() => setTab(t)}
@@ -525,6 +614,10 @@ export default function ComunicadosPage() {
                   </div>
                   <div className="text-[11.5px] text-text-mute mb-1.5 line-clamp-1">{c.cuerpo}</div>
                   <div className="flex items-center gap-1.5 text-[11px]">
+                    {/* Destinatario */}
+                    <span className="px-1.5 py-0.5 bg-primary-light rounded text-primary font-medium">
+                      {DESTINATARIO_LABEL[c.destinatarioTipo] ?? c.destinatarioTipo}
+                    </span>
                     {c.canalSistema && (
                       <span className="px-1.5 py-0.5 bg-surface2 rounded text-text-mute">Panel</span>
                     )}
@@ -544,7 +637,10 @@ export default function ComunicadosPage() {
             })}
             {filtered.length === 0 && (
               <div className="py-10 text-center text-[13px] text-text-mute">
-                Sin comunicados
+                {tab === 'Recibidos'  ? 'No tienes comunicados recibidos' :
+                 tab === 'Borradores' ? 'Sin borradores' :
+                 tab === 'Enviados'   ? 'Sin comunicados enviados' :
+                 'Sin comunicados'}
               </div>
             )}
           </div>
@@ -578,31 +674,33 @@ export default function ComunicadosPage() {
                 </div>
               </div>
 
-              <div className="flex items-center gap-1.5 shrink-0">
-                {!display.publicadoAt && (
+              {!soloLectura && !creadoBasico && (
+                <div className="flex items-center gap-1.5 shrink-0">
+                  {!display.publicadoAt && (
+                    <Btn
+                      size="sm"
+                      disabled={updateMut.isPending}
+                      onClick={() => handlePublicar(display)}
+                    >
+                      <Send size={13} />
+                      Publicar
+                    </Btn>
+                  )}
                   <Btn
+                    variant="secondary"
                     size="sm"
-                    disabled={updateMut.isPending}
-                    onClick={() => handlePublicar(display)}
+                    onClick={() => setEditTarget(display)}
                   >
-                    <Send size={13} />
-                    Publicar
+                    <Edit size={13} /> Editar
                   </Btn>
-                )}
-                <Btn
-                  variant="secondary"
-                  size="sm"
-                  onClick={() => setEditTarget(display)}
-                >
-                  <Edit size={13} /> Editar
-                </Btn>
-                <ActionsMenu
-                  isDraft={!display.publicadoAt}
-                  onEdit={() => setEditTarget(display)}
-                  onPublish={() => handlePublicar(display)}
-                  onDelete={() => setDeleteTarget(display)}
-                />
-              </div>
+                  <ActionsMenu
+                    isDraft={!display.publicadoAt}
+                    onEdit={() => setEditTarget(display)}
+                    onPublish={() => handlePublicar(display)}
+                    onDelete={() => setDeleteTarget(display)}
+                  />
+                </div>
+              )}
             </div>
 
             {/* Body */}
@@ -724,7 +822,10 @@ export default function ComunicadosPage() {
       </div>
 
       {/* ── Modales ───────────────────────────────────────────────── */}
-      {showNew && (
+      {showNew && creadoBasico && (
+        <NuevoAvisoModal onClose={() => setShowNew(false)} />
+      )}
+      {showNew && !creadoBasico && (
         <NuevoComunicadoModal onClose={() => setShowNew(false)} />
       )}
 

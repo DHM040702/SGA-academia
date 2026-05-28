@@ -36,11 +36,20 @@ const NAV_DIRECTOR = [
 
 const NAV_VIGILANTE = [
   { href: '/inicio',      icon: Home,      label: 'Inicio' },
-  { href: '/vigilante',   icon: ScanLine,  label: 'Kiosko asistencia' },
+  { href: '/vigilante',   icon: ScanLine,  label: 'Registro de asistencia' },
   { href: '/alumnos',     icon: Users,     label: 'Alumnos' },
   { href: '/docentes',    icon: Teacher,   label: 'Docentes' },
   { href: '/horarios',    icon: Calendar,  label: 'Horarios' },
   { href: '/asistencia',  icon: Check,     label: 'Asistencia' },
+  { href: '/comunicados', icon: Megaphone, label: 'Comunicados' },
+]
+
+const NAV_DOCENTE = [
+  { href: '/inicio',      icon: Home,      label: 'Inicio' },
+  { href: '/horarios',    icon: Calendar,  label: 'Mi horario' },
+  { href: '/asistencia',  icon: Check,     label: 'Mi asistencia' },
+  { href: '/comunicados', icon: Megaphone, label: 'Comunicados' },
+  { href: '/biblioteca',  icon: Book,      label: 'Biblioteca' },
 ]
 
 interface SidebarProps { compact?: boolean }
@@ -49,13 +58,16 @@ export function Sidebar({ compact = false }: SidebarProps) {
   const { user, logout } = useAuth()
   const pathname = usePathname()
 
-  const nav = user?.rol === 'director' ? NAV_DIRECTOR
+  const nav = user?.rol === 'director'  ? NAV_DIRECTOR
     : user?.rol === 'vigilante' ? NAV_VIGILANTE
+    : user?.rol === 'docente'   ? NAV_DOCENTE
     : NAV_ADMIN
   const displayName = user
-    ? user.docente
-      ? `${user.docente.nombre} ${user.docente.apellidos}`
-      : user.email.split('@')[0]
+    ? (user.docente
+        ? `${user.docente.nombre} ${user.docente.apellidos}`
+        : user.nombre
+          ? `${user.nombre}${user.apellidos ? ' ' + user.apellidos : ''}`
+          : user.email.split('@')[0])
     : ''
 
   return (
@@ -88,7 +100,10 @@ export function Sidebar({ compact = false }: SidebarProps) {
       <nav className={cn('flex-1 overflow-y-auto', compact ? 'p-2' : 'px-3 py-3.5')}>
         {!compact && (
           <div className="text-[10px] tracking-[0.1em] uppercase text-text-soft font-semibold px-2 pb-2 pt-1">
-            {user?.rol === 'director' ? 'Dirección' : user?.rol === 'vigilante' ? 'Vigilancia' : 'Administración'}
+            {user?.rol === 'director'  ? 'Dirección'
+            : user?.rol === 'vigilante' ? 'Vigilancia'
+            : user?.rol === 'docente'   ? 'Docente'
+            : 'Administración'}
           </div>
         )}
         {nav.map(({ href, icon: Icon, label }) => {

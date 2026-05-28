@@ -1,8 +1,10 @@
 import { ApiProperty, ApiPropertyOptional } from '@nestjs/swagger';
 import {
   IsDateString, IsEmail, IsOptional, IsString,
-  IsUUID, Length, Matches,
+  IsUUID, Length, Matches, ValidateNested,
 } from 'class-validator';
+import { Type } from 'class-transformer';
+import { VincularApoderadoDto } from './vincular-apoderado.dto';
 
 export class CreateAlumnoDto {
   /** DNI del alumno (8 dígitos) */
@@ -49,4 +51,11 @@ export class CreateAlumnoDto {
   @IsOptional()
   @IsUUID()
   carrera_id?: string;
+
+  /** Crear o vincular un apoderado al registrar el alumno (opcional) */
+  @ApiPropertyOptional({ type: VincularApoderadoDto })
+  @IsOptional()
+  @ValidateNested()
+  @Type(() => VincularApoderadoDto)
+  apoderado?: VincularApoderadoDto;
 }
