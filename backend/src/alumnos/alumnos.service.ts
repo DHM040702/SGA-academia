@@ -434,4 +434,45 @@ export class AlumnosService {
     }
     return results;
   }
+
+  /* ── Foto de perfil ──────────────────────────────────────── */
+
+  /**
+   * Sube o reemplaza la foto del alumno.
+   * La foto anterior en MinIO se sobreescribe (misma clave).
+   */
+  async subirFoto(id: string, file: Express.Multer.File): Promise<{ foto_url: string }> {
+    if (!file) throw new BadRequestException('No se proporcionó archivo');
+
+    const alumno = await this.prisma.alumno.findFirst({
+      where: { id, deletedAt: null },
+      select: { id: true },
+    });
+    if (!alumno) throw new NotFoundException('Alumno no encontrado');
+
+    const url = await this.minio.subirFoto('alumnos', id, file.buffer, file.mimetype);
+
+    await this.prisma.alumno.update({
+      where: { id },
+      data:  { fotoUrl: url },
+    });
+
+    return { foto_url: url };
+  }
+
+  /** Elimina la foto del alumno (pone fotoUrl en null) */
+  async eliminarFoto(id: string): Promise<{ ok: boolean }> {
+    const alumno = await this.prisma.alumno.findFirst({
+      where: { id, deletedAt: null },
+      select: { id: true, fotoUrl: true },
+    });
+    if (!alumno) throw new NotFoundException('Alumno no encontrado');
+
+    if (alumno.fotoUrl) {
+      await this.minio.eliminarFotoPorUrl(alumno.fotoUrl);
+      await this.prisma.alumno.update({ where: { id }, data: { fotoUrl: null } });
+    }
+
+    return { ok: true };
+  }
 }
