@@ -12,6 +12,7 @@ export interface Alumno {
   dni: string
   telefono?: string | null
   fecha_nacimiento?: string | null
+  foto_url?: string | null
   aula_id?: string | null
   carreraId?: string | null
   created_at: string

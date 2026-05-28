@@ -2,12 +2,14 @@
 import * as React from 'react'
 import { useParams, useRouter } from 'next/navigation'
 import { useForm } from 'react-hook-form'
+import { useQueryClient } from '@tanstack/react-query'
 import { PageHeader } from '@/components/layout/page-header'
 import { Card } from '@/components/ui/card'
 import { Btn } from '@/components/ui/btn'
 import { Field } from '@/components/ui/field'
 import { Input } from '@/components/ui/input'
 import { useDocente, useUpdateDocente } from '@/hooks/use-docentes'
+import { FotoUpload } from '@/components/ui/foto-upload'
 
 interface FormValues {
   nombres: string
@@ -20,6 +22,7 @@ interface FormValues {
 export default function EditarDocentePage() {
   const { id } = useParams<{ id: string }>()
   const router = useRouter()
+  const queryClient = useQueryClient()
   const { data: docente, isLoading } = useDocente(id)
   const updateDocente = useUpdateDocente()
 
@@ -83,6 +86,18 @@ export default function EditarDocentePage() {
 
       <form onSubmit={handleSubmit(onSubmit)}>
         <Card title="Datos personales">
+          {/* ── Foto de perfil (opcional) ── */}
+          <div className="flex justify-center pb-4 pt-1 border-b border-border mb-4">
+            <FotoUpload
+              uploadUrl={`/docentes/${id}/foto`}
+              deleteUrl={`/docentes/${id}/foto`}
+              currentUrl={docente.fotoUrl}
+              name={`${docente.nombre} ${docente.apellidos}`}
+              size={88}
+              onSuccess={() => queryClient.invalidateQueries({ queryKey: ['docentes', id] })}
+              onDeleted={() => queryClient.invalidateQueries({ queryKey: ['docentes', id] })}
+            />
+          </div>
           <div className="grid grid-cols-2 gap-4 p-1">
             <Field label="Nombres" required error={errors.nombres?.message}>
               <Input

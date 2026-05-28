@@ -91,6 +91,31 @@ export class AlumnosController {
     return this.service.desvincularApoderado(id, apoderadoId);
   }
 
+  // ── Foto de perfil ────────────────────────────────────────────
+
+  @Post(':id/foto')
+  @HttpCode(HttpStatus.OK)
+  @Roles(Rol.admin)
+  @ApiOperation({ summary: 'Subir / reemplazar foto de perfil del alumno' })
+  @ApiConsumes('multipart/form-data')
+  @UseInterceptors(FileInterceptor('foto'))
+  subirFoto(
+    @Param('id', ParseUUIDPipe) id: string,
+    @UploadedFile() file: Express.Multer.File,
+  ) {
+    return this.service.subirFoto(id, file);
+  }
+
+  @Delete(':id/foto')
+  @HttpCode(HttpStatus.OK)
+  @Roles(Rol.admin)
+  @ApiOperation({ summary: 'Eliminar foto de perfil del alumno' })
+  eliminarFoto(@Param('id', ParseUUIDPipe) id: string) {
+    return this.service.eliminarFoto(id);
+  }
+
+  // ── Importación Excel ──────────────────────────────────────────
+
   @Post('import')
   @Roles(Rol.admin)
   @ApiOperation({ summary: 'Importar alumnos desde Excel (.xlsx)' })

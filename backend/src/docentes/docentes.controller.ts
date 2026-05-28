@@ -10,9 +10,12 @@ import {
   Patch,
   Post,
   Query,
+  UploadedFile,
   UseGuards,
+  UseInterceptors,
 } from '@nestjs/common';
-import { ApiBearerAuth, ApiOperation, ApiTags } from '@nestjs/swagger';
+import { FileInterceptor } from '@nestjs/platform-express';
+import { ApiBearerAuth, ApiConsumes, ApiOperation, ApiTags } from '@nestjs/swagger';
 import { Rol } from '@prisma/client';
 import { JwtAuthGuard } from '../common/guards/jwt-auth.guard';
 import { RolesGuard } from '../common/guards/roles.guard';
@@ -63,5 +66,28 @@ export class DocentesController {
   @ApiOperation({ summary: 'Eliminar docente (soft delete)' })
   remove(@Param('id', ParseUUIDPipe) id: string) {
     return this.service.remove(id);
+  }
+
+  // ── Foto de perfil ────────────────────────────────────────────
+
+  @Post(':id/foto')
+  @HttpCode(HttpStatus.OK)
+  @Roles(Rol.admin)
+  @ApiOperation({ summary: 'Subir / reemplazar foto de perfil del docente' })
+  @ApiConsumes('multipart/form-data')
+  @UseInterceptors(FileInterceptor('foto'))
+  subirFoto(
+    @Param('id', ParseUUIDPipe) id: string,
+    @UploadedFile() file: Express.Multer.File,
+  ) {
+    return this.service.subirFoto(id, file);
+  }
+
+  @Delete(':id/foto')
+  @HttpCode(HttpStatus.OK)
+  @Roles(Rol.admin)
+  @ApiOperation({ summary: 'Eliminar foto de perfil del docente' })
+  eliminarFoto(@Param('id', ParseUUIDPipe) id: string) {
+    return this.service.eliminarFoto(id);
   }
 }

@@ -4,6 +4,7 @@ import {
 import * as bcrypt from 'bcrypt';
 import { Rol } from '@prisma/client';
 import { PrismaService } from '../prisma/prisma.service';
+import { MinioService } from '../minio/minio.service';
 import { paginate } from '../common/dto/pagination.dto';
 import { CreateDocenteDto } from './dto/create-docente.dto';
 import { UpdateDocenteDto } from './dto/update-docente.dto';
@@ -11,7 +12,10 @@ import { FilterDocentesDto } from './dto/filter-docentes.dto';
 
 @Injectable()
 export class DocentesService {
-  constructor(private prisma: PrismaService) {}
+  constructor(
+    private prisma: PrismaService,
+    private minio:  MinioService,
+  ) {}
 
   async findAll(dto: FilterDocentesDto) {
     const { page = 1, limit = 20, q, curso_id, activo } = dto;
@@ -178,5 +182,43 @@ export class DocentesService {
       });
       return { success: true };
     });
+  }
+
+  /* ── Foto de perfil ──────────────────────────────────────── */
+
+  /** Sube o reemplaza la foto del docente */
+  async subirFoto(id: string, file: Express.Multer.File): Promise<{ foto_url: string }> {
+    if (!file) throw new BadRequestException('No se proporcionó archivo');
+
+    const docente = await this.prisma.docente.findFirst({
+      where: { id, deletedAt: null },
+      select: { id: true },
+    });
+    if (!docente) throw new NotFoundException('Docente no encontrado');
+
+    const url = await this.minio.subirFoto('docentes', id, file.buffer, file.mimetype);
+
+    await this.prisma.docente.update({
+      where: { id },
+      data:  { fotoUrl: url },
+    });
+
+    return { foto_url: url };
+  }
+
+  /** Elimina la foto del docente (pone fotoUrl en null) */
+  async eliminarFoto(id: string): Promise<{ ok: boolean }> {
+    const docente = await this.prisma.docente.findFirst({
+      where: { id, deletedAt: null },
+      select: { id: true, fotoUrl: true },
+    });
+    if (!docente) throw new NotFoundException('Docente no encontrado');
+
+    if (docente.fotoUrl) {
+      await this.minio.eliminarFotoPorUrl(docente.fotoUrl);
+      await this.prisma.docente.update({ where: { id }, data: { fotoUrl: null } });
+    }
+
+    return { ok: true };
   }
 }

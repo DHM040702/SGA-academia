@@ -7,6 +7,7 @@ import { Card } from '@/components/ui/card'
 import { Btn } from '@/components/ui/btn'
 import { Field } from '@/components/ui/field'
 import { Input } from '@/components/ui/input'
+import { useQueryClient } from '@tanstack/react-query'
 import { useAlumno, useUpdateAlumno } from '@/hooks/use-alumnos'
 import { useCiclos, useAulas } from '@/hooks/use-ciclos'
 import { useCarreras, type AreaCarrera } from '@/hooks/use-carreras'
@@ -18,6 +19,7 @@ import {
   PARENTESCO_OPTS,
   type ApoderadoSearchResult,
 } from '@/hooks/use-apoderados'
+import { FotoUpload } from '@/components/ui/foto-upload'
 
 const SELECT_CLS =
   'w-full px-3 py-2 text-[13px] border border-border rounded-2 bg-surface text-text focus:outline-none focus:ring-1 focus:ring-primary disabled:opacity-50'
@@ -36,6 +38,7 @@ interface FormValues {
 export default function EditarAlumnoPage() {
   const { id } = useParams<{ id: string }>()
   const router = useRouter()
+  const queryClient = useQueryClient()
   const { data: alumno, isLoading } = useAlumno(id)
   const updateAlumno = useUpdateAlumno()
   const { data: ciclos = [] } = useCiclos()
@@ -219,6 +222,18 @@ export default function EditarAlumnoPage() {
 
       <form onSubmit={handleSubmit(onSubmit)}>
         <Card title="Datos personales">
+          {/* ── Foto de perfil (opcional) ── */}
+          <div className="flex justify-center pb-4 pt-1 border-b border-border mb-4">
+            <FotoUpload
+              uploadUrl={`/alumnos/${id}/foto`}
+              deleteUrl={`/alumnos/${id}/foto`}
+              currentUrl={alumno.foto_url}
+              name={`${alumno.nombres} ${alumno.apellidos}`}
+              size={88}
+              onSuccess={() => queryClient.invalidateQueries({ queryKey: ['alumnos', id] })}
+              onDeleted={() => queryClient.invalidateQueries({ queryKey: ['alumnos', id] })}
+            />
+          </div>
           <div className="grid grid-cols-2 gap-4 p-1">
             <Field label="Nombres" required error={errors.nombres?.message}>
               <Input

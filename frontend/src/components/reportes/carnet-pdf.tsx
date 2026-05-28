@@ -9,7 +9,7 @@
  *   const { CarnetBatchPDF } = await import('@/components/reportes/carnet-pdf')
  */
 
-import { Document, Page, Text, View, StyleSheet } from '@react-pdf/renderer'
+import { Document, Page, Text, View, StyleSheet, Image } from '@react-pdf/renderer'
 
 /* ─── Dimensiones en puntos (pt) ─────────────────────────────── */
 const CARD_W = 263.62   // 9.3 cm × 28.3465 pt/cm
@@ -96,6 +96,12 @@ const s = StyleSheet.create({
     flexShrink:       0,
   },
   avatarText: { color: C.white, fontSize: 15, fontWeight: 'bold' },
+  avatarImg: {
+    width:        46,
+    height:       46,
+    borderRadius: 23,
+    objectFit:    'cover' as const,
+  },
 
   /* Divisor vertical */
   vline: {
@@ -170,6 +176,7 @@ export interface AlumnoCarnet {
   dni?:            string | null
   codigo_barra?:   string | null
   codigoBarras?:   string | null
+  foto_url?:       string | null
   estado?:         string | null
   asistencia_pct?: number | null
   aula?:           { nombre: string; ciclo?: { nombre: string } | null } | null
@@ -217,10 +224,14 @@ function CarnetCardContent({ alumno, cicloLabel }: { alumno: AlumnoCarnet; ciclo
       {/* ── Cuerpo ── */}
       <View style={s.body}>
 
-        {/* Avatar */}
-        <View style={s.avatar}>
-          <Text style={s.avatarText}>{initials(fullName)}</Text>
-        </View>
+        {/* Avatar — foto si existe, iniciales si no */}
+        {alumno.foto_url ? (
+          <Image src={alumno.foto_url} style={s.avatarImg} />
+        ) : (
+          <View style={s.avatar}>
+            <Text style={s.avatarText}>{initials(fullName)}</Text>
+          </View>
+        )}
 
         {/* Divisor vertical */}
         <View style={s.vline} />
