@@ -4,6 +4,7 @@ import {
 import * as bcrypt from 'bcrypt';
 import { Rol } from '@prisma/client';
 import { PrismaService } from '../prisma/prisma.service';
+import { MinioService } from '../minio/minio.service';
 import { paginate } from '../common/dto/pagination.dto';
 import { CreateAlumnoDto } from './dto/create-alumno.dto';
 import { UpdateAlumnoDto } from './dto/update-alumno.dto';
@@ -29,7 +30,10 @@ async function nextCodigo(prisma: PrismaService): Promise<string> {
 
 @Injectable()
 export class AlumnosService {
-  constructor(private prisma: PrismaService) {}
+  constructor(
+    private prisma: PrismaService,
+    private minio:  MinioService,
+  ) {}
 
   async findAll(dto: FilterAlumnosDto) {
     const { page = 1, limit = 20, q, ciclo_id, aula_id } = dto as any;
