@@ -306,17 +306,6 @@ export default function ReportesPage() {
   const [indivSearch,      setIndivSearch]      = useState('')
   const [indivAlumno,      setIndivAlumno]      = useState<any>(null)
   const [informeLoading,   setInformeLoading]   = useState(false)
-  const [carnetIndLoading, setCarnetIndLoading] = useState(false)
-  const [batchCicloId,     setBatchCicloId]     = useState('')
-  const [batchAulaId,      setBatchAulaId]      = useState('')
-  const [batchLoading,     setBatchLoading]     = useState(false)
-
-  const [sheetCicloId,     setSheetCicloId]     = useState('')
-  const [sheetAulaId,      setSheetAulaId]      = useState('')
-  const [sheetLoading,     setSheetLoading]     = useState(false)
-
-  const { data: batchAulas = [] } = useAulas(batchCicloId || undefined)
-  const { data: sheetAulas = [] } = useAulas(sheetCicloId || undefined)
 
   const { data: indivResults = [] } = useQuery<any[]>({
     queryKey: ['alumnos', 'search-report', indivSearch],
@@ -328,7 +317,7 @@ export default function ReportesPage() {
     staleTime: 30_000,
   })
 
-  /* ── Filtros — Asistencia ── */
+/* ── Filtros — Asistencia ── */
   const [asisDocenteId, setAsisDocenteId] = useState('')
   const [periodo,    setPeriodo]    = useState<PeriodoLabel>('Últimos 30 días')
   const [desdeInput, setDesdeInput] = useState(toISODate(daysAgo(29)))
@@ -433,103 +422,7 @@ export default function ReportesPage() {
     }
   }
 
-  async function descargarCarnetIndividual(alumno: any) {
-    setCarnetIndLoading(true)
-    try {
-      const [{ pdf }, { CarnetPDF }] = await Promise.all([
-        import('@react-pdf/renderer'),
-        import('@/components/reportes/carnet-pdf'),
-      ])
-      const blob = await pdf(CarnetPDF({
-        alumno,
-        cicloLabel: alumno.aula?.ciclo?.nombre ?? cicloActivo?.nombre ?? '2026-I',
-      })).toBlob()
-      const url = URL.createObjectURL(blob)
-      const a = Object.assign(document.createElement('a'), {
-        href: url,
-        download: `carnet-${alumno.apellidos ?? 'alumno'}-${alumno.codigo_barra ?? ''}.pdf`,
-      })
-      document.body.appendChild(a); a.click(); document.body.removeChild(a)
-      URL.revokeObjectURL(url)
-    } catch (err) {
-      console.error('Error al generar carnet:', err)
-      alert('No se pudo generar el carnet.')
-    } finally {
-      setCarnetIndLoading(false)
-    }
-  }
-
-  async function descargarCarnetsBatch() {
-    if (!batchAulaId) return
-    setBatchLoading(true)
-    try {
-      const { data } = await api.get('/alumnos', { params: { aula_id: batchAulaId, limit: 200, page: 1 } })
-      const alumnos = data?.data ?? []
-      if (!alumnos.length) { alert('No hay alumnos en esa aula.'); return }
-      const [{ pdf }, { CarnetBatchPDF }] = await Promise.all([
-        import('@react-pdf/renderer'),
-        import('@/components/reportes/carnet-pdf'),
-      ])
-      const aulaLabel = batchAulas.find((a: any) => a.id === batchAulaId)?.nombre ?? 'aula'
-      const blob = await pdf(CarnetBatchPDF({
-        alumnos,
-        cicloLabel: cicloActivo?.nombre ?? '2026-I',
-      })).toBlob()
-      const url = URL.createObjectURL(blob)
-      const a = Object.assign(document.createElement('a'), {
-        href: url,
-        download: `carnets-${aulaLabel}.pdf`,
-      })
-      document.body.appendChild(a); a.click(); document.body.removeChild(a)
-      URL.revokeObjectURL(url)
-    } catch (err) {
-      console.error('Error al generar carnets:', err)
-      alert('No se pudo generar los carnets.')
-    } finally {
-      setBatchLoading(false)
-    }
-  }
-
-  async function descargarCarnetSheet() {
-    if (!sheetCicloId) return
-    setSheetLoading(true)
-    try {
-      /* Si hay aula filtramos por aula; si no, por ciclo completo */
-      const params: Record<string, string | number> = { limit: 500, page: 1 }
-      if (sheetAulaId) params.aula_id  = sheetAulaId
-      else             params.ciclo_id = sheetCicloId
-
-      const { data } = await api.get('/alumnos', { params })
-      const alumnos = data?.data ?? []
-      if (!alumnos.length) { alert('No hay alumnos para generar carnets.'); return }
-
-      const [{ pdf }, { CarnetSheetPDF }] = await Promise.all([
-        import('@react-pdf/renderer'),
-        import('@/components/reportes/carnet-pdf'),
-      ])
-
-      const cicloNombre = ciclos.find((c) => c.id === sheetCicloId)?.nombre ?? '2026-I'
-      const aulaLabel   = sheetAulaId
-        ? (sheetAulas.find((a: any) => a.id === sheetAulaId)?.nombre ?? 'aula')
-        : cicloNombre
-
-      const blob = await pdf(CarnetSheetPDF({ alumnos, cicloLabel: cicloNombre })).toBlob()
-      const url  = URL.createObjectURL(blob)
-      const a    = Object.assign(document.createElement('a'), {
-        href:     url,
-        download: `carnets-hoja-A4-${aulaLabel}.pdf`,
-      })
-      document.body.appendChild(a); a.click(); document.body.removeChild(a)
-      URL.revokeObjectURL(url)
-    } catch (err) {
-      console.error('Error al generar hoja de carnets:', err)
-      alert('No se pudo generar la hoja de carnets.')
-    } finally {
-      setSheetLoading(false)
-    }
-  }
-
-  /* ── Datos derivados ── */
+/* ── Datos derivados ── */
   function sortRows<T>(rows: T[], key: string, dir: SortDir): T[] {
     return [...rows].sort((a: any, b: any) => {
       const av = a[key]; const bv = b[key]
@@ -1128,8 +1021,8 @@ export default function ReportesPage() {
         {tab === 'individual' && (
           <>
             {/* ── Informe / carnet individual ── */}
-            <Card title="Informe y carnet individual"
-              subtitle="Busca un alumno para generar su informe completo de asistencia o su carnet estudiantil">
+            <Card title="Informe individual de asistencia"
+              subtitle="Busca un alumno y descarga su informe completo de asistencia en PDF">
               <div className="p-4 flex flex-col gap-4">
 
                 {/* Buscador */}
@@ -1189,15 +1082,10 @@ export default function ReportesPage() {
                     </div>
                     {/* Acciones */}
                     <div className="flex gap-2 flex-shrink-0">
-                      <Btn variant="secondary" size="sm" icon={<Download size={14} />}
+                      <Btn size="sm" icon={<Download size={14} />}
                         disabled={informeLoading}
                         onClick={() => descargarReporteIndividual(indivAlumno)}>
                         {informeLoading ? 'Generando…' : 'Informe PDF'}
-                      </Btn>
-                      <Btn size="sm" icon={<Download size={14} />}
-                        disabled={carnetIndLoading}
-                        onClick={() => descargarCarnetIndividual(indivAlumno)}>
-                        {carnetIndLoading ? 'Generando…' : 'Carnet PDF'}
                       </Btn>
                     </div>
                     <button onClick={() => setIndivAlumno(null)}
@@ -1215,98 +1103,6 @@ export default function ReportesPage() {
               </div>
             </Card>
 
-            {/* ── Carnets en lote por aula — un carnet por página ── */}
-            <Card title="Carnets por aula (tarjetón individual)"
-              subtitle="Un carnet por página al tamaño exacto — imprime directo en tarjetón 9.3 × 5.6 cm">
-              <div className="p-4 flex flex-wrap gap-3 items-end">
-                {/* Ciclo */}
-                <div className="flex flex-col gap-1">
-                  <label className="text-[10.5px] text-text-mute uppercase tracking-[0.05em] font-medium">Ciclo</label>
-                  <select value={batchCicloId}
-                    onChange={(e) => { setBatchCicloId(e.target.value); setBatchAulaId('') }}
-                    className="text-[13px] px-2.5 py-1.5 border border-border rounded-2 bg-surface min-w-[180px]">
-                    <option value="">Seleccionar ciclo…</option>
-                    {ciclos.map((c) => (
-                      <option key={c.id} value={c.id}>{c.nombre}{c.activo ? ' ★' : ''}</option>
-                    ))}
-                  </select>
-                </div>
-                {/* Aula */}
-                <div className="flex flex-col gap-1">
-                  <label className="text-[10.5px] text-text-mute uppercase tracking-[0.05em] font-medium">Aula</label>
-                  <select value={batchAulaId} onChange={(e) => setBatchAulaId(e.target.value)}
-                    disabled={!batchCicloId}
-                    className="text-[13px] px-2.5 py-1.5 border border-border rounded-2 bg-surface min-w-[180px] disabled:opacity-50">
-                    <option value="">Seleccionar aula…</option>
-                    {batchAulas.map((a) => (
-                      <option key={a.id} value={a.id}>{a.nombre}</option>
-                    ))}
-                  </select>
-                </div>
-                <Btn size="sm" icon={<Download size={14} />}
-                  disabled={!batchAulaId || batchLoading}
-                  onClick={descargarCarnetsBatch}>
-                  {batchLoading ? 'Generando…' : 'Generar PDF (tarjetón)'}
-                </Btn>
-                {batchAulaId && !batchLoading && (
-                  <p className="text-[11px] text-text-mute self-center">
-                    Página de <span className="font-mono">9.3 × 5.6 cm</span> por alumno
-                  </p>
-                )}
-              </div>
-            </Card>
-
-            {/* ── Hoja A4 con 9 carnets (ciclo completo o aula) ── */}
-            <Card title="Hoja A4 — múltiples carnets por página"
-              subtitle="9 carnets por hoja apaisada (3 × 3) — incluye guías de corte — ideal para guillotinar en tarjetón">
-              <div className="p-4 flex flex-wrap gap-3 items-end">
-
-                {/* Ciclo (obligatorio) */}
-                <div className="flex flex-col gap-1">
-                  <label className="text-[10.5px] text-text-mute uppercase tracking-[0.05em] font-medium">
-                    Ciclo <span className="text-danger">*</span>
-                  </label>
-                  <select value={sheetCicloId}
-                    onChange={(e) => { setSheetCicloId(e.target.value); setSheetAulaId('') }}
-                    className="text-[13px] px-2.5 py-1.5 border border-border rounded-2 bg-surface min-w-[180px]">
-                    <option value="">Seleccionar ciclo…</option>
-                    {ciclos.map((c) => (
-                      <option key={c.id} value={c.id}>{c.nombre}{c.activo ? ' ★' : ''}</option>
-                    ))}
-                  </select>
-                </div>
-
-                {/* Aula (opcional — si se deja vacío, se genera para todo el ciclo) */}
-                <div className="flex flex-col gap-1">
-                  <label className="text-[10.5px] text-text-mute uppercase tracking-[0.05em] font-medium">
-                    Aula <span className="font-normal normal-case text-text-mute">(opcional)</span>
-                  </label>
-                  <select value={sheetAulaId} onChange={(e) => setSheetAulaId(e.target.value)}
-                    disabled={!sheetCicloId}
-                    className="text-[13px] px-2.5 py-1.5 border border-border rounded-2 bg-surface min-w-[200px] disabled:opacity-50">
-                    <option value="">Todas las aulas del ciclo</option>
-                    {sheetAulas.map((a) => (
-                      <option key={a.id} value={a.id}>{a.nombre}</option>
-                    ))}
-                  </select>
-                </div>
-
-                <Btn size="sm" icon={<Download size={14} />}
-                  disabled={!sheetCicloId || sheetLoading}
-                  onClick={descargarCarnetSheet}>
-                  {sheetLoading ? 'Generando…' : 'Generar hoja A4'}
-                </Btn>
-
-                {/* Hint */}
-                <div className="self-center flex flex-col gap-0.5 text-[11px] text-text-mute">
-                  <span className="font-medium text-text">9 carnets por página</span>
-                  <span>A4 apaisado · guías de corte incluidas</span>
-                  {sheetCicloId && !sheetAulaId && (
-                    <span className="text-primary font-medium">Ciclo completo seleccionado</span>
-                  )}
-                </div>
-              </div>
-            </Card>
           </>
         )}
 

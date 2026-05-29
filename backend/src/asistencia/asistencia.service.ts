@@ -57,26 +57,9 @@ export class AsistenciaService {
     });
     if (existente) return existente;
 
-    // Determinar tardanza usando TurnoConfig (horaLimitePuntual del turno del aula).
-    // Si no hay config activa para el turno, el registro se asume puntual (false).
-    let esTardanza = false;
-    if (alumnoId) {
-      const alumno = await this.prisma.alumno.findUnique({
-        where: { id: alumnoId },
-        include: { aula: { select: { turno: true } } },
-      });
-      if (alumno?.aula?.turno) {
-        const config = await this.prisma.turnoConfig.findUnique({
-          where: { turno: alumno.aula.turno },
-        });
-        if (config?.activo) {
-          const limite = config.horaLimitePuntual;
-          const limiteMs = limite.getUTCHours() * 3_600_000 + limite.getUTCMinutes() * 60_000;
-          const ahoraMs  = now.getHours() * 3_600_000 + now.getMinutes() * 60_000;
-          esTardanza = ahoraMs > limiteMs;
-        }
-      }
-    }
+    // Todo ingreso nuevo se registra siempre como presente (esTardanza = false).
+    // La tardanza solo se puede asignar mediante corrección manual posterior.
+    const esTardanza = false;
 
     return this.prisma.asistencia.create({
       data: {

@@ -2,6 +2,7 @@
 
 import { useState } from 'react'
 import { useComunicados, type Comunicado } from '@/hooks/use-comunicados'
+import { useActiveCiclo } from '@/hooks/use-ciclos'
 import { Pill } from '@/components/ui/pill'
 import { Dot } from '@/components/ui/dot'
 import { Btn } from '@/components/ui/btn'
@@ -25,6 +26,7 @@ type TabKey = 'todos' | 'nuevos'
 export default function PortalComunicadosPage() {
   const [tab, setTab] = useState<TabKey>('todos')
   const [selected, setSelected] = useState<Comunicado | null>(null)
+  const cicloActivo = useActiveCiclo()
 
   const { data: comunicadosRes, isLoading } = useComunicados({ limit: 50 })
   const all: Comunicado[] = comunicadosRes?.data ?? []
@@ -50,7 +52,7 @@ export default function PortalComunicadosPage() {
       {/* Hero */}
       <div className="flex items-end justify-between mb-5">
         <div>
-          <div className="text-[11.5px] text-text-mute mb-1">Ciclo 2026-I</div>
+          <div className="text-[11.5px] text-text-mute mb-1">{cicloActivo ? `Ciclo ${cicloActivo.nombre}` : ''}</div>
           <h1 className="m-0 font-serif font-semibold text-[30px] tracking-[-0.02em] leading-[1.1]">
             Avisos y comunicados
           </h1>

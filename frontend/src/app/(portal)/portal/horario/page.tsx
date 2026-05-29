@@ -3,6 +3,7 @@
 import { useState } from 'react'
 import { useAuth } from '@/contexts/auth-context'
 import { useHorarios, type Horario } from '@/hooks/use-horarios'
+import { useActiveCiclo } from '@/hooks/use-ciclos'
 import { Card } from '@/components/ui/card'
 import { Btn } from '@/components/ui/btn'
 import { Pill } from '@/components/ui/pill'
@@ -67,7 +68,7 @@ async function exportarHorarioPDF(horarios: Horario[], aulaLabel: string) {
     <body>
       ${encabezado}
       <h2>Mi Horario Semanal — ${aulaLabel}</h2>
-      <p class="sub">Ciclo 2026-I · ${fecha}</p>
+      <p class="sub">${cicloActivo ? `Ciclo ${cicloActivo.nombre} · ` : ''}${fecha}</p>
       <table>
         <thead><tr><th class="hora">Hora</th>${DIA_FULL.map((d) => `<th>${d}</th>`).join('')}</tr></thead>
         <tbody>${rows}</tbody>
@@ -139,6 +140,7 @@ export default function PortalHorarioPage() {
   const { user } = useAuth()
   const alumno = user?.alumno
   const aulaId: string | undefined = (alumno as any)?.aulaId ?? undefined
+  const cicloActivo = useActiveCiclo()
 
   const [weekOffset, setWeekOffset] = useState(0)
   const weekDates = getWeekDates(weekOffset)
@@ -167,7 +169,7 @@ export default function PortalHorarioPage() {
       <div className="flex items-end justify-between mb-5">
         <div>
           <div className="text-[11.5px] text-text-mute mb-1">
-            Aula {aulaId ? 'activa' : '—'} · Ciclo 2026-I
+            Aula {aulaId ? 'activa' : '—'}{cicloActivo ? ` · Ciclo ${cicloActivo.nombre}` : ''}
           </div>
           <h1 className="m-0 font-serif font-semibold text-[30px] tracking-[-0.02em] leading-[1.1]">
             Mi horario

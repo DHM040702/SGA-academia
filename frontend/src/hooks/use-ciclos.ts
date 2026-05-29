@@ -24,6 +24,12 @@ export interface Aula {
   _count?: { alumnos: number; horarios: number }
 }
 
+/** Devuelve el ciclo activo (o el primero disponible). */
+export function useActiveCiclo(): Ciclo | null {
+  const { data: ciclos = [] } = useCiclos()
+  return ciclos.find((c) => c.activo) ?? ciclos[0] ?? null
+}
+
 export function useCiclos() {
   return useQuery<Ciclo[]>({
     queryKey: ['ciclos'],

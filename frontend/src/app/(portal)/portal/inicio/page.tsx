@@ -1,6 +1,7 @@
 'use client'
 
 import { useAuth } from '@/contexts/auth-context'
+import { useActiveCiclo } from '@/hooks/use-ciclos'
 import { useAsistencia } from '@/hooks/use-asistencia'
 import { useHorarios, type Horario } from '@/hooks/use-horarios'
 import { useComunicados, type Comunicado } from '@/hooks/use-comunicados'
@@ -132,6 +133,7 @@ const TIPO_COLOR: Record<string, string> = {
 /* ─── page ─────────────────────────────────────────────────────── */
 export default function PortalInicioPage() {
   const { user } = useAuth()
+  const cicloActivo = useActiveCiclo()
   if (!user) return null
 
   const isApoderado = user.rol === 'apoderado'
@@ -320,7 +322,7 @@ function AlumnoInicio({ user }: { user: ReturnType<typeof useAuth>['user'] }) {
               <div className="flex items-center gap-2.5 relative">
                 <Avatar name={fullName} size={44} />
                 <div>
-                  <div className="text-[9px] tracking-[0.12em] uppercase opacity-80">Mi carnet · 2026-I</div>
+                  <div className="text-[9px] tracking-[0.12em] uppercase opacity-80">Mi carnet{cicloActivo ? ` · ${cicloActivo.nombre}` : ''}</div>
                   <div className="font-serif text-[15px] font-semibold mt-0.5 leading-tight">{fullName}</div>
                   <div className="text-[11px] opacity-85 mt-0.5">
                     {aulaId ? 'Aula activa' : 'Sin aula'} · DNI —
@@ -436,7 +438,7 @@ function ApoderadoInicio({ user }: { user: ReturnType<typeof useAuth>['user'] })
     <div className="px-8 pt-7 pb-8">
       {/* Hero */}
       <div className="mb-5">
-        <div className="text-[11.5px] text-text-mute mb-1 capitalize">{TODAY_STR} · ciclo 2026-I</div>
+        <div className="text-[11.5px] text-text-mute mb-1 capitalize">{TODAY_STR}{cicloActivo ? ` · ciclo ${cicloActivo.nombre}` : ''}</div>
         <div className="flex items-end justify-between">
           <div>
             <h1 className="m-0 font-serif font-semibold text-[30px] tracking-[-0.02em] leading-[1.1]">

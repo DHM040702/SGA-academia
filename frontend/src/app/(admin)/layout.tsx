@@ -4,6 +4,7 @@ import { useRouter } from 'next/navigation'
 import { Sidebar } from '@/components/layout/sidebar'
 import { TopBar } from '@/components/layout/topbar'
 import { useAuth } from '@/contexts/auth-context'
+import { CicloProvider } from '@/contexts/ciclo-context'
 
 export default function AdminLayout({ children }: { children: React.ReactNode }) {
   const { user, loading } = useAuth()
@@ -24,14 +25,16 @@ export default function AdminLayout({ children }: { children: React.ReactNode })
   if (!user) return null
 
   return (
-    <div className="h-full flex overflow-hidden">
-      <Sidebar />
-      <div className="flex flex-col flex-1 min-w-0 overflow-hidden">
-        <TopBar />
-        <main className="flex-1 overflow-auto bg-bg">
-          {children}
-        </main>
+    <CicloProvider>
+      <div className="h-full flex overflow-hidden">
+        <Sidebar />
+        <div className="flex flex-col flex-1 min-w-0 overflow-hidden">
+          <TopBar />
+          <main className="flex-1 overflow-auto bg-bg">
+            {children}
+          </main>
+        </div>
       </div>
-    </div>
+    </CicloProvider>
   )
 }

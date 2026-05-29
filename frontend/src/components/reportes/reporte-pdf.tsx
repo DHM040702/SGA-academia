@@ -351,7 +351,7 @@ export function ReporteAsistenciaPDF({
           <View style={s.headerRight}>
             <Text style={s.headerDate}>Generado: {fechaGeneracion}</Text>
             <View style={s.headerBadge}>
-              <Text style={s.headerBadgeText}>REPORTE OFICIAL</Text>
+              <Text style={s.headerBadgeText}>REPORTE GENERADO POR EL SISTEMA</Text>
             </View>
           </View>
         </View>

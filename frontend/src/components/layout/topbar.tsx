@@ -3,8 +3,9 @@ import * as React from 'react'
 import { useRouter } from 'next/navigation'
 import { useQuery } from '@tanstack/react-query'
 import { cn } from '@/lib/utils'
-import { Search, Bell, Users, Teacher, Layers } from '@/components/icons'
+import { Search, Bell, Users, Teacher, Layers, ChevD } from '@/components/icons'
 import api from '@/lib/api'
+import { useCicloCtx } from '@/contexts/ciclo-context'
 
 /* ─── tipos de resultado ─────────────────────────────────────────── */
 interface AlumnoResult {
@@ -289,6 +290,46 @@ function SearchBox() {
   )
 }
 
+/* ─── CicloSelector ──────────────────────────────────────────────── */
+function CicloSelector() {
+  const { ciclos, selectedCiclo, setSelectedId, loading } = useCicloCtx()
+
+  if (loading) {
+    return (
+      <div className="h-7 w-[90px] rounded-2 bg-surface2 animate-pulse" />
+    )
+  }
+
+  if (ciclos.length === 0) return null
+
+  return (
+    <div className="flex items-center gap-1.5">
+      <span className="text-[12px] text-text-mute select-none">Ciclo</span>
+      <div className="relative">
+        <select
+          value={selectedCiclo?.id ?? ''}
+          onChange={(e: React.ChangeEvent<HTMLSelectElement>) => setSelectedId(e.target.value)}
+          className={cn(
+            'text-[12.5px] font-sans font-semibold pl-2.5 py-1.5 pr-6 border border-border rounded-2',
+            'bg-surface text-text focus:outline-none focus:border-primary focus:ring-1 focus:ring-primary/20',
+            'appearance-none cursor-pointer transition-colors hover:border-primary/40',
+          )}
+        >
+          {ciclos.map((c) => (
+            <option key={c.id} value={c.id}>
+              {c.nombre}
+              {c.activo ? ' ✓' : ''}
+            </option>
+          ))}
+        </select>
+        <span className="pointer-events-none absolute right-1.5 top-1/2 -translate-y-1/2 text-text-mute">
+          <ChevD size={10} />
+        </span>
+      </div>
+    </div>
+  )
+}
+
 /* ─── TopBar ─────────────────────────────────────────────────────── */
 interface TopBarProps {
   search?: boolean
@@ -316,19 +357,8 @@ export function TopBar({ search = true, className }: TopBarProps) {
 
         <div className="w-px h-[22px] bg-border mx-1" />
 
-        {/* Selector de ciclo */}
-        <span className="text-[12px] text-text-mute">Ciclo</span>
-        <select
-          defaultValue="2026-I"
-          className={cn(
-            'text-[12.5px] font-sans font-medium px-2.5 py-1.5 pr-7 border border-border rounded-2 bg-surface text-text',
-            'focus:outline-none focus:border-primary appearance-none cursor-pointer',
-            'bg-[url("data:image/svg+xml;utf8,<svg xmlns=\'http://www.w3.org/2000/svg\' width=\'10\' height=\'10\' viewBox=\'0 0 10 10\'><path d=\'M2 4l3 3 3-3\' fill=\'none\' stroke=\'%23666\' stroke-width=\'1.5\'/></svg>")] bg-no-repeat bg-[right_8px_center]',
-          )}
-        >
-          <option>2026-I</option>
-          <option>2025-II</option>
-        </select>
+        {/* Selector de ciclo — datos reales */}
+        <CicloSelector />
       </div>
     </header>
   )

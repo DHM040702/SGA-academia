@@ -183,7 +183,7 @@ export function AsistenciaListaPDF({
           <View style={s.headerRight}>
             <Text style={s.headerDate}>Generado: {fechaGeneracion}</Text>
             <View style={s.headerBadge}>
-              <Text style={s.headerBadgeText}>DOCUMENTO OFICIAL</Text>
+              <Text style={s.headerBadgeText}>DOCUMENTO GENERADO POR SISTEMA</Text>
             </View>
           </View>
         </View>

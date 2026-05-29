@@ -2,6 +2,7 @@
 
 import { useParams, useRouter } from 'next/navigation'
 import { useAlumno } from '@/hooks/use-alumnos'
+import { useCicloCtx } from '@/contexts/ciclo-context'
 import { useAsistencia } from '@/hooks/use-asistencia'
 import { Avatar } from '@/components/ui/avatar'
 import { Pill } from '@/components/ui/pill'
@@ -93,6 +94,7 @@ async function descargarReporte(alumno: any, setLoading: (v: boolean) => void) {
 export default function AlumnoDetallePage() {
   const { id } = useParams<{ id: string }>()
   const router = useRouter()
+  const { selectedCiclo } = useCicloCtx()
   const [tab, setTab] = useState<Tab>('Resumen')
   const [reporteLoading, setReporteLoading] = useState(false)
 
@@ -200,7 +202,7 @@ export default function AlumnoDetallePage() {
               style={{ background: 'var(--color-primary)', color: '#fff' }}
             >
               <div className="text-[9px] tracking-[0.2em] opacity-80 uppercase">
-                Centro Preuniversitario · 2026-I
+                Centro Preuniversitario{selectedCiclo ? ` · ${selectedCiclo.nombre}` : ''}
               </div>
               <div className="font-serif text-[14px] font-semibold mt-1 leading-tight">
                 {nombre} {apellidos}

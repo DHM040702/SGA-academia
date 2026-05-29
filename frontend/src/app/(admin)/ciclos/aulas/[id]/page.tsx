@@ -9,7 +9,7 @@ import { Pill } from '@/components/ui/pill'
 import { Dot } from '@/components/ui/dot'
 import { KPI } from '@/components/ui/kpi'
 import { PageHeader } from '@/components/layout/page-header'
-import { Edit, Users, Calendar, MapPin, X } from '@/components/icons'
+import { Edit, Users, Calendar, MapPin, X, Download } from '@/components/icons'
 
 /* ─── Constantes ─────────────────────────────────────────────────── */
 const TURNO_LABEL: Record<string, string> = { manana: 'Mañana', tarde: 'Tarde' }
@@ -137,10 +137,46 @@ export default function AulaDetallePage() {
   const router = useRouter()
   const searchParams = useSearchParams()
   const { data: aula, isLoading } = useAula(id)
-  const [showEdit, setShowEdit] = useState(false)
+  const [showEdit,      setShowEdit]      = useState(false)
+  const [carnetLoading, setCarnetLoading] = useState(false)
 
   const initialTab: Tab = searchParams.get('tab') === 'horarios' ? 'Horarios' : 'Alumnos'
   const [tab, setTab] = useState<Tab>(initialTab)
+
+  /* ── Generar hoja A4 con carnets de todos los alumnos del aula ── */
+  async function generarCarnetsAula() {
+    if (!aula || aula.alumnos.length === 0) return
+    setCarnetLoading(true)
+    try {
+      const cicloLabel = aula.ciclo?.nombre ?? '2026-I'
+      const turno = aula.turno === 'tarde' ? 'Tarde' : aula.turno === 'manana' ? 'Mañana' : undefined
+      const alumnos = aula.alumnos.map((a) => ({
+        nombre:       a.nombre,
+        apellidos:    a.apellidos,
+        dni:          a.dni,
+        codigoBarras: a.codigoBarras,
+        turno,
+        aula:         { nombre: aula.nombre, ciclo: { nombre: cicloLabel } },
+      }))
+      const [{ pdf }, { CarnetSheetPDF }] = await Promise.all([
+        import('@react-pdf/renderer'),
+        import('@/components/reportes/carnet-pdf'),
+      ])
+      const blob = await pdf(CarnetSheetPDF({ alumnos, cicloLabel })).toBlob()
+      const url  = URL.createObjectURL(blob)
+      const link = Object.assign(document.createElement('a'), {
+        href:     url,
+        download: `carnets-hoja-A4-${aula.nombre}-${cicloLabel}.pdf`,
+      })
+      document.body.appendChild(link); link.click(); document.body.removeChild(link)
+      URL.revokeObjectURL(url)
+    } catch (err) {
+      console.error('Error al generar carnets:', err)
+      alert('No se pudo generar los carnets. Inténtalo de nuevo.')
+    } finally {
+      setCarnetLoading(false)
+    }
+  }
 
   // Agrupar horarios por día
   const horariosPorDia = (aula?.horarios ?? []).reduce<Record<number, HorarioAula[]>>(
@@ -296,7 +332,22 @@ export default function AulaDetallePage() {
 
           {/* ── Tab Alumnos ── */}
           {tab === 'Alumnos' && (
-            <Card>
+            <Card
+              title={`Alumnos${aula._count ? ` (${aula._count.alumnos})` : ''}`}
+              action={
+                aula.alumnos.length > 0 ? (
+                  <Btn
+                    size="sm"
+                    icon={<Download size={14} />}
+                    disabled={carnetLoading}
+                    onClick={generarCarnetsAula}
+                    title="Genera una hoja A4 apaisada con 9 carnets por página"
+                  >
+                    {carnetLoading ? 'Generando…' : 'Carnets hoja A4'}
+                  </Btn>
+                ) : undefined
+              }
+            >
               {aula.alumnos.length === 0 ? (
                 <div className="py-10 text-center text-text-mute text-[13px]">
                   No hay alumnos en esta aula

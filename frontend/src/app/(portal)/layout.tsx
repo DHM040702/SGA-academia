@@ -4,6 +4,8 @@ import { useEffect } from 'react'
 import { useRouter, usePathname } from 'next/navigation'
 import Link from 'next/link'
 import { useAuth } from '@/contexts/auth-context'
+import { useActiveCiclo } from '@/hooks/use-ciclos'
+import { cicloWeekInfo } from '@/contexts/ciclo-context'
 import { Avatar } from '@/components/ui/avatar'
 import { Pill } from '@/components/ui/pill'
 import { Dot } from '@/components/ui/dot'
@@ -27,8 +29,15 @@ const NAV_APODERADO = [
 
 export default function PortalLayout({ children }: { children: React.ReactNode }) {
   const { user, loading, logout } = useAuth()
-  const router = useRouter()
+  const router   = useRouter()
   const pathname = usePathname()
+  const cicloActivo = useActiveCiclo()
+  const cicloWeek   = cicloActivo
+    ? cicloWeekInfo(cicloActivo.fechaInicio, cicloActivo.fechaFin)
+    : null
+  const cicloTag = cicloActivo && cicloWeek
+    ? `Ciclo ${cicloActivo.nombre} · semana ${cicloWeek.week}`
+    : cicloActivo?.nombre ?? ''
 
   useEffect(() => {
     if (!loading && !user) router.replace('/login')
@@ -110,7 +119,8 @@ export default function PortalLayout({ children }: { children: React.ReactNode }
                 {alumno.codigoBarras ?? '——'}
               </div>
               <div className="text-[10px] opacity-75 mt-0.5">
-                {(alumno as any).aulaId ? 'Aula activa' : 'Sin aula'} · 2026-I
+                {(alumno as any).aulaId ? 'Aula activa' : 'Sin aula'}
+                {cicloActivo ? ` · ${cicloActivo.nombre}` : ''}
               </div>
             </div>
           </div>
@@ -149,10 +159,12 @@ export default function PortalLayout({ children }: { children: React.ReactNode }
             />
           </div>
           <div className="flex-1" />
-          <Pill tone="primary">
-            <Dot tone="primary" size={6} />
-            Ciclo 2026-I · semana 5
-          </Pill>
+          {cicloTag && (
+            <Pill tone="primary">
+              <Dot tone="primary" size={6} />
+              {cicloTag}
+            </Pill>
+          )}
           <button className="relative p-1.5 text-text-mute hover:text-text transition-colors bg-transparent border-none cursor-pointer">
             <Bell size={18} />
             <span

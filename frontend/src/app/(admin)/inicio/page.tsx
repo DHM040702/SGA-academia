@@ -10,6 +10,7 @@ import { Pill } from '@/components/ui/pill'
 import { Dot } from '@/components/ui/dot'
 import { Avatar } from '@/components/ui/avatar'
 import { useAuth } from '@/contexts/auth-context'
+import { useCicloCtx, cicloWeekInfo } from '@/contexts/ciclo-context'
 import api from '@/lib/api'
 import { Download, Plus, ChevR, Calendar, ScanLine, RefreshCw, AlertTriangle } from '@/components/icons'
 import { useCerrarTurno } from '@/hooks/use-asistencia'
@@ -435,6 +436,7 @@ function VigilanteInicio() {
 function AdminInicio() {
   const { user } = useAuth()
   const router = useRouter()
+  const { cicloActivo } = useCicloCtx()
 
   const firstName = user?.email?.split('@')[0]?.split('.')[0] ?? 'usuario'
   const capitalized = firstName.charAt(0).toUpperCase() + firstName.slice(1)
@@ -442,9 +444,15 @@ function AdminInicio() {
   const now = new Date()
   const horaStr = now.getHours() < 12 ? 'Buenos días' : now.getHours() < 19 ? 'Buenas tardes' : 'Buenas noches'
   const fechaStr = now.toLocaleDateString('es-PE', { weekday: 'long', day: 'numeric', month: 'long', year: 'numeric' })
-  // Usar fecha local, no UTC, para evitar desfase de zona horaria
   const todayStr = `${now.getFullYear()}-${String(now.getMonth() + 1).padStart(2, '0')}-${String(now.getDate()).padStart(2, '0')}`
   const todayDia = now.getDay() === 0 ? 7 : now.getDay()
+
+  const cicloWeek = cicloActivo
+    ? cicloWeekInfo(cicloActivo.fechaInicio, cicloActivo.fechaFin)
+    : null
+  const cicloTag = cicloActivo
+    ? `Ciclo ${cicloActivo.nombre}, semana ${cicloWeek!.week} de ${cicloWeek!.total}`
+    : ''
 
   const { data: reporte } = useQuery({
     queryKey: ['reportes', 'asistencia', '30d'],
@@ -558,7 +566,7 @@ function AdminInicio() {
 
       <p className="text-[12.5px] text-text-mute m-0 px-1">
         <span className="text-text font-medium capitalize">{fechaStr}</span>
-        {' · '}Ciclo 2026-I, semana 5 de 16
+        {cicloTag ? ` · ${cicloTag}` : ''}
       </p>
 
       <div className="grid grid-cols-4 gap-3.5">

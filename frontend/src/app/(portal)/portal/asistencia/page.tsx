@@ -3,6 +3,7 @@
 import { useState } from 'react'
 import { useAuth } from '@/contexts/auth-context'
 import { useAsistencia } from '@/hooks/use-asistencia'
+import { useActiveCiclo } from '@/hooks/use-ciclos'
 import { KPI } from '@/components/ui/kpi'
 import { Card } from '@/components/ui/card'
 import { Pill } from '@/components/ui/pill'
@@ -75,6 +76,7 @@ export default function PortalAsistenciaPage() {
   const { user } = useAuth()
   const alumno = user?.alumno
   const alumnoId: string | undefined = alumno?.id
+  const cicloActivo = useActiveCiclo()
 
   const now = new Date()
   const [viewMonth, setViewMonth] = useState(now.getMonth())
@@ -118,7 +120,7 @@ export default function PortalAsistenciaPage() {
       {/* Hero */}
       <div className="flex items-end justify-between mb-5">
         <div>
-          <div className="text-[11.5px] text-text-mute mb-1">Ciclo 2026-I · seguimiento personal</div>
+          <div className="text-[11.5px] text-text-mute mb-1">{cicloActivo ? `Ciclo ${cicloActivo.nombre} · ` : ''}seguimiento personal</div>
           <h1 className="m-0 font-serif font-semibold text-[30px] tracking-[-0.02em] leading-[1.1]">
             Mi asistencia
           </h1>

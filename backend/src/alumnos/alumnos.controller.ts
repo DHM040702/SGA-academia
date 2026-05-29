@@ -118,24 +118,60 @@ export class AlumnosController {
 
   @Post('import')
   @Roles(Rol.admin)
-  @ApiOperation({ summary: 'Importar alumnos desde Excel (.xlsx)' })
+  @ApiOperation({ summary: 'Importar alumnos desde Excel (.xlsx). Formato: CÓDIGO, DNI, AP. PATERNO, AP. MATERNO, NOMBRES, TURNO, AULA' })
   @ApiConsumes('multipart/form-data')
   @UseInterceptors(FileInterceptor('file'))
   async importar(@UploadedFile() file: Express.Multer.File) {
     const wb = XLSX.read(file.buffer, { type: 'buffer' });
     const ws = wb.Sheets[wb.SheetNames[0]];
-    const rows: any[] = XLSX.utils.sheet_to_json(ws);
+    const rows: any[] = XLSX.utils.sheet_to_json(ws, { defval: '' });
 
-    // Mapea columnas del Excel → DTO
-    const dtos: CreateAlumnoDto[] = rows.map((r) => ({
-      dni: String(r['DNI'] ?? r['dni'] ?? '').trim(),
-      nombres: String(r['Nombres'] ?? r['nombres'] ?? '').trim(),
-      apellidos: String(r['Apellidos'] ?? r['apellidos'] ?? '').trim(),
-      email: String(r['Email'] ?? r['email'] ?? r['Correo'] ?? '').trim(),
-      password: String(r['DNI'] ?? r['dni'] ?? ''), // Contraseña inicial = DNI
-      fecha_nacimiento: r['Fecha_nacimiento'] ?? r['FechaNacimiento'] ?? undefined,
-      telefono: r['Telefono'] ?? r['telefono'] ?? undefined,
-    }));
+    // Obtener mapa de aulas (nombre|turno → id)
+    const aulaMap = await this.service.getAulaMap();
+
+    function str(v: any) { return String(v ?? '').trim(); }
+
+    function normalizeAula(s: string): string {
+      s = s.toUpperCase();
+      const m = s.match(/^([A-Z])(\d{3})$/);
+      return m ? `${m[1]}-${m[2]}` : s;
+    }
+
+    function normalizeTurno(s: string): 'manana' | 'tarde' {
+      return s.toUpperCase().includes('TARDE') ? 'tarde' : 'manana';
+    }
+
+    const dtos: CreateAlumnoDto[] = rows.map((r) => {
+      // Soporte para formato nuevo (CÓDIGO, AP. PATERNO…) y legado (Nombres, Apellidos, Email)
+      const codigo    = str(r['CÓDIGO'] ?? r['CODIGO'] ?? r['Código'] ?? r['codigo'] ?? '').padStart(6, '0').slice(-6);
+      const dni       = str(r['DNI'] ?? r['dni'] ?? '');
+      const apPat     = str(r['AP. PATERNO'] ?? r['AP.PATERNO'] ?? r['ApPaterno'] ?? '');
+      const apMat     = str(r['AP. MATERNO'] ?? r['AP.MATERNO'] ?? r['ApMaterno'] ?? '');
+      const nombres   = str(r['NOMBRES'] ?? r['Nombres'] ?? r['nombres'] ?? '');
+      const apellidos = apPat && apMat
+        ? `${apPat} ${apMat}`
+        : str(r['Apellidos'] ?? r['apellidos'] ?? `${apPat} ${apMat}`.trim());
+
+      // Email: priorizar columna, luego generar desde código
+      const email = str(r['Email'] ?? r['email'] ?? r['Correo'] ?? '') || `${codigo}@academia.edu`;
+
+      // Aula
+      const aulaNom  = normalizeAula(str(r['AULA'] ?? r['Aula'] ?? r['aula'] ?? ''));
+      const turno    = normalizeTurno(str(r['TURNO'] ?? r['Turno'] ?? r['turno'] ?? ''));
+      const aulaKey  = `${aulaNom.toLowerCase()}|${turno}`;
+      const aula_id  = aulaMap.get(aulaKey) ?? undefined;
+
+      return {
+        dni,
+        nombres,
+        apellidos,
+        email,
+        password: dni.length >= 8 ? dni : 'Matricula2026',
+        aula_id,
+        fecha_nacimiento: r['Fecha_nacimiento'] ?? r['FechaNacimiento'] ?? undefined,
+        telefono: r['Telefono'] ?? r['telefono'] ?? undefined,
+      };
+    });
 
     return this.service.importar(dtos);
   }

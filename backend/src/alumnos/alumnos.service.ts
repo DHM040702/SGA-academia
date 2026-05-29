@@ -435,6 +435,18 @@ export class AlumnosService {
     return results;
   }
 
+  /** Mapa (nombre_aula_lower|turno) → aulaId para el controller de importación */
+  async getAulaMap(): Promise<Map<string, string>> {
+    const aulas = await this.prisma.aula.findMany({
+      select: { id: true, nombre: true, turno: true },
+    });
+    const map = new Map<string, string>();
+    for (const a of aulas) {
+      map.set(`${a.nombre.toLowerCase()}|${a.turno}`, a.id);
+    }
+    return map;
+  }
+
   /* ── Foto de perfil ──────────────────────────────────────── */
 
   /**

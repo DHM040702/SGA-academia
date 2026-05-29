@@ -2,6 +2,7 @@
 
 import { useState } from 'react'
 import { useBiblioteca, useBibliotecaStats, type TipoRecurso, type RecursoBiblioteca } from '@/hooks/use-biblioteca'
+import { useActiveCiclo } from '@/hooks/use-ciclos'
 import { Card } from '@/components/ui/card'
 import { Pill } from '@/components/ui/pill'
 import { Btn } from '@/components/ui/btn'
@@ -45,6 +46,7 @@ export default function PortalBibliotecaPage() {
   const [tipoFilter, setTipoFilter] = useState<TipoRecurso | undefined>(undefined)
   const [search, setSearch] = useState('')
   const [page, setPage] = useState(1)
+  const cicloActivo = useActiveCiclo()
 
   const { data: stats } = useBibliotecaStats()
   const { data: recursos, isLoading } = useBiblioteca({
@@ -77,7 +79,7 @@ export default function PortalBibliotecaPage() {
       {/* Hero */}
       <div className="flex items-end justify-between mb-5">
         <div>
-          <div className="text-[11.5px] text-text-mute mb-1">Ciclo 2026-I · material de estudio</div>
+          <div className="text-[11.5px] text-text-mute mb-1">{cicloActivo ? `Ciclo ${cicloActivo.nombre} · ` : ''}material de estudio</div>
           <h1 className="m-0 font-serif font-semibold text-[30px] tracking-[-0.02em] leading-[1.1]">
             Biblioteca digital
           </h1>
