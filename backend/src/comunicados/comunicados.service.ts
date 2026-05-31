@@ -66,16 +66,26 @@ export class ComunicadosService {
       include: {
         publicadoPor: { select: { id: true, email: true } },
         aula:         { select: { id: true, nombre: true } },
+        _count:       { select: { envios: true } },
         envios: {
           select: {
             id: true, usuarioId: true, canal: true,
             estado: true, enviadoAt: true, errorDetalle: true,
           },
+          orderBy: { enviadoAt: 'desc' },
+          take: 10,
         },
       },
     });
     if (!comunicado) throw new NotFoundException('Comunicado no encontrado');
-    return comunicado;
+
+    const [enviados, total_envios] = await Promise.all([
+      this.prisma.comunicadoEnvio.count({ where: { comunicadoId: id, estado: EstadoEnvio.enviado } }),
+      this.prisma.comunicadoEnvio.count({ where: { comunicadoId: id } }),
+    ]);
+    const pct_enviado = total_envios > 0 ? Math.round((enviados / total_envios) * 100) : 0;
+
+    return { ...comunicado, pct_enviado };
   }
 
   async create(dto: CreateComunicadoDto, publicadoPorId: string) {
@@ -111,12 +121,14 @@ export class ComunicadosService {
           select: { id: true },
         });
         if (destinatarios.length > 0) {
+          const ahora = new Date();
           await tx.comunicadoEnvio.createMany({
             data: destinatarios.map((u) => ({
               comunicadoId: comunicado.id,
               usuarioId:    u.id,
               canal:        CanalEnvio.sistema,
-              estado:       EstadoEnvio.pendiente,
+              estado:       EstadoEnvio.enviado,
+              enviadoAt:    ahora,
             })),
           });
         }

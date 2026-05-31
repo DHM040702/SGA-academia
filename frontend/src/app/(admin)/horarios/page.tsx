@@ -16,6 +16,8 @@ import { Btn } from '@/components/ui/btn'
 import { PageHeader } from '@/components/layout/page-header'
 import { Plus, Download, AlertTriangle, Edit, Trash, X, Eye } from '@/components/icons'
 import { useAuth } from '@/contexts/auth-context'
+import { SearchableSelect } from '@/components/ui/searchable-select'
+import type { SelectOption } from '@/components/ui/searchable-select'
 
 const DIA_FULL = ['Lunes', 'Martes', 'Miércoles', 'Jueves', 'Viernes', 'Sábado']
 const DIAS_NUM = [1, 2, 3, 4, 5, 6]
@@ -59,28 +61,54 @@ interface ModalProps {
 }
 
 function HorarioModal({ horario, onClose }: ModalProps) {
-  const { data: aulas = [] }                       = useAulas()
-  const { data: docentesPage, isLoading: loadingD } = useDocentes({ limit: 100 })
-  const { data: cursos = [], isLoading: loadingC }  = useCursos()
-  const docentes = (docentesPage as any)?.data ?? (Array.isArray(docentesPage) ? docentesPage : [])
+  const { data: aulas = [] }                        = useAulas()
+  const { data: docentesPage, isLoading: loadingD } = useDocentes({ limit: 200 })
+  const { data: cursos = [],  isLoading: loadingC } = useCursos()
+  const docentes: any[] = (docentesPage as any)?.data ?? (Array.isArray(docentesPage) ? docentesPage : [])
 
-  const createMut  = useCreateHorario()
-  const updateMut  = useUpdateHorario()
-  const isEditing  = Boolean(horario)
+  const createMut = useCreateHorario()
+  const updateMut = useUpdateHorario()
+  const isEditing = Boolean(horario)
 
   const [form, setForm] = useState({
-    aula_id:    horario?.aulaId    ?? '',
-    curso_id:   horario?.cursoId   ?? '',
-    docente_id: horario?.docenteId ?? '',
-    dia_semana: horario?.diaSemana ?? 1,
+    aula_id:     horario?.aulaId    ?? '',
+    curso_id:    horario?.cursoId   ?? '',
+    docente_id:  horario?.docenteId ?? '',
+    dia_semana:  horario?.diaSemana ?? 1,
     hora_inicio: extractTime(horario?.horaInicio),
     hora_fin:    extractTime(horario?.horaFin),
   })
   const [error, setError] = useState('')
 
+  // ── Cerrar con Escape ──────────────────────────────────────────
+  useEffect(() => {
+    function handler(e: KeyboardEvent) {
+      if (e.key === 'Escape') onClose()
+    }
+    document.addEventListener('keydown', handler)
+    return () => document.removeEventListener('keydown', handler)
+  }, [onClose])
+
   function set(k: string, v: string | number) {
     setForm((f) => ({ ...f, [k]: v }))
     setError('')
+  }
+
+  // ── Al cambiar docente: auto-rellenar curso según especialidad ─
+  function handleDocenteChange(docenteId: string) {
+    set('docente_id', docenteId)
+    if (!docenteId) return
+    const docente = docentes.find((d: any) => d.id === docenteId)
+    if (!docente?.especialidad) return
+    // Buscar curso que coincida (por nombre exacto o inclusión)
+    const esp = docente.especialidad.trim().toLowerCase()
+    const match = (cursos as any[]).find(
+      (c: any) =>
+        c.nombre.toLowerCase() === esp ||
+        c.nombre.toLowerCase().includes(esp) ||
+        esp.includes(c.nombre.toLowerCase()),
+    )
+    if (match) setForm((f) => ({ ...f, docente_id: docenteId, curso_id: match.id }))
   }
 
   async function handleSubmit(e: React.FormEvent) {
@@ -104,74 +132,96 @@ function HorarioModal({ horario, onClose }: ModalProps) {
 
   const isPending = createMut.isPending || updateMut.isPending
 
+  // ── Opciones para SearchableSelect ────────────────────────────
+  const aulaOptions: SelectOption[] = aulas.map((a) => ({
+    id:    a.id,
+    label: a.nombre,
+    sub:   a.turno === 'manana' ? 'Mañana' : 'Tarde',
+  }))
+
+  const docenteOptions: SelectOption[] = docentes.map((d: any) => ({
+    id:    d.id,
+    label: `${d.apellidos}, ${d.nombre}`,
+    sub:   d.especialidad ?? undefined,
+  }))
+
+  const cursoOptions: SelectOption[] = (cursos as any[]).map((c: any) => ({
+    id:    c.id,
+    label: c.nombre,
+    sub:   c.codigo,
+  }))
+
   return (
-    <div className="fixed inset-0 z-50 flex items-center justify-center" style={{ background: 'rgba(0,0,0,0.35)' }}>
+    <div
+      className="fixed inset-0 z-50 flex items-center justify-center"
+      style={{ background: 'rgba(0,0,0,0.45)', backdropFilter: 'blur(2px)' }}
+      onClick={(e) => { if (e.target === e.currentTarget) onClose() }}
+    >
       <div className="bg-surface border border-border rounded-3 shadow-3 w-full max-w-md p-6 flex flex-col gap-4">
         <div className="flex items-center justify-between">
-          <h2 className="text-[15px] font-semibold">{isEditing ? 'Editar clase' : 'Asignar clase'}</h2>
-          <button onClick={onClose} className="text-text-mute hover:text-text">
-            <X size={18} />
+          <div>
+            <h2 className="text-[15px] font-semibold">{isEditing ? 'Editar clase' : 'Asignar clase'}</h2>
+            <p className="text-[11.5px] text-text-mute mt-0.5">Escribe para buscar en los desplegables · Escape para cerrar</p>
+          </div>
+          <button onClick={onClose} className="text-text-mute hover:text-text p-1 rounded-2 hover:bg-surface2 border-none bg-transparent cursor-pointer">
+            <X size={16} />
           </button>
         </div>
 
         <form onSubmit={handleSubmit} className="flex flex-col gap-3">
-          {/* Aula */}
-          <label className="flex flex-col gap-1">
-            <span className="text-[12px] font-medium text-text-mute">Aula</span>
-            <select
-              value={form.aula_id}
-              onChange={(e) => set('aula_id', e.target.value)}
-              className="px-3 py-2 text-[13px] border border-border rounded-2 bg-surface"
-              required
-            >
-              <option value="">Seleccionar aula…</option>
-              {aulas.map((a) => (
-                <option key={a.id} value={a.id}>{a.nombre}</option>
-              ))}
-            </select>
-          </label>
 
-          {/* Curso */}
-          <label className="flex flex-col gap-1">
-            <span className="text-[12px] font-medium text-text-mute">Curso</span>
-            <select
-              value={form.curso_id}
-              onChange={(e) => set('curso_id', e.target.value)}
-              className="px-3 py-2 text-[13px] border border-border rounded-2 bg-surface"
-              required
-              disabled={loadingC}
-            >
-              <option value="">{loadingC ? 'Cargando cursos…' : 'Seleccionar curso…'}</option>
-              {cursos.map((c) => (
-                <option key={c.id} value={c.id}>{c.nombre}</option>
-              ))}
-            </select>
-          </label>
-
-          {/* Docente */}
-          <label className="flex flex-col gap-1">
-            <span className="text-[12px] font-medium text-text-mute">Docente</span>
-            <select
+          {/* ── Docente (primero para auto-rellenar curso) ── */}
+          <div className="flex flex-col gap-1">
+            <span className="text-[12px] font-medium text-text-mute">
+              Docente
+              {form.docente_id && (
+                <span className="ml-1.5 text-primary font-normal">
+                  → curso autocompletado
+                </span>
+              )}
+            </span>
+            <SearchableSelect
               value={form.docente_id}
-              onChange={(e) => set('docente_id', e.target.value)}
-              className="px-3 py-2 text-[13px] border border-border rounded-2 bg-surface"
+              onChange={handleDocenteChange}
+              options={docenteOptions}
+              placeholder={loadingD ? 'Cargando docentes…' : 'Buscar por apellido o especialidad…'}
+              loading={loadingD}
               required
-              disabled={loadingD}
-            >
-              <option value="">{loadingD ? 'Cargando docentes…' : 'Seleccionar docente…'}</option>
-              {docentes.map((d: any) => (
-                <option key={d.id} value={d.id}>{d.nombre} {d.apellidos}</option>
-              ))}
-            </select>
-          </label>
+            />
+          </div>
 
-          {/* Día */}
+          {/* ── Curso (auto-rellenado desde docente) ── */}
+          <div className="flex flex-col gap-1">
+            <span className="text-[12px] font-medium text-text-mute">Curso</span>
+            <SearchableSelect
+              value={form.curso_id}
+              onChange={(v) => set('curso_id', v)}
+              options={cursoOptions}
+              placeholder={loadingC ? 'Cargando cursos…' : 'Buscar curso…'}
+              loading={loadingC}
+              required
+            />
+          </div>
+
+          {/* ── Aula ── */}
+          <div className="flex flex-col gap-1">
+            <span className="text-[12px] font-medium text-text-mute">Aula</span>
+            <SearchableSelect
+              value={form.aula_id}
+              onChange={(v) => set('aula_id', v)}
+              options={aulaOptions}
+              placeholder="Buscar aula…"
+              required
+            />
+          </div>
+
+          {/* ── Día ── */}
           <label className="flex flex-col gap-1">
             <span className="text-[12px] font-medium text-text-mute">Día</span>
             <select
               value={form.dia_semana}
               onChange={(e) => set('dia_semana', Number(e.target.value))}
-              className="px-3 py-2 text-[13px] border border-border rounded-2 bg-surface"
+              className="px-3 py-2 text-[13px] border border-border rounded-2 bg-surface focus:outline-none focus:border-primary"
             >
               {DIA_FULL.map((d, i) => (
                 <option key={i + 1} value={i + 1}>{d}</option>
@@ -179,7 +229,7 @@ function HorarioModal({ horario, onClose }: ModalProps) {
             </select>
           </label>
 
-          {/* Horas */}
+          {/* ── Horas ── */}
           <div className="grid grid-cols-2 gap-3">
             <label className="flex flex-col gap-1">
               <span className="text-[12px] font-medium text-text-mute">Hora inicio</span>
@@ -187,7 +237,7 @@ function HorarioModal({ horario, onClose }: ModalProps) {
                 type="time"
                 value={form.hora_inicio}
                 onChange={(e) => set('hora_inicio', e.target.value)}
-                className="px-3 py-2 text-[13px] border border-border rounded-2 bg-surface"
+                className="px-3 py-2 text-[13px] border border-border rounded-2 bg-surface focus:outline-none focus:border-primary"
                 required
               />
             </label>
@@ -197,14 +247,14 @@ function HorarioModal({ horario, onClose }: ModalProps) {
                 type="time"
                 value={form.hora_fin}
                 onChange={(e) => set('hora_fin', e.target.value)}
-                className="px-3 py-2 text-[13px] border border-border rounded-2 bg-surface"
+                className="px-3 py-2 text-[13px] border border-border rounded-2 bg-surface focus:outline-none focus:border-primary"
                 required
               />
             </label>
           </div>
 
           {error && (
-            <p className="text-[12px] text-danger">{error}</p>
+            <p className="text-[12px] text-danger bg-danger-light/40 px-3 py-2 rounded-2">{error}</p>
           )}
 
           <div className="flex gap-2 pt-1">
@@ -395,11 +445,18 @@ function buildPrintHtml(
 }
 
 function ExportModal({ horarios, aulas, onClose }: ExportModalProps) {
-  const [scope, setScope]           = useState<ExportScope>('completo')
-  const [aulaId, setAulaId]         = useState(aulas[0]?.id ?? '')
-  const [dia, setDia]               = useState(1)
+  const [scope, setScope]             = useState<ExportScope>('completo')
+  const [aulaId, setAulaId]           = useState(aulas[0]?.id ?? '')
+  const [dia, setDia]                 = useState(1)
   const [orientacion, setOrientacion] = useState<'landscape' | 'portrait'>('landscape')
   const [conDocentes, setConDocentes] = useState(true)
+
+  // Cerrar con Escape
+  useEffect(() => {
+    function handler(e: KeyboardEvent) { if (e.key === 'Escape') onClose() }
+    document.addEventListener('keydown', handler)
+    return () => document.removeEventListener('keydown', handler)
+  }, [onClose])
 
   function handleExport() {
     const html = buildPrintHtml({ scope, aulaId, dia, orientacion, conDocentes }, horarios, aulas)
@@ -419,11 +476,15 @@ function ExportModal({ horarios, aulas, onClose }: ExportModalProps) {
   ]
 
   return (
-    <div className="fixed inset-0 z-50 flex items-center justify-center" style={{ background: 'rgba(0,0,0,0.35)' }}>
+    <div
+      className="fixed inset-0 z-50 flex items-center justify-center"
+      style={{ background: 'rgba(0,0,0,0.45)', backdropFilter: 'blur(2px)' }}
+      onClick={(e) => { if (e.target === e.currentTarget) onClose() }}
+    >
       <div className="bg-surface border border-border rounded-3 shadow-3 w-full max-w-md p-6 flex flex-col gap-5">
         <div className="flex items-center justify-between">
           <h2 className="text-[15px] font-semibold">Exportar horario</h2>
-          <button onClick={onClose} className="text-text-mute hover:text-text"><X size={18} /></button>
+          <button onClick={onClose} className="text-text-mute hover:text-text border-none bg-transparent cursor-pointer p-1 rounded-2 hover:bg-surface2"><X size={16} /></button>
         </div>
 
         {/* Alcance */}

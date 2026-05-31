@@ -43,6 +43,7 @@ export class AsistenciaService {
     }
 
     // Verificar si ya existe registro del día
+    // (cubre también horarios contiguos: el segundo scan del mismo día es ignorado)
     const existente = await this.prisma.asistencia.findFirst({
       where: {
         tipoPersona,
@@ -57,9 +58,41 @@ export class AsistenciaService {
     });
     if (existente) return existente;
 
-    // Todo ingreso nuevo se registra siempre como presente (esTardanza = false).
-    // La tardanza solo se puede asignar mediante corrección manual posterior.
-    const esTardanza = false;
+    // ── Determinación de tardanza ─────────────────────────────────────────────
+    // Alumnos: siempre "presente" al escanear (sin chequeo de horario por TurnoConfig).
+    // Docentes: comparar hora de llegada con horaInicio de su primera clase del día.
+    //   · Si llega después de horaInicio → tardanza.
+    //   · Si llega antes o exactamente a tiempo → puntual.
+    //   · Tolerancia de 5 minutos incluida.
+    //   · Si no tiene horario hoy → presente por defecto.
+    let esTardanza = false;
+
+    if (docenteId) {
+      // Día de la semana: 0=Dom → 7, 1=Lun → 1, …, 6=Sáb → 6
+      const diaSemana = now.getDay() === 0 ? 7 : now.getDay();
+
+      const horariosHoy = await this.prisma.horario.findMany({
+        where:   { docenteId, diaSemana },
+        orderBy: { horaInicio: 'asc' },
+        select:  { horaInicio: true, horaFin: true },
+      });
+
+      if (horariosHoy.length > 0) {
+        // Primera clase del día
+        const primera = horariosHoy[0];
+        const TOLERANCIA_MS = 5 * 60_000; // 5 minutos de margen
+
+        const inicioMs =
+          primera.horaInicio.getUTCHours()   * 3_600_000 +
+          primera.horaInicio.getUTCMinutes() * 60_000;
+
+        const ahoraMs =
+          now.getHours()   * 3_600_000 +
+          now.getMinutes() * 60_000;
+
+        esTardanza = ahoraMs > inicioMs + TOLERANCIA_MS;
+      }
+    }
 
     return this.prisma.asistencia.create({
       data: {

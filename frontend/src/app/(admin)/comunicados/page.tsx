@@ -501,7 +501,7 @@ export default function ComunicadosPage() {
   const creadoBasico = esVigilante              // vigilante: crea avisos simples
 
   // Admin/director ven tabs de gestión; el resto solo ve su bandeja de recibidos
-  const TABS_GESTION: Tab[] = ['Todos', 'Enviados', 'Borradores', 'Recibidos']
+  const TABS_GESTION: Tab[] = ['Todos', 'Enviados', 'Borradores']
   const TABS_RECEPTOR: Tab[] = ['Recibidos']
   const tabsDisponibles = esAdmin ? TABS_GESTION : TABS_RECEPTOR
 
@@ -764,7 +764,7 @@ export default function ComunicadosPage() {
                     <div className="flex justify-between text-[11px] text-text-mute">
                       <span>Total envíos</span>
                       <span className="font-mono font-semibold text-text">
-                        {display._count?.envios ?? 0}
+                        {display._count?.envios ?? display.envios?.length ?? 0}
                       </span>
                     </div>
                   </div>

@@ -656,10 +656,12 @@ export default function AsistenciaPage() {
                 </Btn>
               </>
             )}
-            <Btn icon={<ScanLine size={14} />} size="sm"
-              onClick={() => window.open('/vigilante', '_blank')}>
-              Registro de asistencia
-            </Btn>
+            {!isDocente && (
+              <Btn icon={<ScanLine size={14} />} size="sm"
+                onClick={() => window.open('/vigilante', '_blank')}>
+                Registro de asistencia
+              </Btn>
+            )}
           </>
         }
       />
@@ -855,10 +857,12 @@ export default function AsistenciaPage() {
                     Cerrar asistencia del turno
                   </Btn>
                 )}
-                <Btn variant="secondary" size="sm" icon={<ScanLine size={13} />}
-                  onClick={() => window.open('/vigilante', '_blank')} className="w-full justify-start">
-                  Abrir registro de asistencia
-                </Btn>
+                {!isDocente && (
+                  <Btn variant="secondary" size="sm" icon={<ScanLine size={13} />}
+                    onClick={() => window.open('/vigilante', '_blank')} className="w-full justify-start">
+                    Abrir registro de asistencia
+                  </Btn>
+                )}
               </div>
             </Card>
           </div>
