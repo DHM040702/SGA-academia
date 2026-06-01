@@ -80,10 +80,12 @@ export function useDeleteCiclo() {
 
 export interface HorarioAula {
   id: string
+  aulaId?: string | null
   diaSemana: number
   horaInicio: string
   horaFin: string
   publicado: boolean
+  aula?: string | null
   docente: { id: string; nombre: string; apellidos: string }
   curso: { id: string; nombre: string; codigo: string }
 }
@@ -99,6 +101,7 @@ export interface AlumnoAula {
 
 export interface AulaDetalle extends Aula {
   ciclo: { id: string; nombre: string; activo: boolean; fechaInicio: string; fechaFin: string }
+  carrera?: string | null
   alumnos: AlumnoAula[]
   horarios: HorarioAula[]
 }

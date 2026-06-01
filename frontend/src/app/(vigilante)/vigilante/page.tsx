@@ -21,7 +21,7 @@ function dateStr() {
 type ScanState = 'idle' | 'success' | 'error'
 interface LastScan {
   id: string; nombre: string; codigo: string
-  seccion: string; hora: string; esTardanza: boolean
+  aula: string; hora: string; esTardanza: boolean
 }
 
 export default function VigilantePage() {
@@ -61,7 +61,7 @@ export default function VigilantePage() {
           id:         result?.id ?? '',
           nombre:     persona ? `${persona.nombre ?? (persona as any).nombres} ${persona.apellidos}` : code,
           codigo:     code,
-          seccion:    alumno?.aula?.nombre ?? '—',
+          aula:       alumno?.aula?.nombre ?? '—',
           hora:       new Date().toLocaleTimeString('es-PE', { hour: '2-digit', minute: '2-digit' }),
           esTardanza: result?.esTardanza ?? false,
         })
@@ -206,8 +206,8 @@ export default function VigilantePage() {
 
                     <p className="text-[12px] sm:text-[14px] opacity-70 m-0">
                       <span className="font-mono">{lastScan.codigo}</span>
-                      {lastScan.seccion !== '—' && (
-                        <><span className="mx-2 opacity-40">·</span>Aula {lastScan.seccion}</>
+                      {lastScan.aula !== '—' && (
+                        <><span className="mx-2 opacity-40">·</span>Aula {lastScan.aula}</>
                       )}
                     </p>
 
@@ -261,7 +261,7 @@ export default function VigilantePage() {
                   {lastScan.nombre}
                 </h1>
                 <p className="text-[12px] sm:text-[14px] opacity-75 m-0">
-                  {lastScan.codigo}{lastScan.seccion !== '—' ? ` · Aula ${lastScan.seccion}` : ''}
+                  {lastScan.codigo}{lastScan.aula !== '—' ? ` · Aula ${lastScan.aula}` : ''}
                 </p>
                 <div
                   className="inline-flex items-center gap-2 px-4 py-2 rounded-full text-[12px] sm:text-[14px] font-semibold"

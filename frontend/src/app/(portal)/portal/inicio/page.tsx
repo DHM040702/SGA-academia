@@ -151,6 +151,7 @@ function AlumnoInicio({ user }: { user: ReturnType<typeof useAuth>['user'] }) {
   const alumnoId: string | undefined = alumno?.id
   const codigoBarras: string = alumno?.codigoBarras ?? '000000'
 
+  const cicloActivo = useActiveCiclo()
   const { data: horariosRes } = useHorarios(aulaId ? { aula_id: aulaId } : {})
   const { data: asistencias } = useAsistencia(alumnoId ? { alumno_id: alumnoId, limit: 15 } : {})
   const { data: comunicados } = useComunicados({ limit: 3 })
@@ -419,6 +420,7 @@ function ApoderadoInicio({ user }: { user: ReturnType<typeof useAuth>['user'] })
   const apoderado = user?.apoderado
   const nombre = apoderado?.nombre ?? user!.email.split('@')[0]
   const firstName = nombre.split(' ')[0]
+  const cicloActivo = useActiveCiclo()
 
   const { data: asistencias } = useAsistencia({ limit: 7 })
   const { data: comunicados } = useComunicados({ limit: 3 })

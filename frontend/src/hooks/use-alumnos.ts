@@ -22,6 +22,7 @@ export interface Alumno {
   aula?: {
     id: string
     nombre: string
+    turno?: 'manana' | 'tarde'
     area?: 'ciencias' | 'letras' | 'medicas'
     ciclo: { id: string; nombre: string }
     horarios?: {

@@ -16,7 +16,7 @@ const SELECT_CLS =
 /* ─── Helper: genera y descarga un PDF ───────────────────────── */
 async function downloadPDF(component: React.ReactElement, filename: string) {
   const { pdf } = await import('@react-pdf/renderer')
-  const blob = await pdf(component).toBlob()
+  const blob = await pdf(component as React.ReactElement<any>).toBlob()
   const url  = URL.createObjectURL(blob)
   const link = Object.assign(document.createElement('a'), { href: url, download: filename })
   document.body.appendChild(link)

@@ -12,7 +12,7 @@ import { Download, Calendar, ChevL, ChevR } from '@/components/icons'
 
 const DIA_FULL = ['Lunes', 'Martes', 'Miércoles', 'Jueves', 'Viernes', 'Sábado']
 
-async function exportarHorarioPDF(horarios: Horario[], aulaLabel: string) {
+async function exportarHorarioPDF(horarios: Horario[], aulaLabel: string, cicloActivo?: { nombre: string } | null) {
   const fecha = new Date().toLocaleDateString('es-PE', { day: 'numeric', month: 'long', year: 'numeric' })
 
   function t(dt: string | Date | undefined | null): string {
@@ -180,7 +180,7 @@ export default function PortalHorarioPage() {
             variant="secondary"
             icon={<Download size={14} />}
             size="sm"
-            onClick={() => exportarHorarioPDF(allHorarios, aulaId ? 'Aula activa' : 'Sin aula')}
+            onClick={() => exportarHorarioPDF(allHorarios, aulaId ? 'Aula activa' : 'Sin aula', cicloActivo)}
           >PDF</Btn>
           <Btn variant="secondary" icon={<Calendar size={14} />} size="sm">Añadir a calendario</Btn>
         </div>
@@ -269,7 +269,7 @@ export default function PortalHorarioPage() {
                         </div>
                         {h.aula && (
                           <div className="mt-auto text-[9.5px] font-mono font-semibold" style={{ color: col }}>
-                            {h.aula}
+                            {h.aula.nombre}
                           </div>
                         )}
                       </div>

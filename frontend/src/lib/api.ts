@@ -27,9 +27,12 @@ api.interceptors.response.use(
   async (error) => {
     const original = error.config as InternalAxiosRequestConfig & { _retry?: boolean }
 
-    // No intentar refresh si el error viene del login o del propio refresh
+    // No intentar refresh si el error viene de endpoints de autenticación
     const url = original.url ?? ''
-    const isAuthEndpoint = url.includes('/auth/login') || url.includes('/auth/refresh')
+    const isAuthEndpoint =
+      url.includes('/auth/login') ||
+      url.includes('/auth/refresh') ||
+      url.includes('/auth/me')
 
     if (error.response?.status !== 401 || original._retry || isAuthEndpoint) {
       return Promise.reject(error)
@@ -58,7 +61,9 @@ api.interceptors.response.use(
     } catch {
       queue = []
       localStorage.removeItem('access_token')
-      if (typeof window !== 'undefined') window.location.href = '/login'
+      if (typeof window !== 'undefined' && window.location.pathname !== '/login') {
+        window.location.href = '/login'
+      }
       return Promise.reject(error)
     } finally {
       isRefreshing = false

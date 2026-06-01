@@ -15,12 +15,18 @@ async function bootstrap() {
   app.use(cookieParser());
 
   // ── CORS ───────────────────────────────────────────────────────
+  // FRONTEND_URL puede contener múltiples orígenes separados por coma
+  const allowedOrigins = [
+    ...(process.env.FRONTEND_URL ?? '')
+      .split(',')
+      .map((s) => s.trim())
+      .filter(Boolean),
+    'http://localhost:3000',       // desarrollo local
+    'http://127.0.0.1:3000',       // loopback alternativo
+    'http://192.168.137.1:3000',   // Mobile Hotspot
+  ];
   app.enableCors({
-    origin: [
-      process.env.FRONTEND_URL ?? 'http://localhost:3001',
-      'http://localhost:3001',
-      'http://127.0.0.1:3001',
-    ],
+    origin: allowedOrigins,
     credentials: true,
   });
 

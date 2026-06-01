@@ -148,7 +148,7 @@ export default function PortalComunicadosPage() {
                       <div className="flex items-center gap-1.5 mt-1.5">
                         {c.canalSistema && <Pill tone="primary" className="text-[10px]">Sistema</Pill>}
                         {c.canalWhatsapp && <Pill tone="success" className="text-[10px]">WhatsApp</Pill>}
-                        {c.seccion && <Pill tone="neutral" className="text-[10px]">{c.seccion.nombre}</Pill>}
+                        {c.aula && <Pill tone="neutral" className="text-[10px]">{c.aula.nombre}</Pill>}
                       </div>
                     </div>
                   </div>
@@ -180,7 +180,7 @@ export default function PortalComunicadosPage() {
                   <span>{timeAgo(selected.createdAt)}</span>
                   {selected.canalSistema && <Pill tone="primary">Sistema</Pill>}
                   {selected.canalWhatsapp && <Pill tone="success">WhatsApp</Pill>}
-                  {selected.seccion && <Pill tone="neutral">{selected.seccion.nombre}</Pill>}
+                  {selected.aula && <Pill tone="neutral">{selected.aula.nombre}</Pill>}
                 </div>
                 <div
                   className="text-[14px] leading-relaxed text-text whitespace-pre-wrap"

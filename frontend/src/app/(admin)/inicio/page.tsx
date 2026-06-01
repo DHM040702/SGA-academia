@@ -639,7 +639,7 @@ function AdminInicio() {
                       {formatHora(c.horaInicio)}
                     </div>
                     <div className="flex-1 min-w-0">
-                      <div className="text-[12.5px] font-semibold mb-0.5 truncate">{c.curso?.nombre} · {c.seccion?.nombre}</div>
+                      <div className="text-[12.5px] font-semibold mb-0.5 truncate">{c.curso?.nombre} · {c.aula?.nombre}</div>
                       <div className="text-[11.5px] text-text-mute truncate">
                         {c.docente ? `${c.docente.nombre} ${c.docente.apellidos}` : '—'}
                         {c.aula ? ` · ${c.aula?.nombre ?? c.aula}` : ''}
@@ -669,7 +669,7 @@ function AdminInicio() {
                   <Avatar name={`${a.nombre} ${a.apellidos}`} size={30} />
                   <div className="flex-1 min-w-0">
                     <div className="text-[12.5px] font-medium truncate">{a.nombre} {a.apellidos}</div>
-                    <div className="text-[11px] text-text-mute font-mono">{a.codigoBarras} · {a.seccion?.nombre ?? '—'}</div>
+                    <div className="text-[11px] text-text-mute font-mono">{a.codigoBarras} · {a.aula?.nombre ?? '—'}</div>
                   </div>
                   <Pill tone={a.asistencia_pct < 70 ? 'danger' : 'warning'}>{a.asistencia_pct}%</Pill>
                 </div>

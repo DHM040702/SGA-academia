@@ -324,7 +324,7 @@ function CarnetCardContent({ alumno, cicloLabel }: { alumno: AlumnoCarnet; ciclo
 
           {/* Datos */}
           <View style={s.info}>
-            <Text style={s.name} numberOfLines={2}>
+            <Text style={s.name}>
               {apellidos ? `${apellidos}, ${nombre}` : nombre}
             </Text>
 
@@ -338,14 +338,14 @@ function CarnetCardContent({ alumno, cicloLabel }: { alumno: AlumnoCarnet; ciclo
 
             {/* Aula · Turno · Ciclo */}
             {aulaParts.length > 0 && (
-              <Text style={s.aulaLine} numberOfLines={1}>
+              <Text style={s.aulaLine}>
                 {aulaParts.join('  ·  ')}
               </Text>
             )}
 
             {/* Carrera (si aplica) */}
             {alumno.carrera && (
-              <Text style={s.carreraLine} numberOfLines={1}>
+              <Text style={s.carreraLine}>
                 {alumno.carrera.nombre}
               </Text>
             )}

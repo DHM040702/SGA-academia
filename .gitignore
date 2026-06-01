@@ -3,18 +3,21 @@
 # ─────────────────────────────────────────────
 .claude/settings.local.json
 .claude/worktrees/
+.claude/
 
 # ─────────────────────────────────────────────
 # Dependencias (raíz del monorepo)
 # ─────────────────────────────────────────────
 node_modules/
+design-reference/
 
 # ─────────────────────────────────────────────
 # Variables de entorno
 # ─────────────────────────────────────────────
-.env
-.env.local
-.env.*.local
+# .env
+# .env.local
+# .env.*.local
+INSTALACION-Y-DESPLIEGUE.docx
 
 # ─────────────────────────────────────────────
 # Logs

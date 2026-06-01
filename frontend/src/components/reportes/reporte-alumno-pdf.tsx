@@ -445,7 +445,7 @@ export function ReporteAlumnoPDF({
                   <Text style={[s.tableCellMuted, { fontSize: 8 }]}>Auto</Text>
                 )}
               </View>
-              <Text style={[s.tableCell, s.tableCellMuted, { flex: 2.5 }]} numberOfLines={2}>
+              <Text style={[s.tableCell, s.tableCellMuted, { flex: 2.5 }]}>
                 {r.justificacionRazon ?? r.motivoManual ?? '—'}
               </Text>
             </View>

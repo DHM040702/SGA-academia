@@ -241,7 +241,7 @@ function NuevoComunicadoModal({ onClose }: { onClose: () => void }) {
               </label>
               <select
                 value={destinatario}
-                onChange={(e) => setDestinatario(e.target.value as CreateComunicadoDto['destinatario_tipo'])}
+                onChange={(e) => setDestinatario(e.target.value as 'todos' | 'alumnos' | 'apoderados' | 'docentes' | 'seccion' | 'usuario')}
                 className="w-full px-3 py-2 text-[13px] border border-border rounded-2 bg-surface focus:outline-none focus:ring-1 focus:ring-primary"
               >
                 {DESTINATARIO_OPTS.map((o) => (

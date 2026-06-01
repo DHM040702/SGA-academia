@@ -150,7 +150,7 @@ export default function UsuariosPage() {
                   </td>
                   <td className="px-4 py-3">
                     <div className="flex items-center gap-1.5">
-                      <Dot color={u.activo ? 'success' : 'neutral'} />
+                      <Dot tone={u.activo ? 'success' : 'neutral'} />
                       <span className={u.activo ? 'text-text' : 'text-text-mute'}>
                         {u.activo ? 'Activo' : 'Inactivo'}
                       </span>

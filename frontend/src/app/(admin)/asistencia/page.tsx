@@ -848,7 +848,7 @@ export default function AsistenciaPage() {
                   </Btn>
                 )}
                 <Btn variant="secondary" size="sm" icon={<Download size={13} />}
-                  onClick={() => exportarAsistencia(registros, fecha)} className="w-full justify-start">
+                  onClick={() => exportarAsistencia(registros, fecha, presentes, tardanzas, ausentes)} className="w-full justify-start">
                   Exportar lista del día
                 </Btn>
                 {!soloLectura && (
