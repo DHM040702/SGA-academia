@@ -4,6 +4,14 @@ import { JwtService } from '@nestjs/jwt';
 import * as bcrypt from 'bcrypt';
 import { PrismaService } from '../prisma/prisma.service';
 
+const REFRESH_EXPIRES_DAYS = 7;
+
+// Tipo local — no usa el cliente Prisma generado (tabla nueva, CLI roto en este setup)
+interface RefreshTokenRow {
+  id:         string;
+  token_hash: string;
+}
+
 @Injectable()
 export class AuthService {
   constructor(
@@ -34,18 +42,73 @@ export class AuthService {
 
     const refreshToken = this.jwt.sign(payload, {
       secret: this.config.get('JWT_REFRESH_SECRET'),
-      expiresIn: this.config.get('JWT_REFRESH_EXPIRES_IN', '7d'),
+      expiresIn: `${REFRESH_EXPIRES_DAYS}d`,
     });
+
+    // Guardar hash en BD con raw SQL (prisma generate no disponible en este entorno)
+    // Try-catch: si la tabla aún no existe (migración pendiente), el login igual funciona
+    try {
+      const tokenHash = await bcrypt.hash(refreshToken, 10);
+      const expiresAt = new Date(Date.now() + REFRESH_EXPIRES_DAYS * 24 * 60 * 60 * 1000);
+
+      await this.prisma.$executeRaw`
+        DELETE FROM refresh_tokens
+        WHERE usuario_id = ${user.id}::uuid
+          AND expires_at < NOW()
+      `;
+
+      await this.prisma.$executeRaw`
+        INSERT INTO refresh_tokens (usuario_id, token_hash, expires_at)
+        VALUES (${user.id}::uuid, ${tokenHash}, ${expiresAt})
+      `;
+    } catch {
+      // Tabla aún no creada — login sigue funcionando sin revocación
+    }
 
     return { accessToken, refreshToken };
   }
 
-  async refresh(user: { id: string; email: string; rol: string }) {
-    const dbUser = await this.prisma.usuario.findUnique({
-      where: { id: user.id },
-    });
+  async refresh(user: { id: string; email: string; rol: string }, rawToken: string) {
+    const dbUser = await this.prisma.usuario.findUnique({ where: { id: user.id } });
     if (!dbUser || !dbUser.activo) throw new UnauthorizedException();
+
+    // Verificar hash en BD — si la tabla no existe aún, omitir la validación
+    try {
+      const stored = await this.prisma.$queryRaw<RefreshTokenRow[]>`
+        SELECT id, token_hash
+        FROM refresh_tokens
+        WHERE usuario_id = ${user.id}::uuid
+          AND expires_at >= NOW()
+      `;
+
+      let matchedId: string | null = null;
+      for (const row of stored) {
+        if (await bcrypt.compare(rawToken, row.token_hash)) {
+          matchedId = row.id;
+          break;
+        }
+      }
+      if (!matchedId) throw new UnauthorizedException('Token de refresco inválido o revocado');
+
+      await this.prisma.$executeRaw`
+        DELETE FROM refresh_tokens WHERE id = ${matchedId}::uuid
+      `;
+    } catch (e) {
+      // Si es error de autenticación, relanzar; si es error de tabla, omitir
+      if (e instanceof UnauthorizedException) throw e;
+    }
+
     return this.login(dbUser as any);
+  }
+
+  async logout(userId: string) {
+    try {
+      await this.prisma.$executeRaw`
+        DELETE FROM refresh_tokens WHERE usuario_id = ${userId}::uuid
+      `;
+    } catch {
+      // Tabla aún no creada — logout sigue funcionando
+    }
   }
 
   async me(userId: string) {

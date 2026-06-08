@@ -8,6 +8,7 @@ import type { Request as Req, Response as Res } from 'express';
 import { AuthService } from './auth.service';
 import { LoginDto } from './dto/login.dto';
 import { JwtAuthGuard } from '../common/guards/jwt-auth.guard';
+import { LoginThrottleGuard } from '../common/guards/login-throttle.guard';
 import { CurrentUser } from '../common/decorators/current-user.decorator';
 
 const COOKIE_OPTS = {
@@ -21,17 +22,22 @@ const COOKIE_OPTS = {
 @ApiTags('Auth')
 @Controller('auth')
 export class AuthController {
-  constructor(private authService: AuthService) {}
+  constructor(
+    private authService: AuthService,
+    private throttle: LoginThrottleGuard,
+  ) {}
 
   @Post('login')
   @HttpCode(HttpStatus.OK)
-  @UseGuards(AuthGuard('local'))
+  @UseGuards(LoginThrottleGuard, AuthGuard('local'))
   @ApiOperation({ summary: 'Iniciar sesión' })
   async login(@Request() req: Req, @Body() _: LoginDto, @Response({ passthrough: true }) res: Res) {
     const reqUser = req.user as { id: string; email: string; rol: string };
     const { accessToken, refreshToken } = await this.authService.login(reqUser);
     const user = await this.authService.me(reqUser.id);
     res.cookie('refresh_token', refreshToken, COOKIE_OPTS);
+    // Login exitoso → limpiar contador de intentos
+    this.throttle.reset(req);
     return { access_token: accessToken, user };
   }
 
@@ -41,15 +47,20 @@ export class AuthController {
   @ApiCookieAuth('refresh_token')
   @ApiOperation({ summary: 'Renovar access token' })
   async refresh(@Request() req: Req, @Response({ passthrough: true }) res: Res) {
-    const { accessToken, refreshToken } = await this.authService.refresh(req.user as any);
+    const user = req.user as { id: string; email: string; rol: string; rawToken: string };
+    const { accessToken, refreshToken } = await this.authService.refresh(user, user.rawToken);
     res.cookie('refresh_token', refreshToken, COOKIE_OPTS);
     return { access_token: accessToken };
   }
 
   @Post('logout')
   @HttpCode(HttpStatus.OK)
-  @ApiOperation({ summary: 'Cerrar sesión' })
-  async logout(@Response({ passthrough: true }) res: Res) {
+  @UseGuards(AuthGuard('jwt-refresh'))
+  @ApiCookieAuth('refresh_token')
+  @ApiOperation({ summary: 'Cerrar sesión — revoca todos los refresh tokens' })
+  async logout(@Request() req: Req, @Response({ passthrough: true }) res: Res) {
+    const user = req.user as { id: string };
+    await this.authService.logout(user.id);
     res.clearCookie('refresh_token', { path: '/' });
     return { message: 'Sesión cerrada' };
   }

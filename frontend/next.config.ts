@@ -1,7 +1,7 @@
 import type { NextConfig } from "next";
 import path from "path";
 
-const BACKEND = process.env.INTERNAL_API_URL ?? 'http://localhost:3000';
+const BACKEND = process.env.INTERNAL_API_URL ?? 'http://localhost:3001';
 
 const nextConfig: NextConfig = {
   allowedDevOrigins: ['172.29.172.7'],

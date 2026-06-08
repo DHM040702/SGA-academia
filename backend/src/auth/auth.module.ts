@@ -7,6 +7,7 @@ import { AuthService } from './auth.service';
 import { JwtStrategy } from './strategies/jwt.strategy';
 import { JwtRefreshStrategy } from './strategies/jwt-refresh.strategy';
 import { LocalStrategy } from './strategies/local.strategy';
+import { LoginThrottleGuard } from '../common/guards/login-throttle.guard';
 
 @Module({
   imports: [
@@ -20,7 +21,7 @@ import { LocalStrategy } from './strategies/local.strategy';
     }),
   ],
   controllers: [AuthController],
-  providers: [AuthService, LocalStrategy, JwtStrategy, JwtRefreshStrategy],
-  exports: [AuthService],
+  providers: [AuthService, LocalStrategy, JwtStrategy, JwtRefreshStrategy, LoginThrottleGuard],
+  exports: [AuthService, LoginThrottleGuard],
 })
 export class AuthModule {}

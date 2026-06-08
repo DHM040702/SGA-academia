@@ -56,6 +56,9 @@ async function main() {
   await prisma.aula.deleteMany()
   await prisma.ciclo.deleteMany()
   await prisma.curso.deleteMany()
+  // refresh_tokens tiene ON DELETE CASCADE sobre usuarios,
+  // pero lo limpiamos explícitamente con raw SQL (tabla nueva, cliente Prisma no regenerado)
+  await prisma.$executeRaw`DELETE FROM refresh_tokens`
   await prisma.usuario.deleteMany()
   // TurnoConfig is seeded below; clear first so re-running seed is idempotent
   await prisma.$executeRaw`DELETE FROM "turnos_config"`
@@ -73,9 +76,9 @@ async function main() {
 
   // ── 2. Usuarios staff ────────────────────────────────────────────────────
   const [admin, director, vigilante] = await Promise.all([
-    prisma.usuario.create({ data: { email: 'admin@cepreunasam.edu.pe',     passwordHash: hashAdmin, rol: Rol.admin     } }),
-    prisma.usuario.create({ data: { email: 'director@cepreunasam.edu.pe',  passwordHash: hashAdmin, rol: Rol.director  } }),
-    prisma.usuario.create({ data: { email: 'vigilante@cepreunasam.edu.pe', passwordHash: hashAdmin, rol: Rol.vigilante } }),
+    prisma.usuario.create({ data: { email: 'admin@cepreunasam.edu.pe',     passwordHash: hashAdmin, rol: Rol.admin,     dni: '00000001', nombre: 'Admin',     apellidos: 'Sistema'   } }),
+    prisma.usuario.create({ data: { email: 'director@cepreunasam.edu.pe',  passwordHash: hashAdmin, rol: Rol.director,  dni: '00000002', nombre: 'Director',   apellidos: 'Sistema'   } }),
+    prisma.usuario.create({ data: { email: 'vigilante@cepreunasam.edu.pe', passwordHash: hashAdmin, rol: Rol.vigilante, dni: '00000003', nombre: 'Vigilante',  apellidos: 'Sistema'   } }),
   ])
   console.log('   ✓ Staff: admin, director, vigilante')
   void admin
@@ -458,10 +461,10 @@ async function main() {
   // ── Resumen ──────────────────────────────────────────────────────────────
   console.log('\n✅  Seed completado')
   console.log('═══════════════════════════════════════════════════════════════')
-  console.log('ACCESOS:')
-  console.log('  admin@cepreunasam.edu.pe        → admin123')
-  console.log('  director@cepreunasam.edu.pe     → admin123')
-  console.log('  vigilante@cepreunasam.edu.pe    → admin123')
+  console.log('ACCESOS (DNI / contraseña):')
+  console.log('  00000001 / admin123      (admin)')
+  console.log('  00000002 / admin123      (director)')
+  console.log('  00000003 / admin123      (vigilante)')
   console.log('  juan.garcia@cepreunasam.edu.pe  → docente123')
   console.log('  alumno001@cepreunasam.edu.pe    → alumno123  (hasta alumno030)')
   console.log('  roberto.torres@gmail.com        → apoderado123')

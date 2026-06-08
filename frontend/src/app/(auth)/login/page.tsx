@@ -31,8 +31,11 @@ export default function LoginPage() {
     try {
       await login(dni, password)
       // useEffect above handles redirect after user state updates
-    } catch {
-      setError('Credenciales incorrectas. Verifique su DNI y contraseña.')
+    } catch (err: any) {
+      const msg = err?.response?.data?.message
+      if (Array.isArray(msg)) setError(msg.join('. '))
+      else if (typeof msg === 'string') setError(msg)
+      else setError('Credenciales incorrectas. Verifique su DNI y contraseña.')
     } finally {
       setLoading(false)
     }

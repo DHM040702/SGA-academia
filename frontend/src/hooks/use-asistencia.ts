@@ -21,7 +21,7 @@ export interface AsistenciaRecord {
     nombre: string
     apellidos: string
     codigoBarras: string
-    aula?: { id: string; nombre: string } | null
+    aula?: { id: string; nombre: string; area?: string | null } | null
   } | null
   docente?: {
     id: string

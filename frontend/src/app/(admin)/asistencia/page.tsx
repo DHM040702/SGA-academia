@@ -533,7 +533,119 @@ function ManualModal({ onClose }: { onClose: () => void }) {
   )
 }
 
-// ─── Export helper ────────────────────────────────────────────────────────────
+// ─── Export Excel helper ──────────────────────────────────────────────────────
+
+const AREA_LABEL: Record<string, string> = {
+  ciencias: 'Ciencias',
+  letras:   'Letras',
+  medicas:  'Médicas',
+}
+
+function exportarAsistenciaExcel(registros: AsistenciaRecord[], fecha: string) {
+  const soloAlumnos = registros.filter(r => r.tipoPersona === 'alumno' && r.alumno)
+
+  const fechaLabel = new Date(fecha + 'T12:00:00').toLocaleDateString('es-PE', {
+    day: '2-digit', month: '2-digit', year: 'numeric',
+  })
+
+  const filas = soloAlumnos.map(r => {
+    const alumno = r.alumno!
+    const partes = (alumno.apellidos ?? '').trim().split(/\s+/)
+    const apPat  = partes[0] ?? ''
+    const apMat  = partes.slice(1).join(' ')
+    const area   = alumno.aula?.area ? (AREA_LABEL[alumno.aula.area] ?? alumno.aula.area) : ''
+
+    let horaFmt = ''
+    if (r.horaIngreso && !r.esAusente) {
+      const d = new Date(r.horaIngreso)
+      horaFmt = isNaN(d.getTime())
+        ? r.horaIngreso.slice(0, 5)
+        : d.toLocaleTimeString('es-PE', { hour: '2-digit', minute: '2-digit' })
+    }
+    const horaFecha = horaFmt ? `${horaFmt} - ${fechaLabel}` : fechaLabel
+
+    let obs = 'Puntual'
+    if (r.esAusente)          obs = 'Ausente'
+    else if (r.esTardanza)    obs = 'Tardanza'
+    if (r.justificacionRazon) obs += ` (${r.justificacionRazon})`
+    if (r.motivoManual)       obs += ` [${r.motivoManual}]`
+
+    return [alumno.codigoBarras ?? '', apPat, apMat, alumno.nombre ?? '', area, alumno.aula?.nombre ?? '', horaFecha, obs]
+  })
+
+  const encabezado = ['CÓDIGO', 'AP. PATERNO', 'AP. MATERNO', 'NOMBRES', 'ÁREA', 'AULA', 'HORA Y FECHA', 'OBSERVACIÓN']
+
+  import('xlsx').then(XLSX => {
+    const wb = XLSX.utils.book_new()
+    const ws = XLSX.utils.aoa_to_sheet([encabezado, ...filas])
+    ws['!cols'] = [{ wch: 10 }, { wch: 18 }, { wch: 18 }, { wch: 22 }, { wch: 12 }, { wch: 10 }, { wch: 22 }, { wch: 30 }]
+    XLSX.utils.book_append_sheet(wb, ws, `Asistencia ${fecha}`)
+    XLSX.writeFile(wb, `asistencia-alumnos-${fecha}.xlsx`)
+  })
+}
+
+// ─── Export Excel docentes helper ────────────────────────────────────────────
+
+const DIAS_ES = ['Domingo', 'Lunes', 'Martes', 'Miércoles', 'Jueves', 'Viernes', 'Sábado']
+
+async function exportarDocentesExcel(fecha: string) {
+  const [{ default: api }, XLSX] = await Promise.all([
+    import('@/lib/api'),
+    import('xlsx'),
+  ])
+
+  const { data: registros } = await api.get('/asistencia/export-docentes', { params: { fecha } })
+
+  const fechaLabel = new Date(fecha + 'T12:00:00').toLocaleDateString('es-PE', {
+    day: '2-digit', month: '2-digit', year: 'numeric',
+  })
+  const diaNombre = DIAS_ES[new Date(fecha + 'T12:00:00').getDay()].toUpperCase()
+
+  const encabezado = [
+    'ASISTENCIA\nINGRESO - SALIDA',
+    'APELLIDOS Y NOMBRES',
+    'CURSO',
+    'AULA',
+    'FECHA / HORA',
+    'DÍA',
+    'OBSERVACIÓN',
+  ]
+
+  const filas = registros.map((r: any) => {
+    let horaFmt = ''
+    if (r.horaIngreso) {
+      const d = new Date(r.horaIngreso)
+      horaFmt = isNaN(d.getTime())
+        ? String(r.horaIngreso).slice(11, 16)
+        : d.toLocaleTimeString('es-PE', { hour: '2-digit', minute: '2-digit' })
+    }
+    const horaFecha = horaFmt ? `${fechaLabel.replace(/\//g, '/')} ${horaFmt}` : fechaLabel
+
+    let obs = ''
+    if (r.esTardanza)    obs = 'Llegada tarde'
+    if (r.motivoManual)  obs = obs ? `${obs} — ${r.motivoManual}` : r.motivoManual
+
+    return [
+      r.dni,
+      `${r.apellidos} ${r.nombre}`.trim(),
+      r.curso,
+      r.aula,
+      horaFecha,
+      diaNombre,
+      obs,
+    ]
+  })
+
+  const wb = XLSX.utils.book_new()
+  const ws = XLSX.utils.aoa_to_sheet([encabezado, ...filas])
+  ws['!cols'] = [{ wch: 18 }, { wch: 28 }, { wch: 24 }, { wch: 10 }, { wch: 20 }, { wch: 12 }, { wch: 22 }]
+  // Ajustar altura de la fila de encabezado (fila 0)
+  ws['!rows'] = [{ hpt: 30 }]
+  XLSX.utils.book_append_sheet(wb, ws, `Docentes ${fecha}`)
+  XLSX.writeFile(wb, `asistencia-docentes-${fecha}.xlsx`)
+}
+
+// ─── Export PDF helper ────────────────────────────────────────────────────────
 
 async function exportarAsistencia(
   registros: AsistenciaRecord[],
@@ -639,6 +751,16 @@ export default function AsistenciaPage() {
         crumbs={[{ label: isDocente ? 'Mi asistencia' : 'Asistencia' }]}
         action={
           <>
+            <Btn variant="secondary" icon={<Download size={14} />} size="sm"
+              onClick={() => exportarAsistenciaExcel(registros, fecha)}>
+              Excel alumnos
+            </Btn>
+            {!soloLectura && (
+              <Btn variant="secondary" icon={<Download size={14} />} size="sm"
+                onClick={() => exportarDocentesExcel(fecha)}>
+                Excel docentes
+              </Btn>
+            )}
             <Btn variant="secondary" icon={<Download size={14} />} size="sm"
               onClick={() => exportarAsistencia(registros, fecha, presentes, tardanzas, ausentes)}>
               Exportar PDF
@@ -848,8 +970,18 @@ export default function AsistenciaPage() {
                   </Btn>
                 )}
                 <Btn variant="secondary" size="sm" icon={<Download size={13} />}
+                  onClick={() => exportarAsistenciaExcel(registros, fecha)} className="w-full justify-start">
+                  Excel alumnos
+                </Btn>
+                {!soloLectura && (
+                  <Btn variant="secondary" size="sm" icon={<Download size={13} />}
+                    onClick={() => exportarDocentesExcel(fecha)} className="w-full justify-start">
+                    Excel docentes
+                  </Btn>
+                )}
+                <Btn variant="secondary" size="sm" icon={<Download size={13} />}
                   onClick={() => exportarAsistencia(registros, fecha, presentes, tardanzas, ausentes)} className="w-full justify-start">
-                  Exportar lista del día
+                  Exportar PDF
                 </Btn>
                 {!soloLectura && (
                   <Btn variant="secondary" size="sm" icon={<Lock size={13} />}

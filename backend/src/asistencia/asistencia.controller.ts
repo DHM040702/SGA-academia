@@ -64,14 +64,25 @@ export class AsistenciaController {
     return this.service.stats();
   }
 
+  /** GET /asistencia/export-docentes?fecha=YYYY-MM-DD — datos para Excel de docentes */
+  @Get('export-docentes')
+  @ApiBearerAuth('access-token')
+  @UseGuards(JwtAuthGuard, RolesGuard)
+  @Roles(Rol.admin, Rol.director)
+  @ApiOperation({ summary: 'Datos de asistencia de docentes enriquecidos con horario (para exportar a Excel)' })
+  @ApiQuery({ name: 'fecha', required: true, type: String, example: '2026-06-03' })
+  exportDocentes(@Query('fecha') fecha: string) {
+    return this.service.exportDocentes(fecha);
+  }
+
   /** GET /asistencia — listado paginado con filtros */
   @Get()
   @ApiBearerAuth('access-token')
   @UseGuards(JwtAuthGuard, RolesGuard)
   @Roles(Rol.admin, Rol.director, Rol.docente, Rol.alumno, Rol.apoderado, Rol.vigilante)
   @ApiOperation({ summary: 'Listar asistencias paginadas con filtros' })
-  findAll(@Query() dto: FilterAsistenciaDto) {
-    return this.service.findAll(dto);
+  findAll(@Query() dto: FilterAsistenciaDto, @CurrentUser() user: { id: string; rol: string }) {
+    return this.service.findAll(dto, user);
   }
 
   /** GET /asistencia/alumno/:id — últimas asistencias de un alumno */
@@ -84,8 +95,10 @@ export class AsistenciaController {
   findByAlumno(
     @Param('alumnoId', ParseUUIDPipe) alumnoId: string,
     @Query('limit') limit?: string,
+    @CurrentUser() user?: { id: string; rol: string },
   ) {
-    return this.service.findByAlumno(alumnoId, limit ? parseInt(limit, 10) : 50);
+    const parsedLimit = limit ? parseInt(limit, 10) : 50;
+    return this.service.findByAlumno(alumnoId, Math.min(parsedLimit, 200), user);
   }
 
   /** PATCH /asistencia/:id — corrección manual (vigilante solo toggle puntual/tardanza) */

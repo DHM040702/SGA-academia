@@ -162,7 +162,7 @@ export class AsistenciaService {
     });
   }
 
-  async findAll(dto: FilterAsistenciaDto) {
+  async findAll(dto: FilterAsistenciaDto, caller?: { id: string; rol: string }) {
     const { page = 1, limit = 20, fecha, aula_id, alumno_id, docente_id, tipo } = dto as any;
     const skip = (page - 1) * limit;
 
@@ -174,10 +174,40 @@ export class AsistenciaService {
       where.fecha = new Date(Date.UTC(y, m - 1, d));
     }
     if (tipo) where.tipoPersona = tipo;
-    if (alumno_id) where.alumnoId = alumno_id;
     if (docente_id) where.docenteId = docente_id;
     if (aula_id) {
       where.alumno = { aulaId: aula_id };
+    }
+
+    // ── Control de acceso por rol ────────────────────────────────────────────
+    if (caller?.rol === 'alumno') {
+      // El alumno solo puede ver su propia asistencia
+      const alumno = await this.prisma.alumno.findFirst({
+        where: { usuarioId: caller.id, deletedAt: null },
+        select: { id: true },
+      });
+      if (!alumno) throw new NotFoundException('Alumno no encontrado');
+      where.alumnoId = alumno.id;
+      where.tipoPersona = TipoPersona.alumno;
+    } else if (caller?.rol === 'apoderado') {
+      // El apoderado solo puede ver la asistencia de sus pupilos
+      const apoderado = await this.prisma.apoderado.findFirst({
+        where: { usuarioId: caller.id, deletedAt: null },
+        select: { alumnos: { select: { alumnoId: true } } },
+      });
+      const alumnoIds = apoderado?.alumnos.map((a) => a.alumnoId) ?? [];
+      if (alumnoIds.length === 0) return { data: [], total: 0, page, limit, totalPages: 0 };
+      // Si pasa un alumno_id específico, verificar que sea su pupilo
+      if (alumno_id) {
+        if (!alumnoIds.includes(alumno_id)) throw new NotFoundException('Alumno no encontrado');
+        where.alumnoId = alumno_id;
+      } else {
+        where.alumnoId = { in: alumnoIds };
+      }
+      where.tipoPersona = TipoPersona.alumno;
+    } else {
+      // admin, director, vigilante, docente: aplica filtro si viene en el query
+      if (alumno_id) where.alumnoId = alumno_id;
     }
 
     const [items, total] = await Promise.all([
@@ -190,7 +220,7 @@ export class AsistenciaService {
           alumno:  {
             select: {
               nombre: true, apellidos: true, codigoBarras: true,
-              aula: { select: { id: true, nombre: true } },
+              aula: { select: { id: true, nombre: true, area: true } },
             },
           },
           docente: { select: { nombre: true, apellidos: true, dni: true } },
@@ -202,11 +232,22 @@ export class AsistenciaService {
     return paginate(items, total, page, limit);
   }
 
-  async findByAlumno(alumnoId: string, limit = 50) {
+  async findByAlumno(alumnoId: string, limit = 50, caller?: { id: string; rol: string }) {
     const alumno = await this.prisma.alumno.findFirst({
       where: { id: alumnoId, deletedAt: null },
     });
     if (!alumno) throw new NotFoundException('Alumno no encontrado');
+
+    // ── Verificar propiedad ──────────────────────────────────────────────────
+    if (caller?.rol === 'alumno') {
+      if (alumno.usuarioId !== caller.id) throw new NotFoundException('Alumno no encontrado');
+    } else if (caller?.rol === 'apoderado') {
+      const apoderado = await this.prisma.apoderado.findFirst({
+        where: { usuarioId: caller.id, deletedAt: null },
+        select: { alumnos: { where: { alumnoId }, select: { alumnoId: true } } },
+      });
+      if (!apoderado?.alumnos.length) throw new NotFoundException('Alumno no encontrado');
+    }
 
     return this.prisma.asistencia.findMany({
       where: { alumnoId, tipoPersona: TipoPersona.alumno },
@@ -346,6 +387,55 @@ export class AsistenciaService {
     });
 
     return { created: ausentes.length, message: `${ausentes.length} ausencia(s) registrada(s)` };
+  }
+
+  /** Datos enriquecidos de docentes para exportar a Excel */
+  async exportDocentes(fecha: string) {
+    const [y, m, d] = fecha.split('-').map(Number);
+    const fechaDate = new Date(Date.UTC(y, m - 1, d));
+
+    // día de la semana: Dom=0 → 7, Lun=1 → 1 … Sab=6 → 6
+    const jsDay    = new Date(y, m - 1, d).getDay();
+    const diaSemana = jsDay === 0 ? 7 : jsDay;
+
+    const registros = await this.prisma.asistencia.findMany({
+      where: { fecha: fechaDate, tipoPersona: 'docente' },
+      orderBy: { horaIngreso: 'asc' },
+      include: {
+        docente: {
+          select: {
+            id: true, dni: true, nombre: true, apellidos: true,
+            horarios: {
+              where: { diaSemana },
+              orderBy: { horaInicio: 'asc' },
+              take: 1,
+              select: {
+                horaInicio: true,
+                horaFin:    true,
+                curso: { select: { nombre: true } },
+                aula:  { select: { nombre: true } },
+              },
+            },
+          },
+        },
+      },
+    });
+
+    return registros.map(r => {
+      const h = r.docente?.horarios?.[0];
+      return {
+        id:          r.id,
+        dni:         r.docente?.dni ?? '',
+        apellidos:   r.docente?.apellidos ?? '',
+        nombre:      r.docente?.nombre ?? '',
+        curso:       h?.curso?.nombre ?? '',
+        aula:        h?.aula?.nombre ?? '',
+        horaIngreso: r.horaIngreso,
+        fecha:       r.fecha,
+        esTardanza:  r.esTardanza,
+        motivoManual: r.motivoManual ?? '',
+      };
+    });
   }
 
   async justificar(id: string, dto: JustificarAusenciaDto) {

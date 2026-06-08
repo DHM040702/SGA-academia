@@ -45,7 +45,7 @@ export class ComunicadosController {
   }
 
   @Post()
-  @Roles(Rol.admin, Rol.director, Rol.vigilante)
+  @Roles(Rol.admin, Rol.director)
   @ApiOperation({ summary: 'Crear comunicado y enviar a roles destino' })
   create(@Body() dto: CreateComunicadoDto, @CurrentUser() user: { id: string }) {
     return this.service.create(dto, user.id);

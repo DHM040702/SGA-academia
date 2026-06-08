@@ -2,10 +2,9 @@ import { Injectable, Logger, OnModuleInit } from '@nestjs/common';
 import { ConfigService } from '@nestjs/config';
 import * as Minio from 'minio';
 
-/** Bucket dedicado a fotos de alumnos y docentes */
-const FOTOS_BUCKET = 'sga-fotos';
+const FOTOS_BUCKET      = 'sga-fotos';
+const BIBLIOTECA_BUCKET = 'sga-biblioteca';
 
-/** Política pública de lectura para el bucket de fotos */
 const publicReadPolicy = (bucket: string) =>
   JSON.stringify({
     Version: '2012-10-17',
@@ -36,6 +35,7 @@ export class MinioService implements OnModuleInit {
     });
 
     await this.ensureBucket(FOTOS_BUCKET);
+    await this.ensureBucket(BIBLIOTECA_BUCKET);
   }
 
   /* ── helpers ───────────────────────────────────────────────── */
@@ -53,21 +53,15 @@ export class MinioService implements OnModuleInit {
     }
   }
 
-  private publicUrl(key: string): string {
+  private buildUrl(bucket: string, key: string): string {
     const endpoint = this.config.get<string>('MINIO_ENDPOINT') ?? 'localhost';
     const port     = this.config.get<string>('MINIO_PORT')     ?? '9000';
     const ssl      = this.config.get<string>('MINIO_USE_SSL')  === 'true';
-    return `${ssl ? 'https' : 'http'}://${endpoint}:${port}/${FOTOS_BUCKET}/${key}`;
+    return `${ssl ? 'https' : 'http'}://${endpoint}:${port}/${bucket}/${key}`;
   }
 
-  /* ── API pública ───────────────────────────────────────────── */
+  /* ── API pública — fotos ───────────────────────────────────── */
 
-  /**
-   * Sube una foto (Buffer) a MinIO y devuelve su URL pública.
-   *
-   * La clave generada es `fotos/{folder}/{entityId}.{ext}`.
-   * Si ya existe una foto para esa entidad, se sobreescribe.
-   */
   async subirFoto(
     folder: 'alumnos' | 'docentes',
     entityId: string,
@@ -78,29 +72,49 @@ export class MinioService implements OnModuleInit {
     const key = `fotos/${folder}/${entityId}.${ext}`;
 
     await this.client.putObject(
-      FOTOS_BUCKET,
-      key,
-      buffer,
-      buffer.length,
+      FOTOS_BUCKET, key, buffer, buffer.length,
       { 'Content-Type': mimetype },
     );
 
-    return this.publicUrl(key);
+    return this.buildUrl(FOTOS_BUCKET, key);
   }
 
-  /**
-   * Elimina una foto a partir de su URL pública.
-   * Extrae la clave del path y la elimina de MinIO.
-   * No lanza error si el objeto no existe.
-   */
   async eliminarFotoPorUrl(url: string): Promise<void> {
     try {
-      // URL format: http://host:port/{bucket}/{key}
       const parts = url.split(`/${FOTOS_BUCKET}/`);
       if (parts.length < 2) return;
       await this.client.removeObject(FOTOS_BUCKET, parts[1]);
-    } catch {
-      // silencioso si no existe
-    }
+    } catch { /* silencioso */ }
+  }
+
+  /* ── API pública — biblioteca ──────────────────────────────── */
+
+  /**
+   * Sube un PDF a MinIO y devuelve su URL pública.
+   * Clave: pdf/{recursoId}.pdf
+   */
+  async subirPdfBiblioteca(
+    recursoId: string,
+    buffer: Buffer,
+  ): Promise<string> {
+    const key = `pdf/${recursoId}.pdf`;
+
+    await this.client.putObject(
+      BIBLIOTECA_BUCKET, key, buffer, buffer.length,
+      { 'Content-Type': 'application/pdf' },
+    );
+
+    return this.buildUrl(BIBLIOTECA_BUCKET, key);
+  }
+
+  /**
+   * Elimina un PDF de la biblioteca por su URL pública.
+   */
+  async eliminarPdfBibliotecaPorUrl(url: string): Promise<void> {
+    try {
+      const parts = url.split(`/${BIBLIOTECA_BUCKET}/`);
+      if (parts.length < 2) return;
+      await this.client.removeObject(BIBLIOTECA_BUCKET, parts[1]);
+    } catch { /* silencioso */ }
   }
 }

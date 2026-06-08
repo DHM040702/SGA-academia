@@ -19,6 +19,19 @@ export interface RecursoBiblioteca {
   curso?: { id: string; nombre: string; codigo: string } | null
 }
 
+export interface HistorialEntry {
+  id: string
+  recurso_id: string
+  titulo_anterior: string | null
+  descripcion_anterior: string | null
+  url_anterior: string | null
+  nivel_anterior: string | null
+  curso_id_anterior: string | null
+  modificado_por_id: string
+  modificado_at: string
+  editor_email?: string
+}
+
 export interface PaginatedRecursos {
   data: RecursoBiblioteca[]
   total: number
@@ -67,20 +80,78 @@ export function useBibliotecaStats() {
   })
 }
 
+export function useHistorialRecurso(recursoId: string) {
+  return useQuery<HistorialEntry[]>({
+    queryKey: ['biblioteca', 'historial', recursoId],
+    queryFn: async () => {
+      const { data } = await api.get(`/biblioteca/${recursoId}/historial`)
+      return data
+    },
+    enabled: Boolean(recursoId),
+  })
+}
+
+/** Crea un recurso. Si tipo=pdf y se pasa un File, envía multipart. De lo contrario JSON. */
 export function useCreateRecurso() {
   const qc = useQueryClient()
   return useMutation({
-    mutationFn: (dto: Record<string, unknown>) =>
-      api.post('/biblioteca', dto).then((r) => r.data),
+    mutationFn: async (payload: {
+      titulo: string
+      descripcion?: string
+      tipo: TipoRecurso
+      url?: string
+      nivel?: string
+      curso_id?: string
+      file?: File
+    }) => {
+      const { file, ...fields } = payload
+
+      if (file) {
+        const fd = new FormData()
+        Object.entries(fields).forEach(([k, v]) => { if (v !== undefined) fd.append(k, String(v)) })
+        fd.append('file', file)
+        const { data } = await api.post('/biblioteca', fd, {
+          headers: { 'Content-Type': 'multipart/form-data' },
+        })
+        return data
+      }
+
+      const { data } = await api.post('/biblioteca', fields)
+      return data
+    },
     onSuccess: () => qc.invalidateQueries({ queryKey: ['biblioteca'] }),
   })
 }
 
+/** Edita un recurso. Si tipo=pdf y se pasa un nuevo File, envía multipart. */
 export function useUpdateRecurso() {
   const qc = useQueryClient()
   return useMutation({
-    mutationFn: ({ id, ...dto }: { id: string } & Record<string, unknown>) =>
-      api.patch(`/biblioteca/${id}`, dto).then((r) => r.data),
+    mutationFn: async (payload: {
+      id: string
+      titulo?: string
+      descripcion?: string
+      tipo?: TipoRecurso
+      url?: string
+      nivel?: string
+      curso_id?: string
+      file?: File
+    }) => {
+      const { id, file, ...fields } = payload
+
+      if (file) {
+        const fd = new FormData()
+        Object.entries(fields).forEach(([k, v]) => { if (v !== undefined) fd.append(k, String(v)) })
+        fd.append('file', file)
+        const { data } = await api.patch(`/biblioteca/${id}`, fd, {
+          headers: { 'Content-Type': 'multipart/form-data' },
+        })
+        return data
+      }
+
+      const { data } = await api.patch(`/biblioteca/${id}`, fields)
+      return data
+    },
     onSuccess: () => qc.invalidateQueries({ queryKey: ['biblioteca'] }),
   })
 }

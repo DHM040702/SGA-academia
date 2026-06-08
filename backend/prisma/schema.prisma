@@ -25,6 +25,7 @@ model Usuario {
   comunicadosEnvios      ComunicadoEnvio[]
   docente                Docente?
   recursosBiblioteca     RecursoBiblioteca[]
+  // refreshTokens — tabla gestionada con $queryRaw/$executeRaw (prisma generate no disponible en este entorno)
 
   @@map("usuarios")
 }
@@ -196,6 +197,19 @@ model Asistencia {
 
   @@map("asistencias")
 }
+
+// RefreshToken — documentado aquí, pero gestionado con $queryRaw/$executeRaw
+// (prisma generate no disponible en este entorno Windows+pnpm)
+// Ver: backend/prisma/migrations/manual_refresh_tokens.sql
+// model RefreshToken {
+//   id         String   @id @default(dbgenerated("gen_random_uuid()")) @db.Uuid
+//   usuarioId  String   @map("usuario_id") @db.Uuid
+//   tokenHash  String   @map("token_hash") @db.VarChar(255)
+//   expiresAt  DateTime @map("expires_at") @db.Timestamptz(6)
+//   createdAt  DateTime @default(now()) @map("created_at") @db.Timestamptz(6)
+//   @@index([usuarioId])
+//   @@map("refresh_tokens")
+// }
 
 model Comunicado {
   id               String            @id @default(dbgenerated("gen_random_uuid()")) @db.Uuid

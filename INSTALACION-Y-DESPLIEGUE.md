@@ -20,9 +20,10 @@
 10. [Inicio Automático en Windows 11](#10-inicio-automático-en-windows-11)
     - [10.0 Inicio de sesión automático](#100-inicio-de-sesión-automático-obligatorio)
 11. [Actualizaciones desde GitHub](#11-actualizaciones-desde-github)
-12. [Verificación Final](#12-verificación-final)
-13. [Solución de Problemas](#13-solución-de-problemas)
-14. [Mantenimiento y Respaldo](#14-mantenimiento-y-respaldo)
+12. [Actualizar el sistema con Git](#12-actualizar-el-sistema-con-git)
+13. [Verificación Final](#13-verificación-final)
+14. [Solución de Problemas](#14-solución-de-problemas)
+15. [Mantenimiento y Respaldo](#15-mantenimiento-y-respaldo)
 
 ---
 
@@ -246,9 +247,15 @@ Todos deben mostrar estado `running`. Puertos activos:
 
 ### 5.3 Cargar los datos iniciales
 
+El archivo `seed.sql` incluye la creación del esquema completo (tablas, enums, índices y claves foráneas) de forma idempotente. **No es necesario correr las migraciones de Prisma por separado** — con un solo comando se crea todo desde cero:
+
 ```powershell
 docker exec -i sga-academia-postgres-1 psql -U sga_user -d sga_db < C:\sga-academia\seed.sql
 ```
+
+El comando es seguro de ejecutar varias veces: si las tablas ya existen se omiten sin error, y si los datos ya están se reemplazan.
+
+> ⚠️ Si la base de datos tiene datos de producción (asistencias reales, etc.), este comando los borrará. Hacer un respaldo antes (ver Sección 14.1).
 
 ---
 
@@ -759,9 +766,149 @@ git log --oneline -5
 
 ---
 
-## 12. Verificación Final
+## 12. Actualizar el sistema con Git
 
-### 12.1 Lista de verificación completa
+Esta sección explica cómo mantener el sistema al día cuando el equipo de desarrollo publica una nueva versión en GitHub. Se aplica tanto al servidor principal como a cualquier PC donde se haya instalado el sistema.
+
+### 12.1 Entender qué archivos se actualizan con Git
+
+Git sincroniza únicamente el **código fuente** del repositorio. Los siguientes archivos **nunca se tocan** porque están en `.gitignore`:
+
+| Archivo | Por qué no se toca |
+|---|---|
+| `backend/.env` | Contiene contraseñas e IPs de cada instalación |
+| `frontend/.env.local` | Contiene la URL de la API específica del servidor |
+| `node_modules/` | Se regenera con `pnpm install` |
+| `backend/dist/` | Se regenera con `pnpm run build` |
+
+### 12.2 Verificar el estado actual antes de actualizar
+
+Abrir una terminal **WSL** y ejecutar:
+
+```bash
+cd /mnt/c/sga-academia
+
+# Ver en qué versión está el sistema
+git log --oneline -5
+
+# Ver si hay cambios locales pendientes (normalmente no debe haber ninguno)
+git status
+```
+
+Si `git status` muestra archivos modificados que **no** son los de la tabla anterior, consultar al equipo de desarrollo antes de continuar.
+
+### 12.3 Descargar e instalar la actualización
+
+#### Paso 1 — Detener los servicios
+
+En **PowerShell como Administrador**:
+
+```powershell
+net stop SGA-Frontend
+net stop SGA-Backend
+```
+
+#### Paso 2 — Descargar el código nuevo
+
+En terminal **WSL**:
+
+```bash
+cd /mnt/c/sga-academia
+git pull origin main
+```
+
+Salida esperada si hay cambios:
+```
+remote: Enumerating objects: 12, done.
+Updating a1b2c3d..e4f5g6h
+Fast-forward
+ backend/src/... | 5 +++--
+ seed.sql        | 20 ++++++++++++++
+ 2 files changed, ...
+```
+
+Si aparece `Already up to date.` significa que ya tenías la versión más reciente.
+
+#### Paso 3 — Instalar dependencias y compilar
+
+```bash
+# Backend
+cd /mnt/c/sga-academia/backend
+pnpm install
+pnpm run build
+
+# Frontend
+cd /mnt/c/sga-academia/frontend
+pnpm install
+pnpm run build
+```
+
+#### Paso 4 — Cargar datos actualizados (solo si el seed.sql cambió)
+
+Si el `git pull` del Paso 2 mostró cambios en `seed.sql`, ejecutar en **PowerShell**:
+
+```powershell
+docker exec -i sga-academia-postgres-1 psql -U sga_user -d sga_db < C:\sga-academia\seed.sql
+```
+
+> ⚠️ Este comando borra y recarga alumnos, docentes, aulas y cursos. Las asistencias registradas **se borran**. Hacer respaldo primero si hay datos importantes (ver Sección 15.1).
+
+Si el seed.sql **no** cambió, omitir este paso.
+
+#### Paso 5 — Reiniciar los servicios
+
+En **PowerShell como Administrador**:
+
+```powershell
+net start SGA-Backend
+Start-Sleep -Seconds 10
+net start SGA-Frontend
+```
+
+#### Paso 6 — Verificar
+
+Abrir `http://localhost:3000` y confirmar que el login funciona. Revisar la versión instalada:
+
+```bash
+cd /mnt/c/sga-academia
+git log --oneline -3
+```
+
+### 12.4 Script automático de actualización
+
+El archivo `C:\sga-academia\actualizar.bat` (creado en la Sección 11.1) automatiza todos estos pasos excepto la recarga del seed. Ejecutar con **clic derecho → Ejecutar como administrador**.
+
+Para casos donde también cambió el seed, agregar esta línea al final del `.bat` antes del `pause`:
+
+```batch
+echo Recargando datos iniciales...
+docker exec -i sga-academia-postgres-1 psql -U sga_user -d sga_db < C:\sga-academia\seed.sql
+```
+
+### 12.5 Resolver conflictos al hacer git pull
+
+Si `git pull` falla con un mensaje como `error: Your local changes would be overwritten`, significa que hay un archivo del repositorio modificado localmente. En condiciones normales esto no debería ocurrir.
+
+**Solución estándar:**
+
+```bash
+# Ver qué archivos están en conflicto
+git status
+
+# Descartar los cambios locales en ese archivo y aceptar la versión del servidor
+git checkout -- <nombre-del-archivo>
+
+# Reintentar la actualización
+git pull origin main
+```
+
+> 🔴 Solo hacer `git checkout --` sobre archivos que no sean `.env` ni `.env.local`. Si el conflicto es en uno de esos archivos, consultar al equipo de desarrollo.
+
+---
+
+## 13. Verificación Final
+
+### 13.1 Lista de verificación completa
 
 - [ ] Docker Desktop corriendo (icono verde en la bandeja)
 - [ ] `docker compose ps` muestra todos los contenedores en estado `running`
@@ -773,7 +920,7 @@ git log --oneline -5
 - [ ] Login funciona con credenciales correctas
 - [ ] Los servicios `SGA-Backend` y `SGA-Frontend` aparecen en `services.msc`
 
-### 12.2 URLs de acceso
+### 13.2 URLs de acceso
 
 | Acceso | URL |
 |---|---|
@@ -782,7 +929,7 @@ git log --oneline -5
 | Alternativa con IP | `http://192.168.137.1` |
 | API / Swagger | `http://localhost:3001/api/docs` |
 
-### 12.3 Credenciales iniciales para usuarios
+### 13.3 Credenciales iniciales para usuarios
 
 | Tipo | Email / Formato | Contraseña |
 |---|---|---|
@@ -794,9 +941,9 @@ git log --oneline -5
 
 ---
 
-## 13. Solución de Problemas
+## 14. Solución de Problemas
 
-### 13.1 El backend no inicia
+### 14.1 El backend no inicia
 
 ```bash
 # Verificar que el .env tiene las variables correctas
@@ -818,7 +965,7 @@ ipconfig | Select-String "172\."
 ```
 La IP del adaptador **vEthernet (WSL)** es la que va en `DATABASE_URL`.
 
-### 13.2 El frontend no carga desde otros dispositivos
+### 14.2 El frontend no carga desde otros dispositivos
 
 **Paso 1 — Verificar portproxy:**
 ```powershell
@@ -838,7 +985,7 @@ Get-NetFirewallRule | Where-Object { $_.DisplayName -like "SGA*" } | Select-Obje
 curl http://localhost:3000
 ```
 
-### 13.3 El login muestra "Credenciales incorrectas" con credenciales correctas
+### 14.3 El login muestra "Credenciales incorrectas" con credenciales correctas
 
 Causa: el frontend no llega a la API.
 
@@ -856,7 +1003,7 @@ Si se cambió `.env.local`, reconstruir el frontend:
 cd /mnt/c/sga-academia/frontend && pnpm run build && pnpm run start
 ```
 
-### 13.4 `sga.local` no resuelve
+### 14.4 `sga.local` no resuelve
 
 ```bash
 # En WSL — verificar que dnsmasq está corriendo:
@@ -871,7 +1018,7 @@ ip addr show eth0 | grep 192.168.137
 
 Si la IP no aparece, verificar `/etc/wsl.conf` y reiniciar WSL con `wsl --shutdown`.
 
-### 13.5 La página se recarga en bucle en el dispositivo cliente
+### 14.5 La página se recarga en bucle en el dispositivo cliente
 
 Causa: el interceptor de axios intenta hacer refresh cuando la sesión ha expirado y redirige a `/login` en un loop.
 
@@ -893,9 +1040,9 @@ if (typeof window !== 'undefined' && window.location.pathname !== '/login') {
 
 ---
 
-## 14. Mantenimiento y Respaldo
+## 15. Mantenimiento y Respaldo
 
-### 14.1 Respaldar la base de datos
+### 15.1 Respaldar la base de datos
 
 Ejecutar **semanalmente** (reemplazar `FECHA` con la fecha real):
 
@@ -907,7 +1054,7 @@ docker exec sga-academia-postgres-1 pg_dump -U sga_user sga_db > C:\backups\sga_
 
 Copiar el archivo a un disco externo. Conservar al menos las últimas **4 copias**.
 
-### 14.2 Archivos de configuración críticos a respaldar
+### 15.2 Archivos de configuración críticos a respaldar
 
 ```
 C:\sga-academia\backend\.env
@@ -919,7 +1066,7 @@ C:\sga-academia\actualizar.bat
 /etc/dnsmasq.d/sga.conf          (dentro de WSL)
 ```
 
-### 14.3 Reinicio manual de todos los servicios
+### 15.3 Reinicio manual de todos los servicios
 
 ```powershell
 # PowerShell como Administrador:
@@ -933,7 +1080,7 @@ Start-Sleep -Seconds 10
 net start SGA-Frontend
 ```
 
-### 14.4 Secuencia completa de inicio desde cero
+### 15.4 Secuencia completa de inicio desde cero
 
 En caso de reinicio del servidor:
 

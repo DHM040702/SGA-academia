@@ -1,7 +1,7 @@
 'use client'
 import * as React from 'react'
 import { useQueryClient } from '@tanstack/react-query'
-import api from '@/lib/api'
+import api, { setAccessToken } from '@/lib/api'
 
 export interface AuthUser {
   id: string
@@ -45,7 +45,8 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
 
   const login = React.useCallback(async (dni: string, password: string) => {
     const { data } = await api.post<{ access_token: string; user: AuthUser }>('/auth/login', { dni, password })
-    localStorage.setItem('access_token', data.access_token)
+    // Token en memoria — no en localStorage (evita robo por XSS)
+    setAccessToken(data.access_token)
     // Limpiar caché al cambiar de usuario para evitar que datos de un rol
     // contaminen la vista de otro rol (ej: admin → alumno)
     queryClient.clear()
@@ -54,7 +55,7 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
 
   const logout = React.useCallback(async () => {
     await api.post('/auth/logout').catch(() => {})
-    localStorage.removeItem('access_token')
+    setAccessToken(null)
     // Limpiar caché al cerrar sesión
     queryClient.clear()
     setUser(null)

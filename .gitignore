@@ -14,9 +14,9 @@ design-reference/
 # ─────────────────────────────────────────────
 # Variables de entorno
 # ─────────────────────────────────────────────
-# .env
-# .env.local
-# .env.*.local
+.env
+.env.local
+.env.*.local
 INSTALACION-Y-DESPLIEGUE.docx
 
 # ─────────────────────────────────────────────

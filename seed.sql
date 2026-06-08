@@ -1,8 +1,264 @@
 BEGIN;
 
--- -------------------------------------------------------
+-- ═══════════════════════════════════════════════════════════════════════════════
+-- CREACIÓN DE ESQUEMA (idempotente — funciona en instalación nueva y existente)
+-- Si las tablas ya existen se omiten sin error. No es necesario correr las
+-- migraciones de Prisma por separado antes de ejecutar este archivo.
+-- ═══════════════════════════════════════════════════════════════════════════════
+
+CREATE EXTENSION IF NOT EXISTS "pgcrypto";
+
+-- Tipos enumerados
+DO $$ BEGIN CREATE TYPE "Rol"              AS ENUM ('admin','director','vigilante','alumno','apoderado','docente');    EXCEPTION WHEN duplicate_object THEN NULL; END $$;
+DO $$ BEGIN CREATE TYPE "Turno"            AS ENUM ('manana','tarde');                                                  EXCEPTION WHEN duplicate_object THEN NULL; END $$;
+DO $$ BEGIN CREATE TYPE "Area"             AS ENUM ('ciencias','letras','medicas');                                     EXCEPTION WHEN duplicate_object THEN NULL; END $$;
+DO $$ BEGIN CREATE TYPE "TipoPersona"      AS ENUM ('alumno','docente');                                               EXCEPTION WHEN duplicate_object THEN NULL; END $$;
+DO $$ BEGIN CREATE TYPE "TipoRecurso"      AS ENUM ('pdf','video','enlace','iframe');                                  EXCEPTION WHEN duplicate_object THEN NULL; END $$;
+DO $$ BEGIN CREATE TYPE "TipoDestinatario" AS ENUM ('todos','seccion','alumnos','apoderados','docentes','usuario');    EXCEPTION WHEN duplicate_object THEN NULL; END $$;
+DO $$ BEGIN CREATE TYPE "CanalEnvio"       AS ENUM ('whatsapp','sms','sistema');                                       EXCEPTION WHEN duplicate_object THEN NULL; END $$;
+DO $$ BEGIN CREATE TYPE "EstadoEnvio"      AS ENUM ('pendiente','enviado','fallido');                                  EXCEPTION WHEN duplicate_object THEN NULL; END $$;
+
+-- Tablas
+CREATE TABLE IF NOT EXISTS "usuarios" (
+    "id"            UUID         NOT NULL DEFAULT gen_random_uuid(),
+    "email"         VARCHAR(150) NOT NULL,
+    "password_hash" VARCHAR(255) NOT NULL,
+    "rol"           "Rol"        NOT NULL,
+    "nombre"        VARCHAR(100),
+    "apellidos"     VARCHAR(150),
+    "dni"           VARCHAR(12),
+    "activo"        BOOLEAN      NOT NULL DEFAULT true,
+    "created_at"    TIMESTAMPTZ  NOT NULL DEFAULT NOW(),
+    "updated_at"    TIMESTAMPTZ  NOT NULL DEFAULT NOW(),
+    "deleted_at"    TIMESTAMPTZ,
+    CONSTRAINT "usuarios_pkey" PRIMARY KEY ("id")
+);
+CREATE UNIQUE INDEX IF NOT EXISTS "usuarios_email_key" ON "usuarios"("email");
+CREATE UNIQUE INDEX IF NOT EXISTS "usuarios_dni_key"   ON "usuarios"("dni");
+
+CREATE TABLE IF NOT EXISTS "carreras" (
+    "id"     UUID         NOT NULL DEFAULT gen_random_uuid(),
+    "nombre" VARCHAR(100) NOT NULL,
+    "area"   "Area"       NOT NULL,
+    "activo" BOOLEAN      NOT NULL DEFAULT true,
+    CONSTRAINT "carreras_pkey" PRIMARY KEY ("id")
+);
+
+CREATE TABLE IF NOT EXISTS "ciclos" (
+    "id"           UUID         NOT NULL DEFAULT gen_random_uuid(),
+    "nombre"       VARCHAR(100) NOT NULL,
+    "fecha_inicio" DATE         NOT NULL,
+    "fecha_fin"    DATE         NOT NULL,
+    "activo"       BOOLEAN      NOT NULL DEFAULT false,
+    "created_at"   TIMESTAMPTZ  NOT NULL DEFAULT NOW(),
+    CONSTRAINT "ciclos_pkey" PRIMARY KEY ("id")
+);
+
+CREATE TABLE IF NOT EXISTS "aulas" (
+    "id"          UUID        NOT NULL DEFAULT gen_random_uuid(),
+    "ciclo_id"    UUID        NOT NULL,
+    "nombre"      VARCHAR(20) NOT NULL,
+    "turno"       "Turno"     NOT NULL,
+    "area"        "Area"      NOT NULL,
+    "cupo_maximo" INTEGER     NOT NULL DEFAULT 40,
+    "created_at"  TIMESTAMPTZ NOT NULL DEFAULT NOW(),
+    CONSTRAINT "aulas_pkey" PRIMARY KEY ("id")
+);
+
+CREATE TABLE IF NOT EXISTS "cursos" (
+    "id"     UUID         NOT NULL DEFAULT gen_random_uuid(),
+    "nombre" VARCHAR(100) NOT NULL,
+    "codigo" VARCHAR(20)  NOT NULL,
+    "activo" BOOLEAN      NOT NULL DEFAULT true,
+    CONSTRAINT "cursos_pkey" PRIMARY KEY ("id")
+);
+CREATE UNIQUE INDEX IF NOT EXISTS "cursos_codigo_key" ON "cursos"("codigo");
+
+CREATE TABLE IF NOT EXISTS "alumnos" (
+    "id"               UUID         NOT NULL DEFAULT gen_random_uuid(),
+    "usuario_id"       UUID         NOT NULL,
+    "dni"              VARCHAR(12)  NOT NULL,
+    "nombre"           VARCHAR(100) NOT NULL,
+    "apellidos"        VARCHAR(150) NOT NULL,
+    "fecha_nacimiento" DATE,
+    "telefono"         VARCHAR(20),
+    "codigo_barras"    VARCHAR(6)   NOT NULL,
+    "foto_url"         VARCHAR(500),
+    "aula_id"          UUID,
+    "carrera_id"       UUID,
+    "created_at"       TIMESTAMPTZ  NOT NULL DEFAULT NOW(),
+    "updated_at"       TIMESTAMPTZ  NOT NULL DEFAULT NOW(),
+    "deleted_at"       TIMESTAMPTZ,
+    CONSTRAINT "alumnos_pkey" PRIMARY KEY ("id")
+);
+CREATE UNIQUE INDEX IF NOT EXISTS "alumnos_usuario_id_key"    ON "alumnos"("usuario_id");
+CREATE UNIQUE INDEX IF NOT EXISTS "alumnos_dni_key"           ON "alumnos"("dni");
+CREATE UNIQUE INDEX IF NOT EXISTS "alumnos_codigo_barras_key" ON "alumnos"("codigo_barras");
+
+CREATE TABLE IF NOT EXISTS "apoderados" (
+    "id"                UUID         NOT NULL DEFAULT gen_random_uuid(),
+    "usuario_id"        UUID         NOT NULL,
+    "nombre"            VARCHAR(100) NOT NULL,
+    "apellidos"         VARCHAR(150) NOT NULL,
+    "dni"               VARCHAR(12)  NOT NULL,
+    "telefono_whatsapp" VARCHAR(20)  NOT NULL,
+    "created_at"        TIMESTAMPTZ  NOT NULL DEFAULT NOW(),
+    "deleted_at"        TIMESTAMPTZ,
+    CONSTRAINT "apoderados_pkey" PRIMARY KEY ("id")
+);
+CREATE UNIQUE INDEX IF NOT EXISTS "apoderados_usuario_id_key" ON "apoderados"("usuario_id");
+CREATE UNIQUE INDEX IF NOT EXISTS "apoderados_dni_key"        ON "apoderados"("dni");
+
+CREATE TABLE IF NOT EXISTS "alumnos_apoderados" (
+    "alumno_id"    UUID        NOT NULL,
+    "apoderado_id" UUID        NOT NULL,
+    "parentesco"   VARCHAR(50) NOT NULL,
+    "es_principal" BOOLEAN     NOT NULL DEFAULT false,
+    CONSTRAINT "alumnos_apoderados_pkey" PRIMARY KEY ("alumno_id", "apoderado_id")
+);
+
+CREATE TABLE IF NOT EXISTS "docentes" (
+    "id"                UUID         NOT NULL DEFAULT gen_random_uuid(),
+    "usuario_id"        UUID         NOT NULL,
+    "dni"               VARCHAR(12)  NOT NULL,
+    "nombre"            VARCHAR(100) NOT NULL,
+    "apellidos"         VARCHAR(150) NOT NULL,
+    "especialidad"      VARCHAR(100),
+    "telefono_whatsapp" VARCHAR(20),
+    "foto_url"          VARCHAR(500),
+    "created_at"        TIMESTAMPTZ  NOT NULL DEFAULT NOW(),
+    "deleted_at"        TIMESTAMPTZ,
+    CONSTRAINT "docentes_pkey" PRIMARY KEY ("id")
+);
+CREATE UNIQUE INDEX IF NOT EXISTS "docentes_usuario_id_key" ON "docentes"("usuario_id");
+CREATE UNIQUE INDEX IF NOT EXISTS "docentes_dni_key"        ON "docentes"("dni");
+
+CREATE TABLE IF NOT EXISTS "horarios" (
+    "id"          UUID        NOT NULL DEFAULT gen_random_uuid(),
+    "aula_id"     UUID        NOT NULL,
+    "curso_id"    UUID        NOT NULL,
+    "docente_id"  UUID        NOT NULL,
+    "dia_semana"  SMALLINT    NOT NULL,
+    "hora_inicio" TIME        NOT NULL,
+    "hora_fin"    TIME        NOT NULL,
+    "publicado"   BOOLEAN     NOT NULL DEFAULT false,
+    "created_at"  TIMESTAMPTZ NOT NULL DEFAULT NOW(),
+    CONSTRAINT "horarios_pkey" PRIMARY KEY ("id")
+);
+
+CREATE TABLE IF NOT EXISTS "asistencias" (
+    "id"                  UUID          NOT NULL DEFAULT gen_random_uuid(),
+    "tipo_persona"        "TipoPersona" NOT NULL,
+    "alumno_id"           UUID,
+    "docente_id"          UUID,
+    "fecha"               DATE          NOT NULL,
+    "hora_ingreso"        TIMESTAMPTZ   NOT NULL,
+    "es_tardanza"         BOOLEAN       NOT NULL DEFAULT false,
+    "es_manual"           BOOLEAN       NOT NULL DEFAULT false,
+    "es_ausente"          BOOLEAN       NOT NULL DEFAULT false,
+    "motivo_manual"       TEXT,
+    "justificacion_razon" TEXT,
+    "justificacion_doc"   TEXT,
+    "registrado_por"      UUID          NOT NULL,
+    "created_at"          TIMESTAMPTZ   NOT NULL DEFAULT NOW(),
+    CONSTRAINT "asistencias_pkey" PRIMARY KEY ("id")
+);
+
+CREATE TABLE IF NOT EXISTS "turnos_config" (
+    "id"                  UUID    NOT NULL DEFAULT gen_random_uuid(),
+    "turno"               "Turno" NOT NULL,
+    "hora_entrada"        TIME(6) NOT NULL,
+    "hora_limite_puntual" TIME(6) NOT NULL,
+    "hora_fin"            TIME(6) NOT NULL,
+    "activo"              BOOLEAN NOT NULL DEFAULT true,
+    CONSTRAINT "turnos_config_pkey" PRIMARY KEY ("id")
+);
+CREATE UNIQUE INDEX IF NOT EXISTS "turnos_config_turno_key" ON "turnos_config"("turno");
+
+CREATE TABLE IF NOT EXISTS "comunicados" (
+    "id"                UUID               NOT NULL DEFAULT gen_random_uuid(),
+    "titulo"            VARCHAR(200)       NOT NULL,
+    "cuerpo"            TEXT               NOT NULL,
+    "adjunto_url"       VARCHAR(500),
+    "destinatario_tipo" "TipoDestinatario" NOT NULL,
+    "aula_id"           UUID,
+    "canal_sistema"     BOOLEAN            NOT NULL DEFAULT true,
+    "canal_whatsapp"    BOOLEAN            NOT NULL DEFAULT false,
+    "publicado_por"     UUID               NOT NULL,
+    "publicado_at"      TIMESTAMPTZ,
+    "created_at"        TIMESTAMPTZ        NOT NULL DEFAULT NOW(),
+    CONSTRAINT "comunicados_pkey" PRIMARY KEY ("id")
+);
+
+CREATE TABLE IF NOT EXISTS "comunicados_envios" (
+    "id"            UUID          NOT NULL DEFAULT gen_random_uuid(),
+    "comunicado_id" UUID          NOT NULL,
+    "usuario_id"    UUID          NOT NULL,
+    "canal"         "CanalEnvio"  NOT NULL,
+    "estado"        "EstadoEnvio" NOT NULL DEFAULT 'pendiente',
+    "enviado_at"    TIMESTAMPTZ,
+    "error_detalle" TEXT,
+    CONSTRAINT "comunicados_envios_pkey" PRIMARY KEY ("id")
+);
+
+CREATE TABLE IF NOT EXISTS "recursos_biblioteca" (
+    "id"          UUID          NOT NULL DEFAULT gen_random_uuid(),
+    "titulo"      VARCHAR(200)  NOT NULL,
+    "descripcion" TEXT,
+    "tipo"        "TipoRecurso" NOT NULL,
+    "url"         VARCHAR(500)  NOT NULL,
+    "curso_id"    UUID,
+    "nivel"       VARCHAR(50),
+    "activo"      BOOLEAN       NOT NULL DEFAULT true,
+    "descargas"   INTEGER       NOT NULL DEFAULT 0,
+    "subido_por"  UUID          NOT NULL,
+    "created_at"  TIMESTAMPTZ   NOT NULL DEFAULT NOW(),
+    CONSTRAINT "recursos_biblioteca_pkey" PRIMARY KEY ("id")
+);
+
+CREATE TABLE IF NOT EXISTS "refresh_tokens" (
+    "id"         UUID         NOT NULL DEFAULT gen_random_uuid(),
+    "usuario_id" UUID         NOT NULL,
+    "token_hash" VARCHAR(255) NOT NULL,
+    "expires_at" TIMESTAMPTZ  NOT NULL,
+    "created_at" TIMESTAMPTZ  NOT NULL DEFAULT NOW(),
+    CONSTRAINT "refresh_tokens_pkey" PRIMARY KEY ("id")
+);
+CREATE INDEX IF NOT EXISTS "idx_refresh_tokens_usuario_id" ON "refresh_tokens"("usuario_id");
+
+-- Claves foráneas
+DO $$ BEGIN ALTER TABLE "aulas"               ADD CONSTRAINT "aulas_ciclo_id_fkey"                   FOREIGN KEY ("ciclo_id")       REFERENCES "ciclos"("id")       ON DELETE RESTRICT  ON UPDATE CASCADE; EXCEPTION WHEN duplicate_object THEN NULL; END $$;
+DO $$ BEGIN ALTER TABLE "alumnos"             ADD CONSTRAINT "alumnos_usuario_id_fkey"               FOREIGN KEY ("usuario_id")     REFERENCES "usuarios"("id")     ON DELETE RESTRICT  ON UPDATE CASCADE; EXCEPTION WHEN duplicate_object THEN NULL; END $$;
+DO $$ BEGIN ALTER TABLE "alumnos"             ADD CONSTRAINT "alumnos_aula_id_fkey"                  FOREIGN KEY ("aula_id")        REFERENCES "aulas"("id")        ON DELETE SET NULL  ON UPDATE CASCADE; EXCEPTION WHEN duplicate_object THEN NULL; END $$;
+DO $$ BEGIN ALTER TABLE "alumnos"             ADD CONSTRAINT "alumnos_carrera_id_fkey"               FOREIGN KEY ("carrera_id")     REFERENCES "carreras"("id")     ON DELETE SET NULL  ON UPDATE CASCADE; EXCEPTION WHEN duplicate_object THEN NULL; END $$;
+DO $$ BEGIN ALTER TABLE "apoderados"          ADD CONSTRAINT "apoderados_usuario_id_fkey"            FOREIGN KEY ("usuario_id")     REFERENCES "usuarios"("id")     ON DELETE RESTRICT  ON UPDATE CASCADE; EXCEPTION WHEN duplicate_object THEN NULL; END $$;
+DO $$ BEGIN ALTER TABLE "alumnos_apoderados"  ADD CONSTRAINT "alumnos_apoderados_alumno_id_fkey"     FOREIGN KEY ("alumno_id")      REFERENCES "alumnos"("id")      ON DELETE RESTRICT  ON UPDATE CASCADE; EXCEPTION WHEN duplicate_object THEN NULL; END $$;
+DO $$ BEGIN ALTER TABLE "alumnos_apoderados"  ADD CONSTRAINT "alumnos_apoderados_apoderado_id_fkey"  FOREIGN KEY ("apoderado_id")   REFERENCES "apoderados"("id")   ON DELETE RESTRICT  ON UPDATE CASCADE; EXCEPTION WHEN duplicate_object THEN NULL; END $$;
+DO $$ BEGIN ALTER TABLE "docentes"            ADD CONSTRAINT "docentes_usuario_id_fkey"              FOREIGN KEY ("usuario_id")     REFERENCES "usuarios"("id")     ON DELETE RESTRICT  ON UPDATE CASCADE; EXCEPTION WHEN duplicate_object THEN NULL; END $$;
+DO $$ BEGIN ALTER TABLE "horarios"            ADD CONSTRAINT "horarios_aula_id_fkey"                 FOREIGN KEY ("aula_id")        REFERENCES "aulas"("id")        ON DELETE RESTRICT  ON UPDATE CASCADE; EXCEPTION WHEN duplicate_object THEN NULL; END $$;
+DO $$ BEGIN ALTER TABLE "horarios"            ADD CONSTRAINT "horarios_curso_id_fkey"                FOREIGN KEY ("curso_id")       REFERENCES "cursos"("id")       ON DELETE RESTRICT  ON UPDATE CASCADE; EXCEPTION WHEN duplicate_object THEN NULL; END $$;
+DO $$ BEGIN ALTER TABLE "horarios"            ADD CONSTRAINT "horarios_docente_id_fkey"              FOREIGN KEY ("docente_id")     REFERENCES "docentes"("id")     ON DELETE RESTRICT  ON UPDATE CASCADE; EXCEPTION WHEN duplicate_object THEN NULL; END $$;
+DO $$ BEGIN ALTER TABLE "asistencias"         ADD CONSTRAINT "asistencias_alumno_id_fkey"            FOREIGN KEY ("alumno_id")      REFERENCES "alumnos"("id")      ON DELETE SET NULL  ON UPDATE CASCADE; EXCEPTION WHEN duplicate_object THEN NULL; END $$;
+DO $$ BEGIN ALTER TABLE "asistencias"         ADD CONSTRAINT "asistencias_docente_id_fkey"           FOREIGN KEY ("docente_id")     REFERENCES "docentes"("id")     ON DELETE SET NULL  ON UPDATE CASCADE; EXCEPTION WHEN duplicate_object THEN NULL; END $$;
+DO $$ BEGIN ALTER TABLE "asistencias"         ADD CONSTRAINT "asistencias_registrado_por_fkey"       FOREIGN KEY ("registrado_por") REFERENCES "usuarios"("id")     ON DELETE RESTRICT  ON UPDATE CASCADE; EXCEPTION WHEN duplicate_object THEN NULL; END $$;
+DO $$ BEGIN ALTER TABLE "comunicados"         ADD CONSTRAINT "comunicados_publicado_por_fkey"        FOREIGN KEY ("publicado_por")  REFERENCES "usuarios"("id")     ON DELETE RESTRICT  ON UPDATE CASCADE; EXCEPTION WHEN duplicate_object THEN NULL; END $$;
+DO $$ BEGIN ALTER TABLE "comunicados"         ADD CONSTRAINT "comunicados_aula_id_fkey"              FOREIGN KEY ("aula_id")        REFERENCES "aulas"("id")        ON DELETE SET NULL  ON UPDATE CASCADE; EXCEPTION WHEN duplicate_object THEN NULL; END $$;
+DO $$ BEGIN ALTER TABLE "comunicados_envios"  ADD CONSTRAINT "comunicados_envios_comunicado_id_fkey" FOREIGN KEY ("comunicado_id")  REFERENCES "comunicados"("id")  ON DELETE RESTRICT  ON UPDATE CASCADE; EXCEPTION WHEN duplicate_object THEN NULL; END $$;
+DO $$ BEGIN ALTER TABLE "comunicados_envios"  ADD CONSTRAINT "comunicados_envios_usuario_id_fkey"    FOREIGN KEY ("usuario_id")     REFERENCES "usuarios"("id")     ON DELETE RESTRICT  ON UPDATE CASCADE; EXCEPTION WHEN duplicate_object THEN NULL; END $$;
+DO $$ BEGIN ALTER TABLE "recursos_biblioteca" ADD CONSTRAINT "recursos_biblioteca_curso_id_fkey"     FOREIGN KEY ("curso_id")       REFERENCES "cursos"("id")       ON DELETE SET NULL  ON UPDATE CASCADE; EXCEPTION WHEN duplicate_object THEN NULL; END $$;
+DO $$ BEGIN ALTER TABLE "recursos_biblioteca" ADD CONSTRAINT "recursos_biblioteca_subido_por_fkey"   FOREIGN KEY ("subido_por")     REFERENCES "usuarios"("id")     ON DELETE RESTRICT  ON UPDATE CASCADE; EXCEPTION WHEN duplicate_object THEN NULL; END $$;
+DO $$ BEGIN ALTER TABLE "refresh_tokens"      ADD CONSTRAINT "refresh_tokens_usuario_id_fkey"        FOREIGN KEY ("usuario_id")     REFERENCES "usuarios"("id")     ON DELETE CASCADE   ON UPDATE CASCADE; EXCEPTION WHEN duplicate_object THEN NULL; END $$;
+
+-- Configuración inicial de turnos (si no existe)
+INSERT INTO "turnos_config" ("turno", "hora_entrada", "hora_limite_puntual", "hora_fin")
+VALUES
+    ('manana', '07:00:00', '07:15:00', '13:00:00'),
+    ('tarde',  '13:00:00', '13:15:00', '20:00:00')
+ON CONFLICT ("turno") DO NOTHING;
+
+-- ═══════════════════════════════════════════════════════════════════════════════
 -- LIMPIEZA
--- -------------------------------------------------------
+-- ═══════════════════════════════════════════════════════════════════════════════
 DELETE FROM asistencias;
 DELETE FROM alumnos_apoderados;
 DELETE FROM horarios;
