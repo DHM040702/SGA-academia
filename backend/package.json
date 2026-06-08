@@ -9,11 +9,11 @@
     "seed": "ts-node --project tsconfig.seed.json prisma/seed.ts"
   },
   "scripts": {
-    "build": "nest build",
+    "build": "pnpm exec nest build",
     "format": "prettier --write \"src/**/*.ts\" \"test/**/*.ts\"",
-    "start": "nest start",
-    "start:dev": "CHOKIDAR_USEPOLLING=1 CHOKIDAR_INTERVAL=500 nest start --watch",
-    "start:debug": "nest start --debug --watch",
+    "start": "pnpm exec nest start",
+    "start:dev": "CHOKIDAR_USEPOLLING=1 CHOKIDAR_INTERVAL=500 pnpm exec nest start --watch",
+    "start:debug": "pnpm exec nest start --debug --watch",
     "start:prod": "node dist/main",
     "lint": "eslint \"{src,apps,libs,test}/**/*.ts\" --fix",
     "test": "jest",
@@ -57,7 +57,6 @@
   "devDependencies": {
     "@eslint/eslintrc": "^3.2.0",
     "@eslint/js": "^9.18.0",
-    "@mermaid-js/mermaid-cli": "^11.15.0",
     "@nestjs/cli": "^11.0.0",
     "@nestjs/schematics": "^11.0.0",
     "@nestjs/testing": "^11.0.1",
