@@ -60,7 +60,7 @@ async function bootstrap() {
     swaggerOptions: { persistAuthorization: true },
   });
 
-  await app.listen(process.env.PORT ?? 3000);
+  await app.listen(process.env.PORT ?? 3001, '0.0.0.0');
   logger.log(`Backend corriendo en http://localhost:${process.env.PORT ?? 3000}/api`);
   logger.log(`Swagger en http://localhost:${process.env.PORT ?? 3000}/api/docs`);
 }
