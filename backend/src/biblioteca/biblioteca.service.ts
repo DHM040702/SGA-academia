@@ -8,7 +8,7 @@ import { UpdateRecursoDto } from './dto/update-recurso.dto';
 import { FilterBibliotecaDto } from './dto/filter-biblioteca.dto';
 
 // Tipo local para historial (tabla nueva — cliente Prisma no regenerado)
-interface HistorialRow {
+export interface HistorialRow {
   id:                   string;
   recurso_id:           string;
   titulo_anterior:      string | null;
