@@ -1,10 +1,11 @@
 #!/bin/bash
-export NVM_DIR="$HOME/.nvm"
+export NVM_DIR="/home/cpu_ux/.nvm"
 [ -s "$NVM_DIR/nvm.sh" ] && \. "$NVM_DIR/nvm.sh"
 
-cd /mnt/c/Users/Diego/sga-academia/backend
+export PATH=/home/cpu_ux/.nvm/versions/node/v20.20.2/bin/:$PATH
 
-# Liberar el puerto 3001 si hay una instancia anterior corriendo
+cd /mnt/c/sga-academia/backend
+
 fuser -k 3001/tcp 2>/dev/null
 
-pnpm run start:prod
+exec /home/cpu_ux/.nvm/versions/node/v20.20.2/bin/pnpm run start:prod

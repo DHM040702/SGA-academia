@@ -1,11 +1,11 @@
 #!/bin/bash
-export NVM_DIR="$HOME/.nvm"
+export NVM_DIR="/home/cpu_ux/.nvm"
 [ -s "$NVM_DIR/nvm.sh" ] && \. "$NVM_DIR/nvm.sh"
 
-cd /mnt/c/Users/Diego/sga-academia/frontend
+export PATH=/home/cpu_ux/.nvm/versions/node/v20.20.2/bin:$PATH
 
-# Liberar el puerto 3000 si hay una instancia anterior corriendo
+cd /mnt/c/sga-academia/frontend
+
 fuser -k 3000/tcp 2>/dev/null
 
-# Compilar siempre para asegurar que los cambios de .env.local estén incluidos
-pnpm run build && pnpm run start
+exec /home/cpu_ux/.nvm/versions/node/v20.20.2/bin/pnpm run start

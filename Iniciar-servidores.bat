@@ -1,7 +1,7 @@
 @echo off
 
 :: CMD 1 - Backend
-start cmd /k "wsl -u diego bash /mnt/c/Users/Diego/sga-academia/backend.sh"
+start cmd /k "wsl -u cpu_ux bash /mnt/c/sga-academia/backend.sh"
 
 :: CMD 2 - Frontend
-start cmd /k "wsl -u diego bash /mnt/c/Users/Diego/sga-academia/frontend.sh"
+start cmd /k "wsl -u cpu_ux bash /mnt/c/sga-academia/frontend.sh"
