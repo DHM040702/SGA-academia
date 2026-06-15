@@ -164,14 +164,13 @@ Crear el archivo con el siguiente contenido:
 
 ```env
 # ── Base de datos ──────────────────────────────────────────────
-# 172.29.160.1 = IP del host Windows vista desde WSL (vEthernet WSL)
-DATABASE_URL="postgresql://sga_user:sga_pass_dev@172.29.160.1:5433/sga_db"
+DATABASE_URL="postgresql://sga_user:sga_pass_dev@localhost:5433/sga_db"
 
 # ── Redis ──────────────────────────────────────────────────────
-REDIS_URL="redis://172.29.160.1:6380"
+REDIS_URL="redis://localhost:6380"
 
 # ── MinIO ──────────────────────────────────────────────────────
-MINIO_ENDPOINT="172.29.160.1"
+MINIO_ENDPOINT="localhost"
 MINIO_PORT=9000
 MINIO_USE_SSL=false
 MINIO_ACCESS_KEY="minio_admin"
