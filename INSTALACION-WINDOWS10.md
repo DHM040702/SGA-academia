@@ -297,27 +297,63 @@ pnpm run start
 ```
 Esperar a ver: `Ready in ...ms`
 
-### Opción B — Script automático
+### Opción B — Scripts independientes (recomendado)
 
-Crear el archivo `C:\sga-academia\Iniciar-SGA.bat`:
+En lugar de un solo script que mezcla todo, cada servidor tiene su propio script independiente — así se puede reiniciar uno sin tocar el otro, y cada uno libera su puerto automáticamente si quedó un proceso colgado de una ejecución anterior.
 
+**`C:\sga-academia\backend-start.bat`:**
+```batch
+@echo off
+title SGA Backend
+
+:: Liberar el puerto 3001 si quedo ocupado por una ejecucion anterior
+for /f "tokens=5" %%a in ('netstat -aon ^| findstr ":3001" ^| findstr "LISTENING"') do (
+    taskkill /F /PID %%a >nul 2>&1
+)
+
+cd /d C:\sga-academia\backend
+
+echo Iniciando backend SGA...
+node dist/main
+```
+
+**`C:\sga-academia\frontend-start.bat`:**
+```batch
+@echo off
+title SGA Frontend
+
+:: Liberar el puerto 3000 si quedo ocupado por una ejecucion anterior
+for /f "tokens=5" %%a in ('netstat -aon ^| findstr ":3000" ^| findstr "LISTENING"') do (
+    taskkill /F /PID %%a >nul 2>&1
+)
+
+cd /d C:\sga-academia\frontend
+
+echo Iniciando frontend SGA...
+call pnpm run start
+```
+
+**`C:\sga-academia\Iniciar-SGA.bat`** (orquestador — llama a los dos scripts anteriores cada uno en su propia ventana):
 ```batch
 @echo off
 echo Iniciando SGA...
 
-:: Iniciar backend
-start "SGA Backend" cmd /k "cd /d C:\sga-academia\backend && node dist/main"
+:: Asegurar que Docker (PostgreSQL, Redis, MinIO) este levantado
+docker compose -f C:\sga-academia\docker-compose.yml up -d
 
-:: Esperar 10 segundos para que el backend cargue
+:: Iniciar backend en su propia ventana/script independiente
+start "SGA Backend" cmd /k "C:\sga-academia\backend-start.bat"
+
+:: Esperar a que el backend cargue antes de levantar el frontend
 timeout /t 10 /nobreak
 
-:: Iniciar frontend
-start "SGA Frontend" cmd /k "cd /d C:\sga-academia\frontend && pnpm run start"
+:: Iniciar frontend en su propia ventana/script independiente
+start "SGA Frontend" cmd /k "C:\sga-academia\frontend-start.bat"
 
 echo Servidores iniciados. Acceder en http://localhost:3000
 ```
 
-Hacer doble clic en `Iniciar-SGA.bat` para arrancar ambos servidores.
+Hacer doble clic en `Iniciar-SGA.bat` para arrancar todo. Si solo se necesita reiniciar el backend (por ejemplo tras una actualización), basta con cerrar su ventana y volver a ejecutar `backend-start.bat` directamente, sin afectar el frontend que sigue corriendo.
 
 ---
 
@@ -416,7 +452,9 @@ Así el navegador local también puede usar `http://sga.local:3000`.
 
 Para que el sistema arranque automáticamente cuando encienda la computadora.
 
-### 16.1 Script completo de inicio
+### 16.1 Script de espera para arranque desde cero
+
+`Iniciar-SGA.bat` (paso 12, Opción B) ya levanta Docker y llama a `backend-start.bat` / `frontend-start.bat` de forma independiente. Lo único que falta para un arranque automático al encender la PC es darle tiempo a Docker Desktop para terminar de iniciar (puede tardar 20-40 segundos tras el login de Windows).
 
 Crear `C:\sga-academia\inicio-completo.bat`:
 
@@ -428,32 +466,13 @@ echo ============================================
 
 :: Esperar a que Docker Desktop inicie completamente
 echo Esperando que Docker inicie...
-timeout /t 20 /nobreak
+timeout /t 30 /nobreak
 
-:: Levantar contenedores Docker
-echo Iniciando servicios de base de datos...
-docker compose -f C:\sga-academia\docker-compose.yml up -d
-
-:: Esperar a que PostgreSQL este listo
-timeout /t 10 /nobreak
-
-:: Iniciar backend
-echo Iniciando backend...
-start "SGA Backend" cmd /k "cd /d C:\sga-academia\backend && node dist/main"
-
-:: Esperar a que el backend cargue
-timeout /t 15 /nobreak
-
-:: Iniciar frontend
-echo Iniciando frontend...
-start "SGA Frontend" cmd /k "cd /d C:\sga-academia\frontend && pnpm run start"
-
-echo.
-echo Sistema iniciado. Acceder en http://localhost:3000
-echo Para alumnos: http://192.168.137.1:3000
+:: Delegar a los scripts independientes (docker + backend + frontend)
+call C:\sga-academia\Iniciar-SGA.bat
 ```
 
-> Docker Desktop debe estar configurado para iniciar con Windows (paso 6) para que este script funcione sin intervención manual. Si la PC es lenta, aumentar el primer `timeout` a 30-40 segundos.
+> Si la PC es lenta, aumentar el `timeout` a 45-60 segundos. Si el backend o frontend no arrancan en el primer intento por Docker no estar listo aún, basta con volver a ejecutar `backend-start.bat` o `frontend-start.bat` manualmente — cada uno libera su puerto y vuelve a intentar sin afectar al otro.
 
 ### 16.2 Configurar inicio automático con Windows
 
