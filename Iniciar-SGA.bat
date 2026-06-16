@@ -1,6 +1,9 @@
 @echo off
 echo Iniciando SGA...
 
+:: Activar el hotspot SGA-Academia
+powershell -ExecutionPolicy Bypass -File "C:\sga-academia\iniciar-hotspot.ps1"
+
 :: Asegurar que Docker (PostgreSQL, Redis, MinIO) este levantado
 docker compose -f C:\sga-academia\docker-compose.yml up -d
 

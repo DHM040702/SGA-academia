@@ -333,10 +333,13 @@ echo Iniciando frontend SGA...
 call pnpm run start
 ```
 
-**`C:\sga-academia\Iniciar-SGA.bat`** (orquestador — llama a los dos scripts anteriores cada uno en su propia ventana):
+**`C:\sga-academia\Iniciar-SGA.bat`** (orquestador — activa el hotspot, levanta Docker y llama a los dos scripts anteriores cada uno en su propia ventana):
 ```batch
 @echo off
 echo Iniciando SGA...
+
+:: Activar el hotspot SGA-Academia
+powershell -ExecutionPolicy Bypass -File "C:\sga-academia\iniciar-hotspot.ps1"
 
 :: Asegurar que Docker (PostgreSQL, Redis, MinIO) este levantado
 docker compose -f C:\sga-academia\docker-compose.yml up -d
@@ -354,6 +357,8 @@ echo Servidores iniciados. Acceder en http://localhost:3000
 ```
 
 Hacer doble clic en `Iniciar-SGA.bat` para arrancar todo. Si solo se necesita reiniciar el backend (por ejemplo tras una actualización), basta con cerrar su ventana y volver a ejecutar `backend-start.bat` directamente, sin afectar el frontend que sigue corriendo.
+
+> El archivo `iniciar-hotspot.ps1` que invoca este script se crea en el paso 14.1. Si todavía no se ha creado, `Iniciar-SGA.bat` mostrará un error de PowerShell al llamarlo — no afecta a Docker, backend ni frontend, que igualmente se inician.
 
 ---
 
@@ -381,15 +386,63 @@ El hotspot permite que los alumnos accedan al SGA desde sus dispositivos (celula
 
 ### 14.1 Activar el hotspot
 
-1. Abrir **Configuración** → **Red e Internet** → **Zona de acceso móvil**
-2. Activar **"Compartir mi conexión a Internet"**
-3. Configurar:
-   - **Nombre de red:** `SGA-CEPREUNASAM` (o el nombre que prefiera)
-   - **Contraseña:** una contraseña segura
-   - **Banda:** 2.4 GHz (mayor compatibilidad con dispositivos antiguos)
-4. Guardar y activar.
+En lugar de activarlo manualmente desde Configuración cada vez, se usa un script de PowerShell que enciende el hotspot mediante la API de Windows (`NetworkOperatorTetheringManager`). Esto permite automatizarlo junto con el resto del arranque del sistema.
 
-> Si la computadora no tiene adaptador WiFi (por ejemplo, una PC de escritorio conectada por cable), el hotspot de Windows no está disponible. En ese caso usar un router WiFi físico conectado a la misma red, y acceder por la IP LAN de la PC en lugar de `192.168.137.1`.
+Crear `C:\sga-academia\iniciar-hotspot.ps1`:
+
+```powershell
+Add-Type -AssemblyName System.Runtime.WindowsRuntime
+
+function Await($WinRtTask) {
+    $asTask = ([System.WindowsRuntimeSystemExtensions].GetMethods() |
+        Where-Object { $_.Name -eq 'AsTask' -and $_.GetParameters().Count -eq 1 })[0]
+    $netTask = $asTask.MakeGenericMethod($WinRtTask.GetType().GetGenericArguments()[0]).Invoke($null, @($WinRtTask))
+    $netTask.Wait(-1) | Out-Null
+    $netTask.Result
+}
+
+$cp = [Windows.Networking.Connectivity.NetworkInformation,Windows.Networking.Connectivity,ContentType=WindowsRuntime]::GetInternetConnectionProfile()
+
+if ($cp -eq $null) {
+    Write-Host "[ERROR] Sin conexion a internet. Verificar el cable Ethernet." -ForegroundColor Red
+    exit 1
+}
+
+$tm = [Windows.Networking.NetworkOperators.NetworkOperatorTetheringManager,Windows.Networking.NetworkOperators,ContentType=WindowsRuntime]::CreateFromConnectionProfile($cp)
+
+if ($tm.TetheringOperationalState -eq 1) {
+    Write-Host "[OK] Hotspot SGA-Academia ya estaba activo." -ForegroundColor Green
+    exit 0
+}
+
+$cfg = $tm.GetCurrentAccessPointConfiguration()
+if ($cfg.Ssid -ne "SGA-Academia") {
+    $cfg.Ssid       = "SGA-Academia"
+    $cfg.Passphrase = "academia2026"
+    Await($tm.ConfigureAccessPointAsync($cfg)) | Out-Null
+}
+
+Write-Host "[INFO] Iniciando hotspot SGA-Academia..." -ForegroundColor Cyan
+Await($tm.StartTetheringAsync()) | Out-Null
+Start-Sleep -Seconds 3
+
+if ($tm.TetheringOperationalState -eq 1) {
+    Write-Host "[OK] Hotspot activo en 192.168.137.1" -ForegroundColor Green
+} else {
+    Write-Host "[ERROR] No se pudo iniciar el hotspot." -ForegroundColor Red
+}
+```
+
+Ejecutarlo manualmente la primera vez para probarlo:
+```powershell
+powershell -ExecutionPolicy Bypass -File "C:\sga-academia\iniciar-hotspot.ps1"
+```
+
+Para cambiar el nombre de red o la contraseña, editar las variables `$cfg.Ssid` y `$cfg.Passphrase` dentro del script.
+
+> **Requisito de la API de Windows:** `GetInternetConnectionProfile()` necesita que la PC tenga un perfil de conexión activo (por ejemplo, un cable Ethernet conectado), aunque ese cable no tenga salida real a internet. Si no hay ningún adaptador con perfil de conexión, el script falla con `Sin conexion a internet` y el hotspot no puede activarse — es una limitación de la API de tethering de Windows, no del SGA.
+>
+> Si la computadora no tiene adaptador WiFi, el hotspot de Windows no está disponible sin importar el script. En ese caso usar un router WiFi físico conectado a la misma red, y acceder por la IP LAN de la PC en lugar de `192.168.137.1`.
 
 ### 14.2 Verificar la IP del hotspot
 
