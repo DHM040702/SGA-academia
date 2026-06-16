@@ -11,13 +11,14 @@ powershell -ExecutionPolicy Bypass -File "C:\sga-academia\iniciar-hotspot.ps1"
 :: Asegurar que Docker (PostgreSQL, Redis, MinIO) este levantado
 docker compose -f C:\sga-academia\docker-compose.yml up -d
 
-:: Iniciar backend en su propia ventana/script independiente
-start "SGA Backend" cmd /k "C:\sga-academia\backend-start.bat"
+:: Iniciar backend oculto (sin ventana), log en logs\backend.log
+powershell -NoProfile -Command "Start-Process -FilePath 'cmd.exe' -ArgumentList '/c C:\sga-academia\backend-start.bat' -WindowStyle Hidden -RedirectStandardOutput 'C:\sga-academia\logs\backend.log' -RedirectStandardError 'C:\sga-academia\logs\backend-error.log'"
 
 :: Esperar a que el backend cargue antes de levantar el frontend
 timeout /t 10 /nobreak
 
-:: Iniciar frontend en su propia ventana/script independiente
-start "SGA Frontend" cmd /k "C:\sga-academia\frontend-start.bat"
+:: Iniciar frontend oculto (sin ventana), log en logs\frontend.log
+powershell -NoProfile -Command "Start-Process -FilePath 'cmd.exe' -ArgumentList '/c C:\sga-academia\frontend-start.bat' -WindowStyle Hidden -RedirectStandardOutput 'C:\sga-academia\logs\frontend.log' -RedirectStandardError 'C:\sga-academia\logs\frontend-error.log'"
 
-echo Servidores iniciados. Acceder en http://localhost:3000
+echo Servidores iniciados en segundo plano. Acceder en http://localhost:3000
+echo Logs: C:\sga-academia\logs\backend.log y C:\sga-academia\logs\frontend.log

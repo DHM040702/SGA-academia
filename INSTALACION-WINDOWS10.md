@@ -214,7 +214,7 @@ PORT=3001
 NODE_ENV=production
 
 # ── CORS ───────────────────────────────────────────────────────
-FRONTEND_URL="http://localhost:3000,http://192.168.137.1:3000"
+FRONTEND_URL="http://localhost:3000,http://192.168.137.1:3000,http://sga.local:3000"
 ```
 
 Para generar los valores JWT, ejecutar en PowerShell:
@@ -333,7 +333,7 @@ echo Iniciando frontend SGA...
 call pnpm run start
 ```
 
-**`C:\sga-academia\Iniciar-SGA.bat`** (orquestador — activa el hotspot, levanta Docker y llama a los dos scripts anteriores cada uno en su propia ventana):
+**`C:\sga-academia\Iniciar-SGA.bat`** (orquestador — activa el hotspot, levanta Docker y lanza los dos scripts anteriores **ocultos en segundo plano**, sin dejar ninguna ventana de consola abierta):
 ```batch
 @echo off
 echo Iniciando SGA...
@@ -344,19 +344,40 @@ powershell -ExecutionPolicy Bypass -File "C:\sga-academia\iniciar-hotspot.ps1"
 :: Asegurar que Docker (PostgreSQL, Redis, MinIO) este levantado
 docker compose -f C:\sga-academia\docker-compose.yml up -d
 
-:: Iniciar backend en su propia ventana/script independiente
-start "SGA Backend" cmd /k "C:\sga-academia\backend-start.bat"
+:: Iniciar backend oculto (sin ventana), log en logs\backend.log
+powershell -NoProfile -Command "Start-Process -FilePath 'cmd.exe' -ArgumentList '/c C:\sga-academia\backend-start.bat' -WindowStyle Hidden -RedirectStandardOutput 'C:\sga-academia\logs\backend.log' -RedirectStandardError 'C:\sga-academia\logs\backend-error.log'"
 
 :: Esperar a que el backend cargue antes de levantar el frontend
 timeout /t 10 /nobreak
 
-:: Iniciar frontend en su propia ventana/script independiente
-start "SGA Frontend" cmd /k "C:\sga-academia\frontend-start.bat"
+:: Iniciar frontend oculto (sin ventana), log en logs\frontend.log
+powershell -NoProfile -Command "Start-Process -FilePath 'cmd.exe' -ArgumentList '/c C:\sga-academia\frontend-start.bat' -WindowStyle Hidden -RedirectStandardOutput 'C:\sga-academia\logs\frontend.log' -RedirectStandardError 'C:\sga-academia\logs\frontend-error.log'"
 
-echo Servidores iniciados. Acceder en http://localhost:3000
+echo Servidores iniciados en segundo plano. Acceder en http://localhost:3000
+echo Logs: C:\sga-academia\logs\backend.log y C:\sga-academia\logs\frontend.log
 ```
 
-Hacer doble clic en `Iniciar-SGA.bat` para arrancar todo. Si solo se necesita reiniciar el backend (por ejemplo tras una actualización), basta con cerrar su ventana y volver a ejecutar `backend-start.bat` directamente, sin afectar el frontend que sigue corriendo.
+Crear también la carpeta `C:\sga-academia\logs` antes del primer uso (vacía está bien, los scripts escriben ahí directamente).
+
+Hacer doble clic en `Iniciar-SGA.bat` para arrancar todo sin ventanas visibles. Para revisar si algo falló, abrir `logs\backend.log` o `logs\frontend.log` con el Bloc de notas.
+
+**`C:\sga-academia\Detener-SGA.bat`** (como ya no hay ventanas que cerrar, se detienen los procesos por puerto):
+```batch
+@echo off
+echo Deteniendo SGA...
+
+for /f "tokens=5" %%a in ('netstat -aon ^| findstr ":3000" ^| findstr "LISTENING"') do (
+    taskkill /F /PID %%a >nul 2>&1
+)
+
+for /f "tokens=5" %%a in ('netstat -aon ^| findstr ":3001" ^| findstr "LISTENING"') do (
+    taskkill /F /PID %%a >nul 2>&1
+)
+
+echo Backend y frontend detenidos.
+```
+
+Si solo se necesita reiniciar el backend (por ejemplo tras una actualización), ejecutar `Detener-SGA.bat`, esperar unos segundos, y volver a correr únicamente `backend-start.bat` o todo `Iniciar-SGA.bat` de nuevo.
 
 > El archivo `iniciar-hotspot.ps1` que invoca este script se crea en el paso 14.1. Si todavía no se ha creado, `Iniciar-SGA.bat` mostrará un error de PowerShell al llamarlo — no afecta a Docker, backend ni frontend, que igualmente se inician.
 
@@ -560,10 +581,12 @@ Para que el script corra al iniciar sesión en Windows:
 > ```powershell
 > $action = New-ScheduledTaskAction -Execute "C:\sga-academia\inicio-completo.bat"
 > $trigger = New-ScheduledTaskTrigger -AtLogOn
-> $settings = New-ScheduledTaskSettingsSet -RunOnlyIfNetworkAvailable $false
+> $settings = New-ScheduledTaskSettingsSet
 > Register-ScheduledTask -TaskName "Iniciar SGA" -Action $action `
 >   -Trigger $trigger -Settings $settings -RunLevel Highest -Force
 > ```
+>
+> Si al copiar este bloque aparece el error `No se encuentra ningún parámetro de posición que acepte el argumento 'False'`, normalmente es porque el guion `-` se convirtió en un carácter especial al pegar desde un documento. Escribir el comando manualmente en PowerShell evita el problema.
 
 ---
 
