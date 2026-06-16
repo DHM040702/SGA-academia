@@ -480,24 +480,44 @@ Los alumnos deben:
 
 > **Recomendación:** Pedir a los alumnos que guarden esta dirección como marcador/favorito en sus navegadores.
 
-### 15.1 DNS personalizado (opcional)
+### 15.1 DNS personalizado con Technitium DNS Server
 
-Para que los alumnos puedan acceder con un nombre en lugar de la IP (por ejemplo `http://sga.local`), agregar esta entrada al archivo de hosts de cada dispositivo cliente. En Windows, el archivo está en:
-```
-C:\Windows\System32\drivers\etc\hosts
-```
-Agregar la línea:
-```
-192.168.137.1    sga.local
-```
+Para que el personal y los alumnos accedan con `http://sga.local:3000` en lugar de la IP, sin modificar nada en sus celulares o laptops, se usa **Technitium DNS Server**: un servidor DNS gratuito y de código abierto para Windows, con panel de administración web. El hotspot de Windows ya entrega automáticamente su propia IP (`192.168.137.1`) como servidor DNS a cada dispositivo que se conecta — solo falta agregarle el registro de `sga.local`.
 
-En Android e iOS no es posible editar el hosts file sin root/jailbreak, por lo que se recomienda usar la IP directamente en dispositivos móviles. Esta opción es práctica solo si el profesor distribuye laptops/PCs ya configuradas, no para celulares de los alumnos.
+> Si la laptop todavía no lo tiene instalado: descargarlo desde https://technitium.com/dns/ (instalador para Windows), instalarlo como servicio. Se confirma que está corriendo viendo el servicio `DnsService` (nombre para mostrar "Technitium DNS Server") en `services.msc`, o con:
+> ```powershell
+> Get-Service -Name DnsService
+> ```
 
-Para la computadora del profesor/servidor, agregar en el mismo archivo:
+**Configurar el registro `sga.local`:**
+
+1. Abrir en el navegador el panel de administración:
+   ```
+   http://127.0.0.1:5380
+   ```
+2. Iniciar sesión con el usuario administrador configurado al instalar Technitium.
+3. Ir a **Zones** → **Add Zone**.
+   - **Zone Name:** `sga.local`
+   - **Type:** `Primary`
+   - Guardar.
+4. Dentro de la zona `sga.local`, **Add Record**:
+   - **Type:** `A`
+   - **Name:** dejar en blanco (o `@`), para que apunte a la raíz `sga.local`
+   - **IP Address:** `192.168.137.1`
+   - Guardar.
+5. (Opcional) Agregar también un registro con **Name:** `www` apuntando a la misma IP, si se quiere admitir `www.sga.local`.
+
+Esto se configura **una sola vez**; Technitium guarda la zona en disco y la vuelve a cargar automáticamente cada vez que el servicio inicia con Windows.
+
+**Verificar que resuelve correctamente** (desde la misma laptop, en PowerShell):
+```powershell
+Resolve-DnsName sga.local -Server 192.168.137.1
 ```
-127.0.0.1    sga.local
-```
-Así el navegador local también puede usar `http://sga.local:3000`.
+Debe devolver `192.168.137.1`.
+
+Con esto, cualquier alumno o miembro del personal que se conecte a la red `SGA-Academia` puede entrar directamente a `http://sga.local:3000`, porque Windows ya le asignó `192.168.137.1` como su DNS por DHCP, y Technitium responde esa IP para `sga.local` sin que el dispositivo cliente necesite ninguna configuración.
+
+> **Importante:** como Technitium ya ocupa el puerto 53 en `192.168.137.1`, **no** se debe instalar ni ejecutar ningún otro servidor DNS propio del SGA en esa misma interfaz — entrarían en conflicto (`EADDRINUSE`). Toda la configuración de `sga.local` se hace exclusivamente desde el panel de Technitium.
 
 ---
 
