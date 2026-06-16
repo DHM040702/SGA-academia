@@ -34,8 +34,10 @@ export class MinioService implements OnModuleInit {
       secretKey: this.config.get<string>('MINIO_SECRET_KEY') ?? '',
     });
 
-    await this.ensureBucket(FOTOS_BUCKET);
-    await this.ensureBucket(BIBLIOTECA_BUCKET);
+    // No bloqueamos el arranque: si MinIO no está disponible, los buckets
+    // se intentan crear en background y se loguea el warning.
+    this.ensureBucket(FOTOS_BUCKET).catch(() => {});
+    this.ensureBucket(BIBLIOTECA_BUCKET).catch(() => {});
   }
 
   /* ── helpers ───────────────────────────────────────────────── */
