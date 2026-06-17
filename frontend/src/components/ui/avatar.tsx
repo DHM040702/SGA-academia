@@ -29,11 +29,11 @@ export function Avatar({ name = '', src, size = 32, className }: AvatarProps) {
   return (
     <div
       className={cn('shrink-0 rounded-full overflow-hidden flex items-center justify-center border border-border-s', className)}
-      style={{ width: size, height: size, background: src ? 'transparent' : bg, color: fg, fontSize: size * 0.38, fontWeight: 600 }}
+      style={{ width: size, height: size, background: src ? 'transparent' : '#000', color: fg, fontSize: size * 0.38, fontWeight: 600 }}
     >
       {src
-        ? <img src={src} alt={name} className="w-full h-full object-cover" />
-        : <span style={{ fontFamily: 'var(--font-sans)' }}>{initials}</span>
+        ? <img src={src} alt={name} className="w-full h-full object-cover" onError={e => { (e.currentTarget as HTMLImageElement).style.display = 'none'; (e.currentTarget.parentElement as HTMLElement).style.background = '#000' }} />
+        : null
       }
     </div>
   )

@@ -315,9 +315,7 @@ function CarnetCardContent({ alumno, cicloLabel }: { alumno: AlumnoCarnet; ciclo
           {alumno.foto_url ? (
             <Image src={alumno.foto_url} style={s.avatarImg} />
           ) : (
-            <View style={s.avatar}>
-              <Text style={s.avatarText}>{initials(fullName)}</Text>
-            </View>
+            <View style={[s.avatar, { backgroundColor: '#000000' }]} />
           )}
 
           <View style={s.vline} />

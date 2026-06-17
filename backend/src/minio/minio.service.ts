@@ -91,10 +91,6 @@ export class MinioService implements OnModuleInit {
 
   /* ── API pública — biblioteca ──────────────────────────────── */
 
-  /**
-   * Sube un PDF a MinIO y devuelve su URL pública.
-   * Clave: pdf/{recursoId}.pdf
-   */
   async subirPdfBiblioteca(
     recursoId: string,
     buffer: Buffer,
@@ -109,9 +105,6 @@ export class MinioService implements OnModuleInit {
     return this.buildUrl(BIBLIOTECA_BUCKET, key);
   }
 
-  /**
-   * Elimina un PDF de la biblioteca por su URL pública.
-   */
   async eliminarPdfBibliotecaPorUrl(url: string): Promise<void> {
     try {
       const parts = url.split(`/${BIBLIOTECA_BUCKET}/`);
