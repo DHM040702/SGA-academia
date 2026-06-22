@@ -1,7 +1,9 @@
 import { Module } from '@nestjs/common';
+import { APP_INTERCEPTOR } from '@nestjs/core';
 import { ConfigModule } from '@nestjs/config';
 import { AppController } from './app.controller';
 import { AppService } from './app.service';
+import { AuditInterceptor } from './common/interceptors/audit.interceptor';
 import { PrismaModule } from './prisma/prisma.module';
 import { MinioModule } from './minio/minio.module';
 import { AuthModule } from './auth/auth.module';
@@ -18,6 +20,7 @@ import { ReportesModule } from './reportes/reportes.module';
 import { CarrerasModule } from './carreras/carreras.module';
 import { TurnosModule } from './turnos/turnos.module';
 import { UsuariosModule } from './usuarios/usuarios.module';
+import { AuditoriaModule } from './auditoria/auditoria.module';
 
 @Module({
   imports: [
@@ -38,8 +41,12 @@ import { UsuariosModule } from './usuarios/usuarios.module';
     ComunicadosModule,
     BibliotecaModule,
     ReportesModule,
+    AuditoriaModule,
   ],
   controllers: [AppController],
-  providers: [AppService],
+  providers: [
+    AppService,
+    { provide: APP_INTERCEPTOR, useClass: AuditInterceptor },
+  ],
 })
 export class AppModule {}

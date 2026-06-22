@@ -864,6 +864,49 @@ node prisma/reset-passwords-dni.cjs
 **Credenciales tras el reseteo:** cada usuario inicia sesión con su **DNI como usuario y
 como contraseña**, y el sistema le pide cambiarla de inmediato.
 
+### 7.7 Módulo de auditoría (registro de cambios del sistema)
+
+El sistema registra automáticamente toda operación de escritura (crear/actualizar/eliminar)
+en la tabla `auditoria`, mediante un interceptor global. El admin lo consulta en
+**menú lateral → Administración → Auditoría** (tabla con filtros, panel de resumen y
+exportación a CSV).
+
+**Despliegue (una sola vez en el servidor):**
+
+```bash
+# 1. Respaldar la BD
+docker exec -i sga-academia-postgres-1 pg_dump -U sga_user sga_db > /home/sgaadmin/backup-pre-auditoria.sql
+
+# 2. Crear la tabla auditoria (manual, no usamos migraciones de Prisma)
+docker exec -i sga-academia-postgres-1 psql -U sga_user -d sga_db <<'SQL'
+CREATE TABLE IF NOT EXISTS auditoria (
+  id            uuid PRIMARY KEY DEFAULT gen_random_uuid(),
+  usuario_id    uuid,
+  usuario_email varchar(150),
+  usuario_rol   varchar(20),
+  accion        varchar(20)  NOT NULL,
+  entidad       varchar(50)  NOT NULL,
+  entidad_id    varchar(64),
+  detalle       jsonb,
+  ip            varchar(64),
+  created_at    timestamptz  NOT NULL DEFAULT now()
+);
+CREATE INDEX IF NOT EXISTS auditoria_created_at_idx ON auditoria (created_at);
+CREATE INDEX IF NOT EXISTS auditoria_usuario_id_idx ON auditoria (usuario_id);
+CREATE INDEX IF NOT EXISTS auditoria_entidad_idx    ON auditoria (entidad);
+CREATE INDEX IF NOT EXISTS auditoria_accion_idx      ON auditoria (accion);
+SQL
+
+# 3. Traer el código nuevo y reconstruir (build regenera el cliente Prisma con el modelo Auditoria)
+/home/sgaadmin/actualizar-sga.sh
+```
+
+> El registro de auditoría crece con el uso. Para purgar eventos antiguos (ej. > 6 meses):
+> ```bash
+> docker exec -i sga-academia-postgres-1 psql -U sga_user -d sga_db \
+>   -c "DELETE FROM auditoria WHERE created_at < now() - interval '6 months';"
+> ```
+
 ---
 
 ## Verificación final del sistema

@@ -8,7 +8,7 @@ import { useAuth } from '@/contexts/auth-context'
 import {
   Home, Users, Teacher, Grid, Calendar, Check,
   Megaphone, Book, Chart, LogOut, Layers, ScanLine,
-  Clock, Shield, CreditCard,
+  Clock, Shield, CreditCard, FileText,
 } from '@/components/icons'
 
 /* ─── Tipos ────────────────────────────────────────────────── */
@@ -49,9 +49,10 @@ const GROUPS_ADMIN: NavGroup[] = [
   {
     label: 'Administración',
     items: [
-      { href: '/reportes', icon: Chart,  label: 'Reportes' },
-      { href: '/turnos',   icon: Clock,  label: 'Turnos' },
-      { href: '/usuarios', icon: Shield, label: 'Usuarios' },
+      { href: '/reportes',  icon: Chart,    label: 'Reportes' },
+      { href: '/turnos',    icon: Clock,    label: 'Turnos' },
+      { href: '/usuarios',  icon: Shield,   label: 'Usuarios' },
+      { href: '/auditoria', icon: FileText, label: 'Auditoría' },
     ],
   },
 ]
