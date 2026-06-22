@@ -37,12 +37,29 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
   const [loading, setLoading] = React.useState(true)
   const queryClient = useQueryClient()
 
-  /* ── Hydrate on mount (token already in LS or cookie) ─── */
+  /* ── Hidratar al montar ───────────────────────────────────
+     El access token vive solo en memoria, así que tras una recarga
+     se pierde. Si /auth/me falla, intentamos restaurar la sesión con
+     el refresh token (cookie HttpOnly) antes de dar por cerrada la sesión. */
   React.useEffect(() => {
-    api.get<AuthUser>('/auth/me')
-      .then(({ data }) => setUser(data))
-      .catch(() => setUser(null))
-      .finally(() => setLoading(false))
+    async function hydrate() {
+      try {
+        const { data } = await api.get<AuthUser>('/auth/me')
+        setUser(data)
+      } catch {
+        try {
+          const { data: r } = await api.post<{ access_token: string }>('/auth/refresh')
+          setAccessToken(r.access_token)
+          const { data } = await api.get<AuthUser>('/auth/me')
+          setUser(data)
+        } catch {
+          setUser(null)
+        }
+      } finally {
+        setLoading(false)
+      }
+    }
+    void hydrate()
   }, [])
 
   const login = React.useCallback(async (dni: string, password: string) => {

@@ -1,6 +1,7 @@
 'use client'
 
 import { useState, useEffect, useRef, useCallback } from 'react'
+import Link from 'next/link'
 import { useRouter } from 'next/navigation'
 import { useAsistencia, useScan, useCorrectAsistencia } from '@/hooks/use-asistencia'
 import { Avatar } from '@/components/ui/avatar'
@@ -385,13 +386,13 @@ export default function VigilantePage() {
             <Kbd>Esc</Kbd><span>Limpiar</span>
           </div>
 
-          <a
+          <Link
             href="/inicio"
             className="flex-shrink-0 px-3 py-1.5 rounded-lg text-[11px] sm:text-[12px] font-medium"
             style={{ color: '#fff', border: '1px solid rgba(255,255,255,.2)' }}
           >
             Panel
-          </a>
+          </Link>
         </div>
       </div>
 
