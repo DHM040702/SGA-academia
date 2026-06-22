@@ -2,6 +2,7 @@
 
 import { useAuth } from '@/contexts/auth-context'
 import { useActiveCiclo } from '@/hooks/use-ciclos'
+import { cicloWeekInfo } from '@/contexts/ciclo-context'
 import { useAsistencia } from '@/hooks/use-asistencia'
 import { useHorarios, type Horario } from '@/hooks/use-horarios'
 import { useComunicados, type Comunicado } from '@/hooks/use-comunicados'
@@ -117,6 +118,14 @@ function timeAgo(iso: string) {
   return `${Math.floor(hrs / 24)}d`
 }
 
+/** Saludo según la hora del día. */
+function saludo() {
+  const h = new Date().getHours()
+  if (h < 12) return 'Buenos días'
+  if (h < 19) return 'Buenas tardes'
+  return 'Buenas noches'
+}
+
 function tipoIcon(tipo: string) {
   if (tipo === 'pdf') return <FileText size={28} />
   if (tipo === 'video') return <Play size={28} />
@@ -162,6 +171,10 @@ function AlumnoInicio({ user }: { user: ReturnType<typeof useAuth>['user'] }) {
     .filter((h) => h.diaSemana === TODAY_DAY)
     .sort((a, b) => a.horaInicio.localeCompare(b.horaInicio))
 
+  // Semana del ciclo (dinámica) y nombre real del aula
+  const cicloWeek = cicloActivo ? cicloWeekInfo(cicloActivo.fechaInicio, cicloActivo.fechaFin) : null
+  const aulaNombre = allHorarios[0]?.aula ?? (aulaId ? 'Aula asignada' : 'Sin aula')
+
   const records = asistencias?.data ?? []
   const total = records.length
   const puntuales = records.filter((r) => !r.esTardanza).length
@@ -180,9 +193,11 @@ function AlumnoInicio({ user }: { user: ReturnType<typeof useAuth>['user'] }) {
       {/* Hero */}
       <div className="flex items-end justify-between mb-5">
         <div>
-          <div className="text-[11.5px] text-text-mute mb-1 capitalize">{TODAY_STR} · semana 5 de 16</div>
+          <div className="text-[11.5px] text-text-mute mb-1 capitalize">
+            {TODAY_STR}{cicloWeek ? ` · semana ${cicloWeek.week} de ${cicloWeek.total}` : ''}
+          </div>
           <h1 className="m-0 font-serif font-semibold text-[30px] tracking-[-0.02em] leading-[1.1]">
-            Bienvenido{apellidos ? 'a' : ''}, {firstName}.
+            {saludo()}, {firstName}.
           </h1>
           {todayHorarios.length > 0 ? (
             <p className="mt-1.5 text-[13.5px] text-text-mute">
@@ -326,7 +341,7 @@ function AlumnoInicio({ user }: { user: ReturnType<typeof useAuth>['user'] }) {
                   <div className="text-[9px] tracking-[0.12em] uppercase opacity-80">Mi carnet{cicloActivo ? ` · ${cicloActivo.nombre}` : ''}</div>
                   <div className="font-serif text-[15px] font-semibold mt-0.5 leading-tight">{fullName}</div>
                   <div className="text-[11px] opacity-85 mt-0.5">
-                    {aulaId ? 'Aula activa' : 'Sin aula'} · DNI —
+                    {aulaNombre} · DNI {user?.dni ?? '—'}
                   </div>
                 </div>
               </div>
@@ -444,7 +459,7 @@ function ApoderadoInicio({ user }: { user: ReturnType<typeof useAuth>['user'] })
         <div className="flex items-end justify-between">
           <div>
             <h1 className="m-0 font-serif font-semibold text-[30px] tracking-[-0.02em] leading-[1.1]">
-              Buenas tardes, {firstName}.
+              {saludo()}, {firstName}.
             </h1>
             {todayRecord ? (
               <p className="mt-1.5 text-[13.5px] text-text-mute">
@@ -470,7 +485,7 @@ function ApoderadoInicio({ user }: { user: ReturnType<typeof useAuth>['user'] })
       <div className="flex flex-col gap-4">
         {/* KPIs */}
         <div className="grid grid-cols-4 gap-3.5">
-          <KPI label="Asistencia ciclo" value={`${pct}%`} sub={`${puntuales} / ${total} sesiones`} trend={2} accent="var(--color-success)" />
+          <KPI label="Asistencia ciclo" value={`${pct}%`} sub={`${puntuales} / ${total} sesiones`} accent="var(--color-success)" />
           <KPI label="Puntualidad" value={`${total - tardanzas > 0 ? Math.round(((total - tardanzas) / total) * 100) : 0}%`} sub={`${tardanzas} tardanzas`} accent="var(--color-primary)" />
           <KPI label="Ausencias" value={0} sub="0 justificadas" accent="var(--color-info)" />
           <KPI label="Avisos sin leer" value={avisos.length} sub="avisos recientes" accent="var(--color-warning)" />

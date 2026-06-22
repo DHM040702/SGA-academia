@@ -28,6 +28,7 @@
 5. [Despliegue del proyecto SGA](#5-despliegue-del-proyecto-sga)
 6. [Configuración de arranque automático con systemd](#6-configuración-de-arranque-automático-con-systemd)
 7. [Actualizar el proyecto con Git](#7-actualizar-el-proyecto-con-git)
+8. [Migración del hotspot a un adaptador USB WiFi](#8-migración-del-hotspot-a-un-adaptador-usb-wifi)
 
 ---
 
@@ -906,6 +907,151 @@ SQL
 > docker exec -i sga-academia-postgres-1 psql -U sga_user -d sga_db \
 >   -c "DELETE FROM auditoria WHERE created_at < now() - interval '6 months';"
 > ```
+
+---
+
+## 8. Migración del hotspot a un adaptador USB WiFi
+
+> **Por qué:** la tarjeta interna **Intel Centrino Advanced-N 6205** no soporta modo AP
+> de forma estable en Linux (driver `iwldvm`): colapsa con `ADVANCED_SYSASSERT` cada
+> pocos segundos. Se reemplaza el hotspot por un **adaptador USB con chipset
+> MediaTek MT7612U / MT7601U o Ralink RT5370** (driver `mt76`/`rt2800usb` en el kernel,
+> modo AP estable). El adaptador USB pasa a ser la interfaz del hotspot; la Intel se desactiva.
+
+### 8.1 Conectar el adaptador e identificarlo
+
+```bash
+# Enchufar el USB y ver el nombre asignado (algo como wlxAABBCCDDEEFF o wlan0)
+ip link
+# Confirmar el chipset detectado y el driver
+sudo dmesg | tail -20
+sudo lshw -class network | grep -A4 -i wireless
+```
+
+Anota el **nombre de la interfaz nueva** (ej. `wlx00c0ca123456`) y su **MAC**.
+
+### 8.2 Verificar que soporta modo AP
+
+```bash
+sudo iw list | grep -A10 "Supported interface modes"
+```
+
+Debe aparecer **`* AP`** en la lista. Si no, el chipset no sirve para hotspot (devolver/cambiar).
+
+### 8.3 (Recomendado) Asignar un nombre fijo `ap0`
+
+Para que la configuración no dependa del nombre largo basado en MAC, renombra el
+adaptador a `ap0` con una regla de systemd (reemplaza la MAC por la real del paso 8.1):
+
+```bash
+sudo nano /etc/systemd/network/10-ap0.link
+```
+
+```ini
+[Match]
+MACAddress=00:c0:ca:12:34:56
+
+[Link]
+Name=ap0
+```
+
+> A partir de aquí la guía usa **`ap0`** como nombre del hotspot. Si prefieres no renombrar,
+> usa el nombre largo (`wlxXXXX`) en todos los archivos siguientes en lugar de `ap0`.
+
+### 8.4 Desactivar la WiFi interna Intel (evita conflictos y crashes)
+
+```bash
+echo "blacklist iwlwifi" | sudo tee /etc/modprobe.d/blacklist-iwlwifi.conf
+```
+
+> Esto impide que la tarjeta Intel (`wlo1`) se cargue. Ya no se usará. Las opciones
+> anteriores en `/etc/modprobe.d/iwlwifi.conf` quedan inertes (puedes dejarlas).
+
+### 8.5 Actualizar los servicios y configs (wlo1 → ap0)
+
+**Servicio de IP del hotspot** (renombra el archivo para mayor claridad):
+
+```bash
+sudo systemctl disable --now wlo1-ip.service
+sudo rm /etc/systemd/system/wlo1-ip.service
+sudo nano /etc/systemd/system/ap0-ip.service
+```
+
+```ini
+[Unit]
+Description=IP estatica para hotspot ap0
+Before=hostapd.service
+After=network.target
+
+[Service]
+Type=oneshot
+ExecStart=/sbin/ip addr add 192.168.137.1/24 dev ap0
+ExecStart=/sbin/ip link set ap0 up
+ExecStop=/sbin/ip addr del 192.168.137.1/24 dev ap0
+RemainAfterExit=yes
+
+[Install]
+WantedBy=multi-user.target
+```
+
+**hostapd** — cambiar la interfaz:
+
+```bash
+sudo sed -i 's/^interface=wlo1/interface=ap0/' /etc/hostapd/hostapd.conf
+```
+
+**dnsmasq** — cambiar la interfaz:
+
+```bash
+sudo sed -i 's/^interface=wlo1/interface=ap0/' /etc/dnsmasq.conf
+```
+
+**Servicio NAT** — cambiar `wlo1` por `ap0`:
+
+```bash
+sudo sed -i 's/\bwlo1\b/ap0/g' /etc/systemd/system/sga-nat.service
+```
+
+**Watchdog** (si lo creaste) — cambiar `wlo1` por `ap0`:
+
+```bash
+sudo sed -i 's/\bwlo1\b/ap0/g' /usr/local/bin/sga-wifi-watchdog.sh
+```
+
+### 8.6 Aplicar todo y reiniciar
+
+```bash
+sudo systemctl daemon-reload
+sudo netplan apply           # por si acaso
+sudo update-initramfs -u     # aplica el blacklist de iwlwifi
+sudo reboot
+```
+
+### 8.7 Verificar tras reiniciar
+
+```bash
+# La Intel ya no debe aparecer; sí el adaptador USB como ap0
+ip link
+
+# IP del hotspot asignada
+ip a show ap0                       # debe mostrar 192.168.137.1
+
+# Servicios arriba
+sudo systemctl status hostapd dnsmasq ap0-ip sga-nat
+
+# El adaptador en modo AP, y SIN errores de microcódigo
+sudo iw dev ap0 info
+sudo dmesg | grep -iE "mt76|rt2800|error" | tail
+```
+
+Conecta una laptop cliente a **SGA-Academia** y verifica que:
+- Obtiene IP `192.168.137.x`
+- `nslookup sga.intranet` → `192.168.137.1`
+- Carga `http://sga.intranet:3000`
+- Hay internet (NAT) y **ya no hay reinicios** del WiFi
+
+> Con el chipset MediaTek/Ralink ya no deberían aparecer los `ADVANCED_SYSASSERT`.
+> El hotspot quedará estable para los 10-15 alumnos.
 
 ---
 
