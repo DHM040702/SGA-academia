@@ -96,3 +96,13 @@ export function useDeleteUsuario() {
     onSuccess: () => qc.invalidateQueries({ queryKey: ['usuarios'] }),
   })
 }
+
+/** Restablece la contraseña de un usuario a su DNI (solo admin). */
+export function useResetPasswordUsuario() {
+  const qc = useQueryClient()
+  return useMutation({
+    mutationFn: (id: string) =>
+      api.post(`/usuarios/${id}/reset-password`).then((r) => r.data),
+    onSuccess: () => qc.invalidateQueries({ queryKey: ['usuarios'] }),
+  })
+}

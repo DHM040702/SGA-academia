@@ -111,6 +111,28 @@ export class AuthService {
     }
   }
 
+  /** Cambio de contraseña por el propio usuario. Limpia el flag de cambio obligatorio. */
+  async cambiarPassword(userId: string, actual: string, nueva: string) {
+    const user = await this.prisma.usuario.findUnique({ where: { id: userId } });
+    if (!user || !user.activo) throw new UnauthorizedException();
+
+    const valid = await bcrypt.compare(actual, user.passwordHash);
+    if (!valid) throw new UnauthorizedException('La contraseña actual es incorrecta');
+
+    const hash = await bcrypt.hash(nueva, 12);
+    await this.prisma.usuario.update({
+      where: { id: userId },
+      data: { passwordHash: hash, debeCambiarPassword: false },
+    });
+
+    // Revocar todos los refresh tokens por seguridad tras el cambio
+    try {
+      await this.prisma.$executeRaw`DELETE FROM refresh_tokens WHERE usuario_id = ${userId}::uuid`;
+    } catch { /* tabla aún no creada — ignorar */ }
+
+    return { ok: true };
+  }
+
   async me(userId: string) {
     return this.prisma.usuario.findUnique({
       where: { id: userId },
@@ -119,6 +141,7 @@ export class AuthService {
         email: true,
         rol: true,
         activo: true,
+        debeCambiarPassword: true,
         nombre:    true,
         apellidos: true,
         dni:       true,

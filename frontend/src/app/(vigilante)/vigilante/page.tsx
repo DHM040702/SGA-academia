@@ -1,6 +1,7 @@
 'use client'
 
 import { useState, useEffect, useRef, useCallback } from 'react'
+import { useRouter } from 'next/navigation'
 import { useAsistencia, useScan, useCorrectAsistencia } from '@/hooks/use-asistencia'
 import { Avatar } from '@/components/ui/avatar'
 import { Dot } from '@/components/ui/dot'
@@ -25,9 +26,16 @@ interface LastScan {
 }
 
 export default function VigilantePage() {
-  const { user } = useAuth()
+  const { user, loading } = useAuth()
+  const router     = useRouter()
   const scanMut    = useScan()
   const correctMut = useCorrectAsistencia()
+
+  useEffect(() => {
+    if (loading) return
+    if (!user) router.replace('/login')
+    else if (user.debeCambiarPassword) router.replace('/cambiar-password')
+  }, [user, loading, router])
 
   const [currentTime, setCurrentTime]   = useState(clock())
   const [buffer, setBuffer]             = useState('')

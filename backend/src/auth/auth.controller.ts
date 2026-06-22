@@ -7,6 +7,7 @@ import { ApiBearerAuth, ApiCookieAuth, ApiOperation, ApiTags } from '@nestjs/swa
 import type { Request as Req, Response as Res } from 'express';
 import { AuthService } from './auth.service';
 import { LoginDto } from './dto/login.dto';
+import { CambiarPasswordDto } from './dto/cambiar-password.dto';
 import { JwtAuthGuard } from '../common/guards/jwt-auth.guard';
 import { LoginThrottleGuard } from '../common/guards/login-throttle.guard';
 import { CurrentUser } from '../common/decorators/current-user.decorator';
@@ -71,5 +72,17 @@ export class AuthController {
   @ApiOperation({ summary: 'Usuario actual' })
   async me(@CurrentUser() user: { id: string }) {
     return this.authService.me(user.id);
+  }
+
+  @Post('cambiar-password')
+  @HttpCode(HttpStatus.OK)
+  @UseGuards(JwtAuthGuard)
+  @ApiBearerAuth('access-token')
+  @ApiOperation({ summary: 'Cambiar la propia contraseña (obligatorio al primer ingreso)' })
+  async cambiarPassword(
+    @CurrentUser() user: { id: string },
+    @Body() dto: CambiarPasswordDto,
+  ) {
+    return this.authService.cambiarPassword(user.id, dto.actual, dto.nueva);
   }
 }

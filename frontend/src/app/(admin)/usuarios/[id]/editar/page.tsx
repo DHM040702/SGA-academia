@@ -7,7 +7,7 @@ import { Card } from '@/components/ui/card'
 import { Btn } from '@/components/ui/btn'
 import { Field } from '@/components/ui/field'
 import { Input } from '@/components/ui/input'
-import { useUsuario, useUpdateUsuario, ROL_LABELS } from '@/hooks/use-usuarios'
+import { useUsuario, useUpdateUsuario, useResetPasswordUsuario, ROL_LABELS } from '@/hooks/use-usuarios'
 import { useAuth } from '@/contexts/auth-context'
 import { useAlumnos, type Alumno } from '@/hooks/use-alumnos'
 import {
@@ -44,6 +44,24 @@ export default function EditarUsuarioPage() {
   const { user: me } = useAuth()
   const { data: usuario, isLoading } = useUsuario(id)
   const updateMut = useUpdateUsuario()
+  const resetMut  = useResetPasswordUsuario()
+
+  async function handleResetPassword() {
+    if (!usuario?.dni) {
+      alert('Este usuario no tiene DNI registrado para usarlo como contraseña temporal.')
+      return
+    }
+    if (!confirm(
+      `¿Restablecer la contraseña de este usuario a su DNI (${usuario.dni})?\n\n` +
+      `El usuario deberá cambiarla obligatoriamente en su próximo inicio de sesión.`,
+    )) return
+    try {
+      await resetMut.mutateAsync(id)
+      alert(`Contraseña restablecida al DNI (${usuario.dni}). El usuario deberá cambiarla al ingresar.`)
+    } catch (err: any) {
+      alert(err?.response?.data?.message ?? 'Error al restablecer la contraseña')
+    }
+  }
 
   const esYo = me?.id === id
 
@@ -355,6 +373,24 @@ export default function EditarUsuarioPage() {
                 })}
               />
             </Field>
+
+            {/* Restablecer contraseña al DNI (forzar cambio en próximo ingreso) */}
+            <div className="flex items-center justify-between gap-3 border-t border-border pt-3 mt-1">
+              <p className="text-[11.5px] text-text-mute leading-snug">
+                Restablece la contraseña al <strong className="text-text">DNI</strong> del usuario y
+                lo obliga a cambiarla en el próximo ingreso.
+              </p>
+              <Btn
+                variant="secondary"
+                size="sm"
+                type="button"
+                onClick={handleResetPassword}
+                disabled={resetMut.isPending}
+                className="shrink-0"
+              >
+                {resetMut.isPending ? 'Restableciendo…' : 'Restablecer al DNI'}
+              </Btn>
+            </div>
           </div>
         </Card>
 

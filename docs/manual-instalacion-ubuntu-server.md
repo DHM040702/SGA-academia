@@ -640,7 +640,7 @@ Requires=sga-backend.service
 Type=simple
 User=sgaadmin
 WorkingDirectory=/home/sgaadmin/sga-academia/frontend
-ExecStart=/home/sgaadmin/.nvm/versions/node/vXX.XX.X/bin/node node_modules/.bin/next start
+ExecStart=/home/sgaadmin/.nvm/versions/node/vXX.XX.X/bin/node node_modules/next/dist/bin/next start
 Restart=always
 RestartSec=5
 StandardOutput=journal
@@ -650,6 +650,10 @@ Environment=NODE_ENV=production
 [Install]
 WantedBy=multi-user.target
 ```
+
+> ⚠️ **IMPORTANTE:** usar `node_modules/next/dist/bin/next` (el archivo JS real),
+> **NO** `node_modules/.bin/next` (ese es un wrapper de shell y `node` falla al
+> interpretarlo con `SyntaxError: missing ) after argument list`).
 
 ### 6.3 Habilitar y arrancar los servicios
 
@@ -725,7 +729,6 @@ git pull origin main
 cd /home/sgaadmin/sga-academia/backend
 pnpm install
 pnpm run build
-pnpm prisma migrate deploy     # solo si hay migraciones nuevas
 
 # Frontend
 cd /home/sgaadmin/sga-academia/frontend
@@ -733,11 +736,31 @@ pnpm install
 pnpm run build
 ```
 
+> ⚠️ **NO ejecutar `pnpm prisma migrate deploy` en las actualizaciones.**
+> La base de datos del servidor se carga desde `seed.sql`, no con migraciones de Prisma,
+> por lo que no existe la tabla `_prisma_migrations`. Si se ejecuta `migrate deploy`,
+> Prisma intentará aplicar todas las migraciones sobre tablas que ya existen y **fallará**.
+> Los cambios de esquema de BD se hacen **manualmente** (sección 7.5).
+
+> **Nota sobre tiempos:** no hace falta agregar `sleep`/timeout entre comandos.
+> `pnpm build` y `systemctl restart` son **bloqueantes** — cada uno espera a terminar
+> antes de pasar al siguiente. El `set -e` del script detiene todo si algo falla.
+
 ### 7.3 Reiniciar los servicios
 
 ```bash
 /home/sgaadmin/reiniciar-sga.sh
 ```
+
+> ⚠️ **Versión de pnpm — debe coincidir entre dev y servidor.**
+> El `pnpm-lock.yaml` se genera según la versión de pnpm. Si difieren (ej. dev pnpm 11.x
+> y servidor pnpm 10.x), `pnpm install` reescribe el lock y aparece como modificado,
+> rompiendo los `git pull`. Alinear ambas a la misma versión (la que generó el lock):
+> ```bash
+> npm install -g pnpm@11.1.3
+> pnpm --version            # confirmar 11.1.3
+> ```
+> Usar siempre `pnpm install --frozen-lockfile` para que NO modifique el lock.
 
 ### 7.4 Script de actualización todo-en-uno (opcional)
 
@@ -750,18 +773,20 @@ nano /home/sgaadmin/actualizar-sga.sh
 set -e
 cd /home/sgaadmin/sga-academia
 
+echo "==> Descartando artefactos de build locales..."
+git restore .                       # limpia tsconfig.json, pnpm-lock, etc. (.env es gitignored, no se toca)
+
 echo "==> Trayendo cambios de GitHub..."
 git pull origin main
 
 echo "==> Reconstruyendo backend..."
 cd backend
-pnpm install
+pnpm install --frozen-lockfile
 pnpm run build
-pnpm prisma migrate deploy
 
 echo "==> Reconstruyendo frontend..."
 cd ../frontend
-pnpm install
+pnpm install --frozen-lockfile
 pnpm run build
 
 echo "==> Reiniciando servicios..."
@@ -777,11 +802,67 @@ echo "Actualizacion completada."
 chmod +x /home/sgaadmin/actualizar-sga.sh
 ```
 
+> - **`git restore .`** descarta los cambios locales que el build genera (`tsconfig.json`,
+>   `pnpm-lock.yaml`) ANTES del pull, evitando conflictos. No afecta `.env` (gitignored).
+> - **`--frozen-lockfile`** instala exactamente las versiones del lock sin modificarlo.
+>   Si da error, el lock del repo está desincronizado → arreglarlo en la laptop de desarrollo.
+
 A partir de entonces, actualizar todo el sistema es un solo comando:
 
 ```bash
 /home/sgaadmin/actualizar-sga.sh
 ```
+
+### 7.5 Cambios en el esquema de la base de datos (manual)
+
+Como la BD no usa el historial de migraciones de Prisma, los cambios de esquema se
+aplican manualmente con `psql` cuando realmente ocurran. Ejemplo (agregar una columna):
+
+```bash
+docker exec -i sga-academia-postgres-1 psql -U sga_user -d sga_db \
+  -c "ALTER TABLE usuarios ADD COLUMN IF NOT EXISTS telefono VARCHAR(20);"
+```
+
+> ⚠️ **Cuidado con el shell y los hashes/valores con `$`:** dentro de comillas dobles
+> el shell expande `$...`. Para valores con `$` (como hashes bcrypt) usa una variable
+> y un heredoc, o comillas simples, para que no se corrompa el valor.
+
+**Respaldo de la BD antes de cualquier cambio de esquema:**
+
+```bash
+docker exec -i sga-academia-postgres-1 pg_dump -U sga_user sga_db > /home/sgaadmin/backup-$(date +%F).sql
+```
+
+### 7.6 Funcionalidad: contraseña temporal = DNI + cambio obligatorio
+
+El sistema usa una columna `debe_cambiar_password` para forzar el cambio de contraseña
+al primer ingreso. La contraseña temporal de cada usuario es su **DNI**. El reseteo por
+olvido solo lo hace el **admin** (módulo Usuarios → Editar → "Restablecer al DNI").
+
+**Despliegue de esta funcionalidad en el servidor (una sola vez):**
+
+```bash
+# 1. Respaldar la BD
+docker exec -i sga-academia-postgres-1 pg_dump -U sga_user sga_db > /home/sgaadmin/backup-pre-password.sql
+
+# 2. Agregar la columna a la BD (manual, porque no usamos migraciones de Prisma)
+docker exec -i sga-academia-postgres-1 psql -U sga_user -d sga_db \
+  -c "ALTER TABLE usuarios ADD COLUMN IF NOT EXISTS debe_cambiar_password BOOLEAN NOT NULL DEFAULT true;"
+
+# 3. Traer el código nuevo y reconstruir (build regenera el cliente Prisma con el campo)
+/home/sgaadmin/actualizar-sga.sh
+
+# 4. (Opcional) Resetear la contraseña de TODOS los usuarios existentes a su DNI
+cd /home/sgaadmin/sga-academia/backend
+node prisma/reset-passwords-dni.cjs
+```
+
+> ⚠️ El paso 4 resetea **todos** los usuarios (incluido el admin) a su DNI y los obliga
+> a cambiar la contraseña al ingresar. Si no quieres tocar al admin, omite el paso 4 y
+> resetea individualmente desde la UI cuando haga falta.
+
+**Credenciales tras el reseteo:** cada usuario inicia sesión con su **DNI como usuario y
+como contraseña**, y el sistema le pide cambiarla de inmediato.
 
 ---
 

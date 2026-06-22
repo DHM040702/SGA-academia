@@ -64,4 +64,11 @@ export class UsuariosController {
   getAlumnosByApoderado(@Param('id', ParseUUIDPipe) id: string) {
     return this.service.getAlumnosByApoderado(id);
   }
+
+  @Post(':id/reset-password')
+  @HttpCode(HttpStatus.OK)
+  @ApiOperation({ summary: 'Restablecer la contraseña de un usuario a su DNI (solo admin)' })
+  resetPassword(@Param('id', ParseUUIDPipe) id: string) {
+    return this.service.resetPassword(id);
+  }
 }

@@ -21,7 +21,9 @@ export default function LoginPage() {
   }
 
   React.useEffect(() => {
-    if (user) router.replace(roleHome(user.rol))
+    if (!user) return
+    if (user.debeCambiarPassword) router.replace('/cambiar-password')
+    else router.replace(roleHome(user.rol))
   }, [user, router])
 
   async function handleSubmit(e: React.FormEvent) {

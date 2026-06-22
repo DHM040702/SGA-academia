@@ -64,21 +64,18 @@ async function main() {
   await prisma.$executeRaw`DELETE FROM "turnos_config"`
   console.log('   ✓ Tablas limpiadas')
 
-  // ── 1. Hashes ────────────────────────────────────────────────────────────
+  // ── 1. Hash helper ───────────────────────────────────────────────────────
+  // Contraseña temporal = DNI del usuario. debeCambiarPassword usa el default
+  // (true) del esquema, por lo que todos deben cambiarla al primer ingreso.
   const ROUNDS = 10
-  const [hashAdmin, hashDocente, hashAlumno, hashApoderado] = await Promise.all([
-    bcrypt.hash('admin123',     ROUNDS),
-    bcrypt.hash('docente123',   ROUNDS),
-    bcrypt.hash('alumno123',    ROUNDS),
-    bcrypt.hash('apoderado123', ROUNDS),
-  ])
-  console.log('   ✓ Contraseñas hasheadas')
+  const hashDni = (dni: string) => bcrypt.hash(dni, ROUNDS)
+  console.log('   ✓ Contraseña temporal = DNI (cambio obligatorio al ingresar)')
 
   // ── 2. Usuarios staff ────────────────────────────────────────────────────
   const [admin, director, vigilante] = await Promise.all([
-    prisma.usuario.create({ data: { email: 'admin@cepreunasam.edu.pe',     passwordHash: hashAdmin, rol: Rol.admin,     dni: '00000001', nombre: 'Admin',     apellidos: 'Sistema'   } }),
-    prisma.usuario.create({ data: { email: 'director@cepreunasam.edu.pe',  passwordHash: hashAdmin, rol: Rol.director,  dni: '00000002', nombre: 'Director',   apellidos: 'Sistema'   } }),
-    prisma.usuario.create({ data: { email: 'vigilante@cepreunasam.edu.pe', passwordHash: hashAdmin, rol: Rol.vigilante, dni: '00000003', nombre: 'Vigilante',  apellidos: 'Sistema'   } }),
+    prisma.usuario.create({ data: { email: 'admin@cepreunasam.edu.pe',     passwordHash: await hashDni('00000001'), rol: Rol.admin,     dni: '00000001', nombre: 'Admin',     apellidos: 'Sistema'   } }),
+    prisma.usuario.create({ data: { email: 'director@cepreunasam.edu.pe',  passwordHash: await hashDni('00000002'), rol: Rol.director,  dni: '00000002', nombre: 'Director',   apellidos: 'Sistema'   } }),
+    prisma.usuario.create({ data: { email: 'vigilante@cepreunasam.edu.pe', passwordHash: await hashDni('00000003'), rol: Rol.vigilante, dni: '00000003', nombre: 'Vigilante',  apellidos: 'Sistema'   } }),
   ])
   console.log('   ✓ Staff: admin, director, vigilante')
   void admin
@@ -143,12 +140,12 @@ async function main() {
   ]
 
   const docentes = await Promise.all(
-    docentesDef.map((d) =>
+    docentesDef.map(async (d) =>
       prisma.docente.create({
         data: {
           dni: d.dni, nombre: d.nombre, apellidos: d.apellidos,
           especialidad: d.especialidad, telefonoWhatsapp: d.tel,
-          usuario: { create: { email: d.email, passwordHash: hashDocente, rol: Rol.docente } },
+          usuario: { create: { email: d.email, passwordHash: await hashDni(d.dni), rol: Rol.docente } },
         },
       }),
     ),
@@ -197,7 +194,7 @@ async function main() {
   ]
 
   const alumnos = await Promise.all(
-    alumnosDef.map((a, i) => {
+    alumnosDef.map(async (a, i) => {
       const areaAula = a.aula.area
       const carrerasArea = carrerasPorArea[areaAula]
       const carrera = carrerasArea[i % 3]
@@ -211,7 +208,7 @@ async function main() {
           usuario: {
             create: {
               email: `alumno${pad(i + 1, 3)}@cepreunasam.edu.pe`,
-              passwordHash: hashAlumno,
+              passwordHash: await hashDni(a.dni),
               rol: Rol.alumno,
             },
           },
@@ -230,11 +227,11 @@ async function main() {
   ]
 
   const apoderados = await Promise.all(
-    apoderadosDef.map((ap) =>
+    apoderadosDef.map(async (ap) =>
       prisma.apoderado.create({
         data: {
           dni: ap.dni, nombre: ap.nombre, apellidos: ap.apellidos, telefonoWhatsapp: ap.tel,
-          usuario: { create: { email: ap.email, passwordHash: hashApoderado, rol: Rol.apoderado } },
+          usuario: { create: { email: ap.email, passwordHash: await hashDni(ap.dni), rol: Rol.apoderado } },
         },
       }),
     ),

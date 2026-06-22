@@ -11,7 +11,9 @@ export default function AdminLayout({ children }: { children: React.ReactNode })
   const router = useRouter()
 
   React.useEffect(() => {
-    if (!loading && !user) router.replace('/login')
+    if (loading) return
+    if (!user) router.replace('/login')
+    else if (user.debeCambiarPassword) router.replace('/cambiar-password')
   }, [user, loading, router])
 
   if (loading) {

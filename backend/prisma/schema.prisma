@@ -15,6 +15,7 @@ model Usuario {
   apellidos              String?             @db.VarChar(150)
   dni                    String?             @unique @db.VarChar(12)
   activo                 Boolean             @default(true)
+  debeCambiarPassword    Boolean             @default(true) @map("debe_cambiar_password")
   createdAt              DateTime            @default(now()) @map("created_at") @db.Timestamptz(6)
   updatedAt              DateTime            @default(now()) @updatedAt @map("updated_at") @db.Timestamptz(6)
   deletedAt              DateTime?           @map("deleted_at") @db.Timestamptz(6)

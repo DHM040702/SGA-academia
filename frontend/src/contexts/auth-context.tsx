@@ -7,6 +7,7 @@ export interface AuthUser {
   id: string
   email: string
   rol: 'admin' | 'director' | 'vigilante' | 'docente' | 'alumno' | 'apoderado'
+  debeCambiarPassword?: boolean
   nombre?: string | null
   apellidos?: string | null
   dni?: string | null
@@ -26,6 +27,7 @@ interface AuthState {
   loading: boolean
   login: (dni: string, password: string) => Promise<void>
   logout: () => Promise<void>
+  refreshUser: () => Promise<void>
 }
 
 const AuthContext = React.createContext<AuthState | null>(null)
@@ -61,8 +63,14 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
     setUser(null)
   }, [queryClient])
 
+  // Re-obtiene el usuario actual (ej. tras cambiar la contraseña, para refrescar el flag)
+  const refreshUser = React.useCallback(async () => {
+    const { data } = await api.get<AuthUser>('/auth/me')
+    setUser(data)
+  }, [])
+
   return (
-    <AuthContext.Provider value={{ user, loading, login, logout }}>
+    <AuthContext.Provider value={{ user, loading, login, logout, refreshUser }}>
       {children}
     </AuthContext.Provider>
   )

@@ -255,6 +255,34 @@ export class UsuariosService {
     });
   }
 
+  /**
+   * Restablece la contraseña de un usuario a su número de DNI y obliga a cambiarla
+   * en el próximo inicio de sesión. Solo lo ejecuta un administrador (controller).
+   */
+  async resetPassword(id: string) {
+    const u = await this.prisma.usuario.findFirst({
+      where: { id, deletedAt: null },
+      select: { id: true, dni: true },
+    });
+    if (!u) throw new NotFoundException('Usuario no encontrado');
+    if (!u.dni) {
+      throw new BadRequestException('El usuario no tiene DNI para usarlo como contraseña temporal');
+    }
+
+    const hash = await bcrypt.hash(u.dni, 10);
+    await this.prisma.usuario.update({
+      where: { id },
+      data: { passwordHash: hash, debeCambiarPassword: true },
+    });
+
+    // Revocar sesiones activas para forzar reingreso con la contraseña temporal
+    try {
+      await this.prisma.$executeRaw`DELETE FROM refresh_tokens WHERE usuario_id = ${id}::uuid`;
+    } catch { /* tabla aún no creada — ignorar */ }
+
+    return { ok: true, mensaje: 'Contraseña restablecida al DNI; el usuario deberá cambiarla al ingresar' };
+  }
+
   async remove(id: string, requesterId: string) {
     if (id === requesterId) {
       throw new ForbiddenException('No puedes eliminar tu propia cuenta');
