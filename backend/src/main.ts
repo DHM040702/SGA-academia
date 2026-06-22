@@ -10,6 +10,10 @@ const logger = new Logger('Bootstrap');
 async function bootstrap() {
   const app = await NestFactory.create(AppModule, { logger: ['error', 'warn', 'log'] });
 
+  // Confiar en el proxy (Next.js) para que req.ip lea la IP real del cliente
+  // desde el header x-forwarded-for en lugar de 127.0.0.1.
+  app.getHttpAdapter().getInstance().set('trust proxy', true);
+
   // ── Global prefix ──────────────────────────────────────────────
   app.setGlobalPrefix('api');
 

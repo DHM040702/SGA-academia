@@ -47,7 +47,7 @@ export class AuditInterceptor implements NestInterceptor {
     if (entidad === 'auth' || entidad === 'auditoria') return next.handle();
 
     return next.handle().pipe(
-      tap(() => {
+      tap((data: any) => {
         const user = req.user as
           | { id?: string; email?: string; rol?: string }
           | undefined;
@@ -57,11 +57,20 @@ export class AuditInterceptor implements NestInterceptor {
         if (method === 'DELETE') accion = 'eliminar';
         if (path.includes('reset-password')) accion = 'reset_password';
 
-        const ip =
+        // ID: en updates/deletes viene en la URL; en creates, en la respuesta
+        const entidadId =
+          req.params?.id ??
+          (data && typeof data === 'object'
+            ? data.id ?? data.alumno?.id ?? data.usuario?.id ?? null
+            : null);
+
+        // IP real del cliente (limpia el prefijo IPv4-mapeado ::ffff:)
+        const rawIp =
           (req.headers['x-forwarded-for'] as string)?.split(',')[0]?.trim() ||
           req.ip ||
           req.socket?.remoteAddress ||
-          null;
+          '';
+        const ip = rawIp.replace(/^::ffff:/, '') || null;
 
         void this.prisma.auditoria
           .create({
@@ -71,7 +80,7 @@ export class AuditInterceptor implements NestInterceptor {
               usuarioRol: user?.rol ?? null,
               accion,
               entidad,
-              entidadId: req.params?.id ?? null,
+              entidadId: entidadId ? String(entidadId) : null,
               detalle: sanitize(req.body) ?? undefined,
               ip,
             },
