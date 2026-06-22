@@ -41,7 +41,7 @@ interface ApoderadoForm {
 
 const APODERADO_FORM_INIT: ApoderadoForm = {
   nombre: '', apellidos: '', dni: '', telefono_whatsapp: '',
-  email: '', password: 'Temporal1234!', parentesco: 'Padre',
+  email: '', password: '', parentesco: 'Padre',
 }
 
 export default function NuevoAlumnoPage() {
@@ -92,8 +92,10 @@ export default function NuevoAlumnoPage() {
 
   async function onSubmit(values: AlumnoFormValues) {
     const { ciclo_id, ...dto } = values
+    // La contraseña temporal = DNI (el backend la asigna automáticamente).
     const payload: Record<string, unknown> = {
       ...dto,
+      password:         undefined,
       fecha_nacimiento: dto.fecha_nacimiento || undefined,
       telefono:         dto.telefono         || undefined,
       aula_id:          dto.aula_id          || undefined,
@@ -113,7 +115,7 @@ export default function NuevoAlumnoPage() {
           dni:               apForm.dni,
           telefono_whatsapp: apForm.telefono_whatsapp,
           email:             apForm.email,
-          password:          apForm.password,
+          password:          apForm.dni, // contraseña temporal = DNI
         },
         parentesco:   apForm.parentesco,
         es_principal: true,
@@ -194,12 +196,9 @@ export default function NuevoAlumnoPage() {
                 {...register('email', { required: 'Requerido' })}
               />
             </Field>
-            <Field label="Contraseña inicial" required error={errors.password?.message}>
-              <Input
-                type="text"
-                {...register('password', { required: 'Requerido', minLength: { value: 8, message: 'Mínimo 8 caracteres' } })}
-              />
-            </Field>
+            <p className="text-[11.5px] text-text-mute px-1">
+              La contraseña temporal será el <strong>DNI</strong> del alumno; deberá cambiarla al ingresar.
+            </p>
           </div>
         </Card>
 
@@ -296,13 +295,6 @@ export default function NuevoAlumnoPage() {
                   placeholder="carlos.garcia@gmail.com"
                   value={apForm.email}
                   onChange={(e) => apCampo('email', e.target.value)}
-                />
-              </Field>
-              <Field label="Contraseña inicial">
-                <Input
-                  type="text"
-                  value={apForm.password}
-                  onChange={(e) => apCampo('password', e.target.value)}
                 />
               </Field>
               <Field label="Parentesco" required>

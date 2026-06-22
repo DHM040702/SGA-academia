@@ -39,16 +39,16 @@ export default function NuevoUsuarioPage() {
     watch,
     formState: { errors, isSubmitting },
   } = useForm<FormValues>({
-    defaultValues: { password: 'Temporal1234!', rol: 'vigilante', activo: 'true' },
+    defaultValues: { rol: 'vigilante', activo: 'true' },
   })
 
   const rolSeleccionado = watch('rol')
   const esApoderado = rolSeleccionado === 'apoderado'
 
   async function onSubmit(values: FormValues) {
+    // La contraseña temporal = DNI (el backend la asigna automáticamente).
     const dto: Record<string, unknown> = {
       email:    values.email,
-      password: values.password,
       rol:      values.rol,
       activo:   values.activo === 'true',
     }
@@ -188,18 +188,10 @@ export default function NuevoUsuarioPage() {
                 })}
               />
             </Field>
-            <Field label="Contraseña inicial" required error={errors.password?.message}>
-              <Input
-                type="text"
-                {...register('password', {
-                  required: 'Requerido',
-                  minLength: { value: 8, message: 'Mínimo 8 caracteres' },
-                })}
-              />
-              <p className="mt-1 text-[11.5px] text-text-mute">
-                Contraseña temporal — el usuario deberá cambiarla tras su primer acceso.
-              </p>
-            </Field>
+            <p className="text-[11.5px] text-text-mute px-1">
+              La contraseña temporal será el <strong>DNI</strong> del usuario. Deberá cambiarla
+              en su primer inicio de sesión.
+            </p>
           </div>
         </Card>
 

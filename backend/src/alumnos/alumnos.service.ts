@@ -205,7 +205,8 @@ export class AlumnosService {
     });
     if (existing) throw new BadRequestException('Ya existe un alumno con ese DNI');
 
-    const hash = await bcrypt.hash(dto.password, 12);
+    // Contraseña temporal = DNI (cambio obligatorio al primer ingreso)
+    const hash = await bcrypt.hash(dto.password || dto.dni, 12);
     const codigoBarras = await nextCodigo(this.prisma);
 
     return this.prisma.$transaction(async (tx) => {

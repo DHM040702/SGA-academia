@@ -100,7 +100,8 @@ export class DocentesService {
     });
     if (existingEmail) throw new BadRequestException('Ya existe un usuario con ese email');
 
-    const hash = await bcrypt.hash(dto.password, 12);
+    // Contraseña temporal = DNI (cambio obligatorio al primer ingreso)
+    const hash = await bcrypt.hash(dto.password || dto.dni, 12);
 
     return this.prisma.$transaction(async (tx) => {
       const usuario = await tx.usuario.create({
@@ -108,6 +109,8 @@ export class DocentesService {
           email: dto.email,
           passwordHash: hash,
           rol: Rol.docente,
+          // El DNI del docente también sirve como DNI de acceso al sistema
+          dni: dto.dni,
         },
       });
 

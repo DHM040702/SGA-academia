@@ -30,11 +30,11 @@ export class CreateDocenteDto {
   @IsNotEmpty()
   email: string;
 
-  @ApiProperty({ description: 'Contraseña inicial', minLength: 6 })
+  @ApiPropertyOptional({ description: 'Opcional. Si se omite, la contraseña temporal es el DNI.' })
+  @IsOptional()
   @IsString()
-  @IsNotEmpty()
   @MinLength(6, { message: 'La contraseña debe tener al menos 6 caracteres' })
-  password: string;
+  password?: string;
 
   @ApiPropertyOptional({ example: '987654321' })
   @IsOptional()

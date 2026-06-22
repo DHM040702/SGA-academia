@@ -27,10 +27,11 @@ export class CreateAlumnoDto {
   @IsEmail()
   email: string;
 
-  @ApiProperty({ example: 'Temporal1234!' })
+  @ApiPropertyOptional({ description: 'Opcional. Si se omite, la contraseña temporal es el DNI.' })
+  @IsOptional()
   @IsString()
-  @Length(8, 100)
-  password: string;
+  @Length(6, 100)
+  password?: string;
 
   @ApiPropertyOptional({ example: '2025-01-15' })
   @IsOptional()

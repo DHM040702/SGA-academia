@@ -23,14 +23,14 @@ export default function NuevoDocentePage() {
   const router = useRouter()
   const createDocente = useCreateDocente()
 
-  const { register, handleSubmit, formState: { errors, isSubmitting } } = useForm<FormValues>({
-    defaultValues: { password: 'Temporal1234!' },
-  })
+  const { register, handleSubmit, formState: { errors, isSubmitting } } = useForm<FormValues>()
 
   async function onSubmit(values: FormValues) {
     try {
+      // La contraseña temporal = DNI (el backend la asigna automáticamente).
       await createDocente.mutateAsync({
         ...values,
+        password: undefined,
         telefono: values.telefono || undefined,
         especialidad: values.especialidad || undefined,
       })
@@ -98,14 +98,9 @@ export default function NuevoDocentePage() {
                 {...register('email', { required: 'Requerido' })}
               />
             </Field>
-            <Field label="Contraseña inicial" required error={errors.password?.message}>
-              <Input
-                type="text"
-                {...register('password', { required: 'Requerido', minLength: { value: 8, message: 'Mínimo 8 caracteres' } })}
-              />
-            </Field>
           </div>
           <p className="text-[11.5px] text-text-mute px-1 pb-1 mt-1">
+            La contraseña temporal será el <strong>DNI</strong> del docente; deberá cambiarla al ingresar.
             El DNI del docente será su código de asistencia en el lector de barras.
           </p>
         </Card>

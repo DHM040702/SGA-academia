@@ -117,11 +117,11 @@ export class UsuariosService {
       if (dniExists) throw new BadRequestException('Ya existe un apoderado con ese DNI');
     }
 
-    const passwordHash = await bcrypt.hash(dto.password, 10);
-
     try {
       // Apoderado: crear usuario + perfil en una transacción
       if (dto.rol === Rol.apoderado && dto.perfil) {
+        // Contraseña temporal = DNI (cambio obligatorio al primer ingreso)
+        const passwordHash = await bcrypt.hash(dto.password || dto.perfil.dni, 10);
         return await this.prisma.$transaction(async (tx) => {
           const usuario = await tx.usuario.create({
             data: {
@@ -149,6 +149,11 @@ export class UsuariosService {
       }
 
       // Admin, director, vigilante: usuario con nombre/apellidos/dni opcionales
+      if (!dto.password && !dto.dni) {
+        throw new BadRequestException('Debe indicar el DNI: se usa como contraseña temporal');
+      }
+      // Contraseña temporal = DNI (cambio obligatorio al primer ingreso)
+      const passwordHash = await bcrypt.hash(dto.password || dto.dni!, 10);
       return await this.prisma.usuario.create({
         data: {
           email:        dto.email,

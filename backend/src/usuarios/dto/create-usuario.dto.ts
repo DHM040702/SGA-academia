@@ -25,10 +25,11 @@ export class CreateUsuarioDto {
   @IsEmail()
   email: string;
 
-  @ApiProperty({ example: 'Temporal1234!', minLength: 8 })
+  @ApiPropertyOptional({ description: 'Opcional. Si se omite, la contraseña temporal es el DNI.' })
+  @IsOptional()
   @IsString()
-  @MinLength(8)
-  password: string;
+  @MinLength(6)
+  password?: string;
 
   @ApiProperty({ enum: Rol })
   @IsEnum(Rol)
