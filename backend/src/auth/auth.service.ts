@@ -112,12 +112,18 @@ export class AuthService {
   }
 
   /** Cambio de contraseña por el propio usuario. Limpia el flag de cambio obligatorio. */
-  async cambiarPassword(userId: string, actual: string, nueva: string) {
+  async cambiarPassword(userId: string, actual: string | undefined, nueva: string) {
     const user = await this.prisma.usuario.findUnique({ where: { id: userId } });
     if (!user || !user.activo) throw new UnauthorizedException();
 
-    const valid = await bcrypt.compare(actual, user.passwordHash);
-    if (!valid) throw new UnauthorizedException('La contraseña actual es incorrecta');
+    // En el cambio obligatorio (primer ingreso / reseteo) el usuario ya se autenticó
+    // al iniciar sesión, por lo que no se vuelve a pedir la contraseña actual.
+    // En un cambio voluntario sí se exige y verifica.
+    if (!user.debeCambiarPassword) {
+      if (!actual) throw new UnauthorizedException('Debe ingresar su contraseña actual');
+      const valid = await bcrypt.compare(actual, user.passwordHash);
+      if (!valid) throw new UnauthorizedException('La contraseña actual es incorrecta');
+    }
 
     const hash = await bcrypt.hash(nueva, 12);
     await this.prisma.usuario.update({

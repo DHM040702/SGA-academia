@@ -1,10 +1,11 @@
 import { ApiProperty } from '@nestjs/swagger';
-import { IsString, MinLength } from 'class-validator';
+import { IsOptional, IsString, MinLength } from 'class-validator';
 
 export class CambiarPasswordDto {
-  @ApiProperty({ description: 'Contraseña actual (al primer ingreso, es el DNI)' })
+  @ApiProperty({ required: false, description: 'Contraseña actual (solo requerida en cambios voluntarios)' })
+  @IsOptional()
   @IsString()
-  actual: string;
+  actual?: string;
 
   @ApiProperty({ description: 'Nueva contraseña (mínimo 6 caracteres)' })
   @IsString()

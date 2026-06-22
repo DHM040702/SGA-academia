@@ -11,7 +11,6 @@ import { Lock } from '@/components/icons'
 export default function CambiarPasswordPage() {
   const { user, loading, refreshUser, logout } = useAuth()
   const router = useRouter()
-  const [actual, setActual] = React.useState('')
   const [nueva, setNueva] = React.useState('')
   const [confirmar, setConfirmar] = React.useState('')
   const [error, setError] = React.useState('')
@@ -43,7 +42,7 @@ export default function CambiarPasswordPage() {
 
     setSaving(true)
     try {
-      await api.post('/auth/cambiar-password', { actual, nueva })
+      await api.post('/auth/cambiar-password', { nueva })
       await refreshUser()
       router.replace(roleHome(user?.rol))
     } catch (err: any) {
@@ -64,22 +63,9 @@ export default function CambiarPasswordPage() {
         </h1>
         <p className="mt-2 mb-8 text-[13.5px] text-text-mute leading-relaxed">
           Por seguridad, debe establecer una nueva contraseña antes de continuar.
-          Si es su primer ingreso o su contraseña fue restablecida, la contraseña actual es su <strong>DNI</strong>.
         </p>
 
         <form onSubmit={handleSubmit} className="flex flex-col gap-4">
-          <Field label="Contraseña actual" required>
-            <Input
-              icon={<Lock size={14} />}
-              type="password"
-              placeholder="Su DNI o contraseña actual"
-              value={actual}
-              onChange={(e) => setActual(e.target.value)}
-              required
-              autoComplete="current-password"
-            />
-          </Field>
-
           <Field label="Nueva contraseña" required>
             <Input
               icon={<Lock size={14} />}
