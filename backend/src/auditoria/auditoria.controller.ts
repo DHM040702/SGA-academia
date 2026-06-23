@@ -11,13 +11,13 @@ import { FilterAuditoriaDto } from './dto/filter-auditoria.dto';
 @ApiTags('Auditoría')
 @ApiBearerAuth('access-token')
 @UseGuards(JwtAuthGuard, RolesGuard)
-@Roles(Rol.admin)
+@Roles(Rol.admin, Rol.director)
 @Controller('auditoria')
 export class AuditoriaController {
   constructor(private readonly service: AuditoriaService) {}
 
   @Get()
-  @ApiOperation({ summary: 'Listar eventos de auditoría con filtros (solo admin)' })
+  @ApiOperation({ summary: 'Listar eventos de auditoría con filtros (admin y director)' })
   findAll(@Query() dto: FilterAuditoriaDto) {
     return this.service.findAll(dto);
   }

@@ -641,20 +641,24 @@ Requires=sga-backend.service
 Type=simple
 User=sgaadmin
 WorkingDirectory=/home/sgaadmin/sga-academia/frontend
-ExecStart=/home/sgaadmin/.nvm/versions/node/vXX.XX.X/bin/node node_modules/next/dist/bin/next start
+ExecStart=/home/sgaadmin/.nvm/versions/node/vXX.XX.X/bin/node server.js
 Restart=always
 RestartSec=5
 StandardOutput=journal
 StandardError=journal
 Environment=NODE_ENV=production
+Environment=INTERNAL_API_URL=http://127.0.0.1:3001
 
 [Install]
 WantedBy=multi-user.target
 ```
 
-> ⚠️ **IMPORTANTE:** usar `node_modules/next/dist/bin/next` (el archivo JS real),
-> **NO** `node_modules/.bin/next` (ese es un wrapper de shell y `node` falla al
-> interpretarlo con `SyntaxError: missing ) after argument list`).
+> ⚠️ **IMPORTANTE:** se ejecuta `server.js` (servidor personalizado), **NO**
+> `next start` ni `node_modules/.bin/next`/`node_modules/next/dist/bin/next`.
+> `server.js` usa `http-proxy-middleware` con `xfwd: true` para que el backend
+> reciba la **IP real del cliente** en `X-Forwarded-For` — los `rewrites` de
+> `next.config.ts` (usados solo en `next dev`) no agregan ese header, por lo que
+> la auditoría registraba siempre `127.0.0.1`.
 
 ### 6.3 Habilitar y arrancar los servicios
 

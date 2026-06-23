@@ -83,8 +83,9 @@ const GROUPS_DIRECTOR: NavGroup[] = [
   {
     label: 'Administración',
     items: [
-      { href: '/reportes', icon: Chart, label: 'Reportes' },
-      { href: '/turnos',   icon: Clock, label: 'Turnos' },
+      { href: '/reportes',  icon: Chart,    label: 'Reportes' },
+      { href: '/turnos',    icon: Clock,    label: 'Turnos' },
+      { href: '/auditoria', icon: FileText, label: 'Auditoría' },
     ],
   },
 ]

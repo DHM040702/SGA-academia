@@ -87,7 +87,7 @@ export default function AuditoriaPage() {
         <Card pad={0}><div className="p-3">
           <div className="text-[11px] uppercase tracking-wide text-text-mute">Usuario más activo</div>
           <div className="text-[14px] font-medium text-text truncate mt-1.5">
-            {resumen?.usuariosActivos?.[0]?.email ?? '—'}
+            {resumen?.usuariosActivos?.[0]?.nombre ?? '—'}
           </div>
           <div className="text-[11px] text-text-mute">
             {resumen?.usuariosActivos?.[0]?.total ?? 0} acciones (7 días)
@@ -154,7 +154,7 @@ export default function AuditoriaPage() {
                 page!.data.map((e) => (
                   <tr key={e.id} className="border-b border-border-s hover:bg-surface2">
                     <td className="px-3 py-2 whitespace-nowrap text-text-mute">{fmtFecha(e.createdAt)}</td>
-                    <td className="px-3 py-2 truncate max-w-[180px]">{e.usuarioEmail ?? '—'}</td>
+                    <td className="px-3 py-2 truncate max-w-[180px]">{e.usuarioNombre ?? e.usuarioEmail ?? '—'}</td>
                     <td className="px-3 py-2 capitalize text-text-mute">{e.usuarioRol ?? '—'}</td>
                     <td className="px-3 py-2">
                       <span className={`text-[11px] font-medium px-1.5 py-0.5 rounded ${ACCION_COLOR[e.accion] ?? 'bg-slate-100 text-slate-600'}`}>

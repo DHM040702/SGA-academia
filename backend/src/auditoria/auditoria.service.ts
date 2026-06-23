@@ -27,6 +27,26 @@ export class AuditoriaService {
     return where;
   }
 
+  /** Mapa usuarioId → "Nombre Apellidos" para mostrar en lugar del email. */
+  private async nombresPorUsuarioId(usuarioIds: string[]): Promise<Map<string, string>> {
+    const ids = [...new Set(usuarioIds)];
+    if (ids.length === 0) return new Map();
+
+    const usuarios = await this.prisma.usuario.findMany({
+      where: { id: { in: ids } },
+      select: { id: true, nombre: true, apellidos: true, email: true },
+    });
+
+    return new Map(
+      usuarios.map((u) => [
+        u.id,
+        (u.nombre || u.apellidos)
+          ? `${u.nombre ?? ''} ${u.apellidos ?? ''}`.trim()
+          : u.email,
+      ]),
+    );
+  }
+
   async findAll(dto: FilterAuditoriaDto) {
     const { page = 1, limit = 20 } = dto;
     const where = this.buildWhere(dto);
@@ -41,7 +61,15 @@ export class AuditoriaService {
       this.prisma.auditoria.count({ where }),
     ]);
 
-    return paginate(items, total, page, limit);
+    const nombres = await this.nombresPorUsuarioId(
+      items.map((i) => i.usuarioId).filter((id): id is string => !!id),
+    );
+    const itemsConNombre = items.map((i) => ({
+      ...i,
+      usuarioNombre: (i.usuarioId && nombres.get(i.usuarioId)) || i.usuarioEmail,
+    }));
+
+    return paginate(itemsConNombre, total, page, limit);
   }
 
   /** Métricas para el panel de resumen del administrador. */
@@ -72,12 +100,15 @@ export class AuditoriaService {
 
     // Usuarios más activos (últimos 7 días)
     const activos = await this.prisma.auditoria.groupBy({
-      by: ['usuarioEmail'],
-      where: { createdAt: { gte: hace7 }, usuarioEmail: { not: null } },
-      _count: { usuarioEmail: true },
-      orderBy: { _count: { usuarioEmail: 'desc' } },
+      by: ['usuarioId'],
+      where: { createdAt: { gte: hace7 }, usuarioId: { not: null } },
+      _count: { usuarioId: true },
+      orderBy: { _count: { usuarioId: 'desc' } },
       take: 5,
     });
+    const nombresActivos = await this.nombresPorUsuarioId(
+      activos.map((a) => a.usuarioId).filter((id): id is string => !!id),
+    );
 
     return {
       total,
@@ -86,8 +117,8 @@ export class AuditoriaService {
       porAccion: porAccion.map((a) => ({ accion: a.accion, total: a._count.accion })),
       porEntidad: porEntidad.map((e) => ({ entidad: e.entidad, total: e._count.entidad })),
       usuariosActivos: activos.map((u) => ({
-        email: u.usuarioEmail,
-        total: u._count.usuarioEmail,
+        nombre: (u.usuarioId && nombresActivos.get(u.usuarioId)) || 'Desconocido',
+        total: u._count.usuarioId,
       })),
     };
   }

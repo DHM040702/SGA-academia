@@ -4,6 +4,7 @@ import api from '@/lib/api'
 export interface AuditoriaEvento {
   id: string
   usuarioEmail: string | null
+  usuarioNombre: string | null
   usuarioRol: string | null
   accion: string
   entidad: string
@@ -27,7 +28,7 @@ export interface AuditoriaResumen {
   accesos7: number
   porAccion: { accion: string; total: number }[]
   porEntidad: { entidad: string; total: number }[]
-  usuariosActivos: { email: string | null; total: number }[]
+  usuariosActivos: { nombre: string | null; total: number }[]
 }
 
 export interface AuditoriaFiltros {
