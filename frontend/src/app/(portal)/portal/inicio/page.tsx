@@ -216,7 +216,7 @@ function AlumnoInicio({ user }: { user: ReturnType<typeof useAuth>['user'] }) {
         >Descargar carnet</Btn>
       </div>
 
-      <div className="grid gap-4" style={{ gridTemplateColumns: '1fr 1fr 1fr' }}>
+      <div className="grid gap-4" style={{ gridTemplateColumns: 'minmax(0,1fr) minmax(0,1fr) minmax(0,1fr)' }}>
         {/* KPIs row */}
         <KPI label="Asistencia ciclo" value={`${pct}%`} sub={`${puntuales} / ${total} sesiones`} accent="var(--color-success)" />
         <KPI label="Puntualidad" value={`${puntualidadPct}%`} sub={`${tardanzas} tardanzas registradas`} accent="var(--color-primary)" />
@@ -492,7 +492,7 @@ function ApoderadoInicio({ user }: { user: ReturnType<typeof useAuth>['user'] })
         </div>
 
         {/* Attendance + avisos */}
-        <div className="grid gap-4" style={{ gridTemplateColumns: '1.5fr 1fr' }}>
+        <div className="grid gap-4" style={{ gridTemplateColumns: 'minmax(0,1.5fr) minmax(0,1fr)' }}>
           <Card
             title="Asistencia reciente"
             subtitle="Últimos registros"

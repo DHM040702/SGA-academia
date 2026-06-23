@@ -170,7 +170,7 @@ export default function PortalBibliotecaPage() {
               <p className="text-[13px]">No se encontraron recursos.</p>
             </div>
           ) : (
-            <div className="grid gap-3" style={{ gridTemplateColumns: 'repeat(3, 1fr)' }}>
+            <div className="grid gap-3" style={{ gridTemplateColumns: 'repeat(3, minmax(0,1fr))' }}>
               {list.map((r) => (
                 <ResourceCard key={r.id} recurso={r} />
               ))}

@@ -65,7 +65,7 @@ export default function PortalComunicadosPage() {
         )}
       </div>
 
-      <div className="flex-1 grid gap-4 min-h-0" style={{ gridTemplateColumns: '360px 1fr' }}>
+      <div className="flex-1 grid gap-4 min-h-0" style={{ gridTemplateColumns: '360px minmax(0,1fr)' }}>
         {/* Left: list */}
         <div className="flex flex-col min-h-0 bg-surface border border-border rounded-3 shadow-1 overflow-hidden">
           {/* Tabs */}

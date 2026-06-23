@@ -233,7 +233,7 @@ function VigilanteInicio() {
       )}
 
       {/* Grid principal */}
-      <div className="grid gap-4" style={{ gridTemplateColumns: '1fr 340px' }}>
+      <div className="grid gap-4" style={{ gridTemplateColumns: 'minmax(0,1fr) 340px' }}>
         {/* Clases del día */}
         <Card
           title="Clases de hoy"
@@ -814,7 +814,7 @@ function DocenteInicio() {
         />
       </div>
 
-      <div className="grid gap-4" style={{ gridTemplateColumns: '1fr 340px' }}>
+      <div className="grid gap-4" style={{ gridTemplateColumns: 'minmax(0,1fr) 340px' }}>
         {/* Clases del día */}
         <Card
           title="Mis clases de hoy"

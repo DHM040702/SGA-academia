@@ -145,7 +145,7 @@ export default function PortalAsistenciaPage() {
         <KPI label="Ausencias" value={total - puntuales - tardanzas > 0 ? total - puntuales - tardanzas : 0} sub="no justificadas" accent="var(--color-danger)" />
       </div>
 
-      <div className="grid gap-4" style={{ gridTemplateColumns: '320px 1fr' }}>
+      <div className="grid gap-4" style={{ gridTemplateColumns: '320px minmax(0,1fr)' }}>
         {/* Calendar */}
         <Card>
           <div className="px-4 pt-4 pb-2">
