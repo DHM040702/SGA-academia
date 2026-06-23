@@ -161,9 +161,11 @@ export default function VigilantePage() {
 
           {/* User */}
           <div className="flex items-center gap-2">
-            <Avatar name={user?.email ?? 'Vigilante'} size={26} />
+            <Avatar name={user?.nombre ? `${user.nombre} ${user.apellidos ?? ''}`.trim() : (user?.email ?? 'Vigilante')} size={26} />
             <div className="hidden md:block leading-tight">
-              <div className="text-[12px] font-semibold">{user?.email?.split('@')[0] ?? 'Vigilante'}</div>
+              <div className="text-[12px] font-semibold">
+                {user?.nombre ? `${user.nombre}${user.apellidos ? ' ' + user.apellidos : ''}` : (user?.email?.split('@')[0] ?? 'Vigilante')}
+              </div>
               <div className="text-[10px] opacity-55">Vigilante · Entrada principal</div>
             </div>
           </div>

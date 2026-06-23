@@ -94,7 +94,7 @@ function VigilanteInicio() {
   const todayIso = `${now.getFullYear()}-${String(now.getMonth() + 1).padStart(2, '0')}-${String(now.getDate()).padStart(2, '0')}`
   const todayDia = now.getDay() === 0 ? 7 : now.getDay()
 
-  const firstName = user?.email?.split('@')[0]?.split('.')[0] ?? 'vigilante'
+  const firstName = user?.nombre?.split(' ')[0] ?? user?.email?.split('@')[0]?.split('.')[0] ?? 'vigilante'
   const capitalized = firstName.charAt(0).toUpperCase() + firstName.slice(1)
 
   // Estado para el modal de cierre de turno
@@ -438,7 +438,7 @@ function AdminInicio() {
   const router = useRouter()
   const { cicloActivo } = useCicloCtx()
 
-  const firstName = user?.email?.split('@')[0]?.split('.')[0] ?? 'usuario'
+  const firstName = user?.nombre?.split(' ')[0] ?? user?.email?.split('@')[0]?.split('.')[0] ?? 'usuario'
   const capitalized = firstName.charAt(0).toUpperCase() + firstName.slice(1)
 
   const now = new Date()
@@ -746,7 +746,9 @@ function DocenteInicio() {
   const docenteId = user?.docente?.id
   const displayName = user?.docente
     ? `${user.docente.nombre} ${user.docente.apellidos}`
-    : user?.email?.split('@')[0] ?? 'Docente'
+    : user?.nombre
+      ? `${user.nombre}${user.apellidos ? ' ' + user.apellidos : ''}`
+      : user?.email?.split('@')[0] ?? 'Docente'
 
   const { data: horariosHoy } = useQuery({
     queryKey: ['horarios', 'docente-inicio', todayDia, docenteId],

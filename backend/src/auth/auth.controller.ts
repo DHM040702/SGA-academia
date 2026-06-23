@@ -14,7 +14,11 @@ import { CurrentUser } from '../common/decorators/current-user.decorator';
 
 const COOKIE_OPTS = {
   httpOnly: true,
-  secure: process.env.NODE_ENV === 'production',
+  // Secure debe ser true SOLO con HTTPS. El sistema corre sobre HTTP en la red
+  // local, por lo que una cookie Secure NO se envía y la sesión se pierde al
+  // recargar. Se controla con COOKIE_SECURE (default false). Poner en true
+  // únicamente cuando se sirva por HTTPS/TLS.
+  secure: process.env.COOKIE_SECURE === 'true',
   sameSite: 'lax' as const,
   maxAge: 7 * 24 * 60 * 60 * 1000,
   path: '/',
