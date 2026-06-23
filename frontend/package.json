@@ -10,7 +10,6 @@
   },
   "dependencies": {
     "@fontsource/crimson-pro": "^5.2.8",
-    "http-proxy-middleware": "^3.0.3",
     "@fontsource/inter": "^5.2.8",
     "@fontsource/jetbrains-mono": "^5.2.8",
     "@hookform/resolvers": "^5.2.2",

@@ -56,9 +56,18 @@ export class MinioService implements OnModuleInit {
   }
 
   private buildUrl(bucket: string, key: string): string {
-    const endpoint = this.config.get<string>('MINIO_ENDPOINT') ?? 'localhost';
-    const port     = this.config.get<string>('MINIO_PORT')     ?? '9000';
-    const ssl      = this.config.get<string>('MINIO_USE_SSL')  === 'true';
+    // El endpoint PÚBLICO (lo que abren los navegadores de los clientes) debe ser
+    // accesible desde el hotspot (ej. sga.intranet), NO 127.0.0.1, que solo vale
+    // para la conexión interna del backend. Se usa MINIO_PUBLIC_ENDPOINT si existe.
+    const endpoint =
+      this.config.get<string>('MINIO_PUBLIC_ENDPOINT') ??
+      this.config.get<string>('MINIO_ENDPOINT') ??
+      'localhost';
+    const port =
+      this.config.get<string>('MINIO_PUBLIC_PORT') ??
+      this.config.get<string>('MINIO_PORT') ??
+      '9000';
+    const ssl = this.config.get<string>('MINIO_USE_SSL') === 'true';
     return `${ssl ? 'https' : 'http'}://${endpoint}:${port}/${bucket}/${key}`;
   }
 

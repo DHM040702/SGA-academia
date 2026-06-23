@@ -509,11 +509,16 @@ JWT_REFRESH_SECRET=tu_secreto_refresh_aqui
 JWT_EXPIRES_IN=15m
 
 # MinIO
+# ENDPOINT = conexión interna del backend a MinIO (127.0.0.1, evita el problema IPv6)
 MINIO_ENDPOINT=127.0.0.1
 MINIO_PORT=9000
 MINIO_USE_SSL=false
 MINIO_ACCESS_KEY=minio_admin
 MINIO_SECRET_KEY=minio_pass_dev
+# PUBLIC_ENDPOINT = host con el que se construyen las URLs públicas (fotos, PDFs)
+# que abren los NAVEGADORES de los clientes. Debe ser accesible desde el hotspot.
+MINIO_PUBLIC_ENDPOINT=sga.intranet
+MINIO_PUBLIC_PORT=9000
 
 # General
 PORT=3001
