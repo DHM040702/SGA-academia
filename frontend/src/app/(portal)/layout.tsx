@@ -70,7 +70,12 @@ export default function PortalLayout({ children }: { children: React.ReactNode }
   return (
     <div
       className="w-screen h-screen overflow-hidden grid"
-      style={{ gridTemplateColumns: '240px 1fr', background: 'var(--color-bg)', fontFamily: 'var(--font-sans)' }}
+      style={{
+        gridTemplateColumns: '240px minmax(0,1fr)',
+        gridTemplateRows: '100%',
+        background: 'var(--color-bg)',
+        fontFamily: 'var(--font-sans)',
+      }}
     >
       {/* Sidebar */}
       <aside className="flex flex-col h-full bg-surface border-r border-border overflow-hidden">
