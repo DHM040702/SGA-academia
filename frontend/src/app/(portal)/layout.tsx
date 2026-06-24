@@ -1,6 +1,6 @@
 'use client'
 
-import { useEffect } from 'react'
+import { useEffect, useState } from 'react'
 import { useRouter, usePathname } from 'next/navigation'
 import Link from 'next/link'
 import { useAuth } from '@/contexts/auth-context'
@@ -31,6 +31,7 @@ export default function PortalLayout({ children }: { children: React.ReactNode }
   const { user, loading, logout } = useAuth()
   const router   = useRouter()
   const pathname = usePathname()
+  const [navOpen, setNavOpen] = useState(false)
   const cicloActivo = useActiveCiclo()
   const cicloWeek   = cicloActivo
     ? cicloWeekInfo(cicloActivo.fechaInicio, cicloActivo.fechaFin)
@@ -44,6 +45,9 @@ export default function PortalLayout({ children }: { children: React.ReactNode }
     if (!user) router.replace('/login')
     else if (user.debeCambiarPassword) router.replace('/cambiar-password')
   }, [user, loading, router])
+
+  // Cerrar el menú móvil al navegar
+  useEffect(() => { setNavOpen(false) }, [pathname])
 
   if (loading) {
     return (
@@ -69,16 +73,26 @@ export default function PortalLayout({ children }: { children: React.ReactNode }
 
   return (
     <div
-      className="w-screen h-screen overflow-hidden grid"
-      style={{
-        gridTemplateColumns: '240px minmax(0,1fr)',
-        gridTemplateRows: '100%',
-        background: 'var(--color-bg)',
-        fontFamily: 'var(--font-sans)',
-      }}
+      className="w-screen h-screen overflow-hidden grid grid-rows-[100%] grid-cols-1 md:grid-cols-[240px_minmax(0,1fr)]"
+      style={{ background: 'var(--color-bg)', fontFamily: 'var(--font-sans)' }}
     >
-      {/* Sidebar */}
-      <aside className="flex flex-col h-full bg-surface border-r border-border overflow-hidden">
+      {/* Backdrop móvil */}
+      {navOpen && (
+        <div
+          className="md:hidden fixed inset-0 z-40"
+          style={{ background: 'rgba(0,0,0,0.4)' }}
+          onClick={() => setNavOpen(false)}
+        />
+      )}
+
+      {/* Sidebar — drawer en móvil, fijo en escritorio */}
+      <aside
+        className={cn(
+          'flex flex-col h-full bg-surface border-r border-border overflow-hidden z-50',
+          'max-md:fixed max-md:inset-y-0 max-md:left-0 max-md:w-64 max-md:transition-transform max-md:duration-200',
+          navOpen ? 'max-md:translate-x-0' : 'max-md:-translate-x-full',
+        )}
+      >
         {/* Brand */}
         <div className="h-[60px] flex items-center px-[18px] border-b border-border-s">
           <span className="font-serif font-bold text-primary text-[17px] tracking-tight leading-tight">
@@ -154,8 +168,17 @@ export default function PortalLayout({ children }: { children: React.ReactNode }
       <div className="flex flex-col min-w-0 h-full">
         {/* Top bar */}
         <header
-          className="h-[60px] border-b border-border bg-surface flex items-center gap-4 px-6 shrink-0"
+          className="h-[60px] border-b border-border bg-surface flex items-center gap-3 md:gap-4 px-4 md:px-6 shrink-0"
         >
+          <button
+            className="md:hidden text-text-mute hover:text-text shrink-0"
+            onClick={() => setNavOpen(true)}
+            aria-label="Abrir menú"
+          >
+            <svg width="22" height="22" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round">
+              <line x1="3" y1="6" x2="21" y2="6" /><line x1="3" y1="12" x2="21" y2="12" /><line x1="3" y1="18" x2="21" y2="18" />
+            </svg>
+          </button>
           <div className="flex-1 max-w-[380px] relative">
             <span className="absolute left-2.5 top-1/2 -translate-y-1/2 text-text-soft flex">
               <Search size={14} />
@@ -167,7 +190,7 @@ export default function PortalLayout({ children }: { children: React.ReactNode }
           </div>
           <div className="flex-1" />
           {cicloTag && (
-            <Pill tone="primary">
+            <Pill tone="primary" className="max-md:hidden">
               <Dot tone="primary" size={6} />
               {cicloTag}
             </Pill>

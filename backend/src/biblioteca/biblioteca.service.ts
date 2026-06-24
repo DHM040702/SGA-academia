@@ -192,6 +192,7 @@ export class BibliotecaService {
         ...(nuevaUrl         !== undefined && { url:          nuevaUrl }),
         ...(dto.nivel        !== undefined && { nivel:        dto.nivel }),
         ...(dto.curso_id     !== undefined && { cursoId:      dto.curso_id }),
+        ...(dto.area         !== undefined && { area:         dto.area ?? null }),
       },
       include: INCLUDE,
     });

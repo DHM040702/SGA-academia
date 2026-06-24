@@ -23,6 +23,7 @@ export function EditRecursoModal({ recurso, onClose, canViewHistory = false }: P
   const [url,         setUrl]         = useState(recurso.tipo === 'pdf' ? '' : (recurso.url ?? ''))
   const [nivel,       setNivel]       = useState(recurso.nivel ?? '')
   const [cursoId,     setCursoId]     = useState(recurso.cursoId ?? '')
+  const [area,        setArea]        = useState(recurso.area ?? '')
   const [file,        setFile]        = useState<File | null>(null)
   const [drag,        setDrag]        = useState(false)
   const [error,       setError]       = useState('')
@@ -50,6 +51,7 @@ export function EditRecursoModal({ recurso, onClose, canViewHistory = false }: P
         url:         esPdf ? (url.trim() || undefined) : (url.trim() || undefined),
         nivel:       nivel.trim() || undefined,
         curso_id:    cursoId || undefined,
+        area:        area || null,
         file:        file ?? undefined,
       })
       onClose()
@@ -172,6 +174,18 @@ export function EditRecursoModal({ recurso, onClose, canViewHistory = false }: P
                   className="px-3 py-2 text-[13px] border border-border rounded-2 bg-surface" />
               </label>
             </div>
+
+            {/* Área de envío */}
+            <label className="flex flex-col gap-1">
+              <span className="text-[12px] font-medium text-text-mute">Enviar al área</span>
+              <select value={area} onChange={e => setArea(e.target.value)}
+                className="px-3 py-2 text-[13px] border border-border rounded-2 bg-surface">
+                <option value="">Todas las áreas</option>
+                <option value="ciencias">Ciencias</option>
+                <option value="letras">Letras</option>
+                <option value="medicas">Médicas</option>
+              </select>
+            </label>
 
             {error && <p className="text-[12px] text-danger">{error}</p>}
 

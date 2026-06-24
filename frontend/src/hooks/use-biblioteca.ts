@@ -138,6 +138,7 @@ export function useUpdateRecurso() {
       url?: string
       nivel?: string
       curso_id?: string
+      area?: string | null
       file?: File
     }) => {
       const { id, file, ...fields } = payload
