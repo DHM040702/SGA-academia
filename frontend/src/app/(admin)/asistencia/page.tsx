@@ -489,7 +489,7 @@ function ManualModal({ onClose }: { onClose: () => void }) {
           )}
 
           {/* Fecha + Hora */}
-          <div className="grid grid-cols-2 gap-3">
+          <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
             <label className="flex flex-col gap-1">
               <span className="text-[12px] font-medium text-text-mute">Fecha</span>
               <input type="date" value={fecha} onChange={e => setFecha(e.target.value)} required
@@ -790,7 +790,7 @@ export default function AsistenciaPage() {
 
       <div className="p-7 flex flex-col gap-3.5">
         {/* KPIs */}
-        <div className="grid grid-cols-4 gap-3.5">
+        <div className="grid grid-cols-2 md:grid-cols-4 gap-3.5">
           <KPI label="Presentes hoy"    value={presentes}  sub={`de ${total} registros`}  trend={4} accent="var(--color-success)" />
           <KPI label="Tardanzas hoy"    value={tardanzas}  sub="del total"                         accent="var(--color-warning)" />
           <KPI label="Ausentes"         value={ausentes}   sub="sin registro"                       accent="var(--color-danger)" />

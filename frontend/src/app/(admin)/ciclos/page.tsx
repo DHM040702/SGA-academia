@@ -175,7 +175,7 @@ function NuevoCicloModal({
             className="px-3 py-2 text-[13px] border border-border rounded-2 bg-surface focus:outline-none focus:ring-1 focus:ring-primary"
           />
         </label>
-        <div className="grid grid-cols-2 gap-3">
+        <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
           <label className="flex flex-col gap-1">
             <span className="text-[12px] font-medium text-text-mute uppercase tracking-[0.05em]">
               Fecha de inicio *
@@ -256,7 +256,7 @@ function NuevaAulaModal({
   return (
     <Modal title={isEdit ? 'Editar aula' : 'Nueva aula'} onClose={onClose}>
       <form onSubmit={handleSubmit} className="flex flex-col gap-4">
-        <div className="grid grid-cols-2 gap-3">
+        <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
           <label className="flex flex-col gap-1">
             <span className="text-[12px] font-medium text-text-mute uppercase tracking-[0.05em]">
               Nombre *
@@ -298,7 +298,7 @@ function NuevaAulaModal({
           </select>
         </label>
 
-        <div className="grid grid-cols-2 gap-3">
+        <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
           <label className="flex flex-col gap-1">
             <span className="text-[12px] font-medium text-text-mute uppercase tracking-[0.05em]">
               Turno
@@ -428,7 +428,7 @@ export default function CiclosPage() {
         }
       />
 
-      <div className="p-7 flex flex-col gap-3.5">
+      <div className="p-4 md:p-7 flex flex-col gap-3.5">
 
         {isLoading && (
           <div className="text-center py-10 text-text-mute text-[13px]">Cargando…</div>

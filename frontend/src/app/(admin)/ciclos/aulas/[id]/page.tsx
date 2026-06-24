@@ -90,7 +90,7 @@ function EditarAulaModal({ aula, onClose }: {
           <Btn variant="ghost" size="sm" onClick={onClose} style={{ padding: 6 }}><X size={16} /></Btn>
         </header>
         <form onSubmit={handleSubmit} className="p-5 flex flex-col gap-4">
-          <div className="grid grid-cols-2 gap-3">
+          <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
             <label className="flex flex-col gap-1">
               <span className="text-[12px] font-medium text-text-mute uppercase tracking-[0.05em]">Nombre</span>
               <input value={nombre} onChange={(e) => setNombre(e.target.value)} required
@@ -102,7 +102,7 @@ function EditarAulaModal({ aula, onClose }: {
                 className="px-3 py-2 text-[13px] border border-border rounded-2 bg-surface focus:outline-none focus:ring-1 focus:ring-primary" />
             </label>
           </div>
-          <div className="grid grid-cols-2 gap-3">
+          <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
             <label className="flex flex-col gap-1">
               <span className="text-[12px] font-medium text-text-mute uppercase tracking-[0.05em]">Turno</span>
               <select value={turno} onChange={(e) => setTurno(e.target.value as any)}

@@ -48,6 +48,7 @@ export interface FilterBiblioteca {
   tipo?: TipoRecurso
   curso_id?: string
   area?: 'ciencias' | 'letras' | 'medicas'
+  solo_generales?: boolean
 }
 
 export function useBiblioteca(filters: FilterBiblioteca = {}) {
@@ -72,11 +73,14 @@ export function useRecurso(id: string) {
   })
 }
 
-export function useBibliotecaStats() {
+export function useBibliotecaStats(opts?: { area?: string; solo_generales?: boolean }) {
+  const params: Record<string, string> = {}
+  if (opts?.area) params.area = opts.area
+  if (opts?.solo_generales) params.solo_generales = 'true'
   return useQuery<{ total_pdf: number; total_video: number; total_enlace: number; total_iframe: number }>({
-    queryKey: ['biblioteca', 'stats'],
+    queryKey: ['biblioteca', 'stats', params],
     queryFn: async () => {
-      const { data } = await api.get('/biblioteca/stats')
+      const { data } = await api.get('/biblioteca/stats', { params })
       return data
     },
   })

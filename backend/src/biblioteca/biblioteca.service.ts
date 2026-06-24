@@ -1,5 +1,5 @@
 import { BadRequestException, ForbiddenException, Injectable, NotFoundException } from '@nestjs/common';
-import { TipoRecurso } from '@prisma/client';
+import { TipoRecurso, Area } from '@prisma/client';
 import { PrismaService } from '../prisma/prisma.service';
 import { MinioService } from '../minio/minio.service';
 import { paginate } from '../common/dto/pagination.dto';
@@ -36,7 +36,7 @@ export class BibliotecaService {
   /* ── Listar ───────────────────────────────────────────────────── */
 
   async findAll(dto: FilterBibliotecaDto) {
-    const { page = 1, limit = 20, q, tipo, curso_id, area } = dto;
+    const { page = 1, limit = 20, q, tipo, curso_id, area, solo_generales } = dto;
     const skip = (page - 1) * limit;
 
     const where: any = { activo: true };
@@ -45,8 +45,10 @@ export class BibliotecaService {
 
     // Se combinan con AND para no pisar el OR del buscador con el del área
     const and: any[] = [];
-    // Filtro por área: recursos del área pedida + los de "todas" (area null)
-    if (area) and.push({ OR: [{ area }, { area: null }] });
+    // Filtro por área: recursos del área pedida + los de "todas" (area null).
+    // solo_generales → únicamente los sin área (para alumnos sin área asignada).
+    if (solo_generales) and.push({ area: null });
+    else if (area) and.push({ OR: [{ area }, { area: null }] });
     if (q) {
       and.push({
         OR: [
@@ -220,12 +222,21 @@ export class BibliotecaService {
 
   /* ── Stats ────────────────────────────────────────────────────── */
 
-  async stats() {
+  async stats(opts?: { area?: Area; solo_generales?: boolean }) {
+    // Los conteos respetan el mismo filtro de área que la lista, para que un
+    // alumno no vea cantidades de recursos que no le corresponden.
+    const areaWhere: any = opts?.solo_generales
+      ? { area: null }
+      : opts?.area
+        ? { OR: [{ area: opts.area }, { area: null }] }
+        : {};
+    const count = (tipo: TipoRecurso) =>
+      this.prisma.recursoBiblioteca.count({ where: { tipo, activo: true, ...areaWhere } });
     const [total_pdf, total_video, total_enlace, total_iframe] = await Promise.all([
-      this.prisma.recursoBiblioteca.count({ where: { tipo: TipoRecurso.pdf,    activo: true } }),
-      this.prisma.recursoBiblioteca.count({ where: { tipo: TipoRecurso.video,  activo: true } }),
-      this.prisma.recursoBiblioteca.count({ where: { tipo: TipoRecurso.enlace, activo: true } }),
-      this.prisma.recursoBiblioteca.count({ where: { tipo: TipoRecurso.iframe, activo: true } }),
+      count(TipoRecurso.pdf),
+      count(TipoRecurso.video),
+      count(TipoRecurso.enlace),
+      count(TipoRecurso.iframe),
     ]);
     return { total_pdf, total_video, total_enlace, total_iframe };
   }

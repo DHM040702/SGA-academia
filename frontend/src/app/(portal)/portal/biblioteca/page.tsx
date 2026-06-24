@@ -50,15 +50,20 @@ export default function PortalBibliotecaPage() {
   const cicloActivo = useActiveCiclo()
   const { user } = useAuth()
 
-  // Filtra por el área del alumno: ve los recursos de su área + los de "todas".
-  // Apoderados y otros roles ven todo (sin filtro de área).
-  const areaAlumno = user?.rol === 'alumno' ? user?.alumno?.aula?.area ?? undefined : undefined
+  // Filtro de área para alumnos:
+  //  - con área  → ve los de su área + los generales (area)
+  //  - sin área  → SOLO los generales (solo_generales), no los de otras áreas
+  //  - apoderado/otros roles → ven todo
+  const esAlumno = user?.rol === 'alumno'
+  const areaAlumno = esAlumno ? user?.alumno?.aula?.area ?? undefined : undefined
+  const soloGenerales = esAlumno && !areaAlumno
 
-  const { data: stats } = useBibliotecaStats()
+  const { data: stats } = useBibliotecaStats({ area: areaAlumno, solo_generales: soloGenerales })
   const { data: recursos, isLoading } = useBiblioteca({
     tipo: tipoFilter,
     q: search || undefined,
     area: areaAlumno ?? undefined,
+    solo_generales: soloGenerales || undefined,
     page,
     limit: PAGE_SIZE,
   })

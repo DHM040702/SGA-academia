@@ -514,7 +514,7 @@ export default function ReportesPage() {
         }
       />
 
-      <div className="p-7 flex flex-col gap-4">
+      <div className="p-4 md:p-7 flex flex-col gap-4">
 
         {/* ── Tabs ── */}
         <div className="flex gap-1 border-b border-border">

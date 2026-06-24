@@ -234,7 +234,7 @@ function NuevoComunicadoModal({ onClose }: { onClose: () => void }) {
           </div>
 
           {/* Destinatario */}
-          <div className="grid grid-cols-2 gap-3">
+          <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
             <div>
               <label className="text-[11px] font-semibold text-text-mute mb-1.5 block uppercase tracking-[0.05em]">
                 Destinatarios

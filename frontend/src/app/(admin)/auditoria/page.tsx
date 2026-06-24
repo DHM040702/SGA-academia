@@ -71,7 +71,7 @@ export default function AuditoriaPage() {
       />
 
       {/* ── Panel de resumen ─────────────────────────────────── */}
-      <div className="grid grid-cols-4 gap-3">
+      <div className="grid grid-cols-2 md:grid-cols-4 gap-3">
         <Card pad={0}><div className="p-3">
           <div className="text-[11px] uppercase tracking-wide text-text-mute">Eventos totales</div>
           <div className="text-[26px] font-serif font-semibold text-text">{resumen?.total ?? '—'}</div>

@@ -124,7 +124,7 @@ function TurnoCard({ turno, label }: { turno: TurnoKey; label: string }) {
 
 export default function TurnosPage() {
   return (
-    <div className="px-7 pt-[22px] pb-7 flex flex-col gap-4 max-w-[760px]">
+    <div className="px-4 md:px-7 pt-4 md:pt-[22px] pb-7 flex flex-col gap-4 max-w-[760px]">
       <PageHeader
         title="Configuración de turnos"
         crumbs={[{ label: 'Configuración' }, { label: 'Turnos' }]}

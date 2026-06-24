@@ -1,5 +1,6 @@
 import { ApiPropertyOptional } from '@nestjs/swagger';
-import { IsEnum, IsOptional, IsUUID } from 'class-validator';
+import { IsBoolean, IsEnum, IsOptional, IsUUID } from 'class-validator';
+import { Transform } from 'class-transformer';
 import { TipoRecurso, Area } from '@prisma/client';
 import { PaginationDto } from '../../common/dto/pagination.dto';
 
@@ -13,6 +14,12 @@ export class FilterBibliotecaDto extends PaginationDto {
   @IsOptional()
   @IsEnum(Area)
   area?: Area;
+
+  @ApiPropertyOptional({ description: 'Solo recursos generales (sin área asignada)' })
+  @IsOptional()
+  @Transform(({ value }) => value === 'true' || value === true)
+  @IsBoolean()
+  solo_generales?: boolean;
 
   @ApiPropertyOptional({ description: 'UUID del curso', format: 'uuid' })
   @IsOptional()

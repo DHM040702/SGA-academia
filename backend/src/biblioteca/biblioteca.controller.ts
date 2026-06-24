@@ -43,8 +43,8 @@ export class BibliotecaController {
   @Get('stats')
   @Roles(Rol.admin, Rol.director, Rol.docente, Rol.alumno, Rol.apoderado)
   @ApiOperation({ summary: 'Estadísticas de la biblioteca digital' })
-  stats() {
-    return this.service.stats();
+  stats(@Query() dto: FilterBibliotecaDto) {
+    return this.service.stats({ area: dto.area, solo_generales: dto.solo_generales });
   }
 
   @Get(':id/historial')

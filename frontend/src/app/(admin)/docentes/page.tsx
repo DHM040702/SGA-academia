@@ -135,9 +135,9 @@ export default function DocentesPage() {
         ) : undefined}
       />
 
-      <div className="p-7 flex flex-col gap-3.5">
+      <div className="p-4 md:p-7 flex flex-col gap-3.5">
         {/* KPIs */}
-        <div className="grid grid-cols-4 gap-3.5">
+        <div className="grid grid-cols-2 md:grid-cols-4 gap-3.5">
           <KPI label="Docentes activos" value={total} sub="en plantilla" accent="var(--color-primary)" />
           <KPI label="Puntualidad media" value="97%" trend={1} accent="var(--color-success)" />
           <KPI label="Asistencia ciclo" value="98%" accent="var(--color-primary)" />
