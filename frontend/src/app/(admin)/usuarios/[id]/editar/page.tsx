@@ -195,7 +195,7 @@ export default function EditarUsuarioPage() {
   const tienePerfilSoloLectura = (usuario.docente || usuario.alumno) && !usuario.apoderado
 
   return (
-    <div className="px-7 pt-[22px] pb-7 flex flex-col gap-4 max-w-[600px]">
+    <div className="px-4 md:px-7 pt-4 md:pt-[22px] pb-7 flex flex-col gap-4 max-w-[600px]">
       <PageHeader
         title="Editar usuario"
         crumbs={[
@@ -211,7 +211,7 @@ export default function EditarUsuarioPage() {
       <form onSubmit={handleSubmit(onSubmit)}>
         {/* Rol y estado */}
         <Card title="Rol y estado">
-          <div className="grid grid-cols-2 gap-4 p-1">
+          <div className="grid grid-cols-1 sm:grid-cols-2 gap-4 p-1">
             <Field label="Rol" required>
               <select {...register('rol')} className={SELECT_CLS}>
                 {ROLES_EDITABLES.map((r) => (
@@ -238,7 +238,7 @@ export default function EditarUsuarioPage() {
         {/* Datos personales para admin / director / vigilante */}
         {tieneDatosEnUsuario && (
           <Card title="Datos personales" className="mt-4">
-            <div className="grid grid-cols-2 gap-4 p-1">
+            <div className="grid grid-cols-1 sm:grid-cols-2 gap-4 p-1">
               <Field label="Nombres" error={errors.nombre?.message}>
                 <Input
                   placeholder="Juan Carlos"
@@ -280,7 +280,7 @@ export default function EditarUsuarioPage() {
         {/* Perfil apoderado editable */}
         {rolActual === 'apoderado' && (
           <Card title="Datos del apoderado" className="mt-4">
-            <div className="grid grid-cols-2 gap-4 p-1">
+            <div className="grid grid-cols-1 sm:grid-cols-2 gap-4 p-1">
               <Field label="Nombres" error={errors.ap_nombre?.message}>
                 <Input
                   placeholder="Juan Carlos"

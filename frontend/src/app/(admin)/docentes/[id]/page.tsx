@@ -107,7 +107,7 @@ export default function DocenteDetallePage() {
         }
       />
 
-      <div className="p-7 grid gap-[18px]" style={{ gridTemplateColumns: '300px 1fr' }}>
+      <div className="p-4 md:p-7 grid gap-[18px] grid-cols-1 lg:grid-cols-[300px_minmax(0,1fr)]">
 
         {/* ── Columna izquierda ── */}
         <div className="flex flex-col gap-3.5">

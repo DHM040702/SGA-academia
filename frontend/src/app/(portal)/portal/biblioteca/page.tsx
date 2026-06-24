@@ -82,20 +82,20 @@ export default function PortalBibliotecaPage() {
   }
 
   return (
-    <div className="px-8 pt-7 pb-8">
+    <div className="px-4 md:px-8 pt-5 md:pt-7 pb-8">
       {/* Hero */}
       <div className="flex items-end justify-between mb-5">
         <div>
           <div className="text-[11.5px] text-text-mute mb-1">{cicloActivo ? `Ciclo ${cicloActivo.nombre} · ` : ''}material de estudio</div>
-          <h1 className="m-0 font-serif font-semibold text-[30px] tracking-[-0.02em] leading-[1.1]">
+          <h1 className="m-0 font-serif font-semibold text-[24px] md:text-[30px] tracking-[-0.02em] leading-[1.1]">
             Biblioteca digital
           </h1>
         </div>
       </div>
 
-      <div className="flex gap-5">
+      <div className="flex flex-col md:flex-row gap-4 md:gap-5">
         {/* Left sidebar: type filters */}
-        <div className="w-[200px] shrink-0">
+        <div className="w-full md:w-[200px] md:shrink-0">
           <Card>
             <div className="p-3">
               <div className="text-[10px] tracking-[0.1em] uppercase text-text-soft font-semibold px-2 pb-2 pt-1">
@@ -177,7 +177,7 @@ export default function PortalBibliotecaPage() {
               <p className="text-[13px]">No se encontraron recursos.</p>
             </div>
           ) : (
-            <div className="grid gap-3" style={{ gridTemplateColumns: 'repeat(3, minmax(0,1fr))' }}>
+            <div className="grid gap-3 grid-cols-1 sm:grid-cols-2 lg:grid-cols-3">
               {list.map((r) => (
                 <ResourceCard key={r.id} recurso={r} />
               ))}

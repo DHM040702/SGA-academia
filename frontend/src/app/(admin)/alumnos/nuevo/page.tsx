@@ -152,7 +152,7 @@ export default function NuevoAlumnoPage() {
       <form onSubmit={handleSubmit(onSubmit)}>
         {/* Datos personales */}
         <Card title="Datos personales">
-          <div className="grid grid-cols-2 gap-4 p-1">
+          <div className="grid grid-cols-1 sm:grid-cols-2 gap-4 p-1">
             <Field label="Nombres" required error={errors.nombres?.message}>
               <Input
                 placeholder="Lucía"
@@ -188,7 +188,7 @@ export default function NuevoAlumnoPage() {
 
         {/* Acceso */}
         <Card title="Acceso al sistema" className="mt-4">
-          <div className="grid grid-cols-2 gap-4 p-1">
+          <div className="grid grid-cols-1 sm:grid-cols-2 gap-4 p-1">
             <Field label="Correo institucional" required error={errors.email?.message}>
               <Input
                 type="email"
@@ -204,7 +204,7 @@ export default function NuevoAlumnoPage() {
 
         {/* Aula y carrera */}
         <Card title="Aula y carrera" className="mt-4">
-          <div className="grid grid-cols-2 gap-4 p-1">
+          <div className="grid grid-cols-1 sm:grid-cols-2 gap-4 p-1">
             <Field label="Ciclo">
               <select {...register('ciclo_id')} className={SELECT_CLS}>
                 <option value="">Sin asignar</option>
@@ -258,7 +258,7 @@ export default function NuevoAlumnoPage() {
 
           {/* Formulario nuevo apoderado */}
           {apModo === 'nuevo' && (
-            <div className="grid grid-cols-2 gap-4 p-1">
+            <div className="grid grid-cols-1 sm:grid-cols-2 gap-4 p-1">
               <Field label="Nombres" required>
                 <Input
                   placeholder="Carlos"

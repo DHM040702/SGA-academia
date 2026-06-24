@@ -93,3 +93,21 @@ h1, h2, h3, h4 {
   outline: 2px solid var(--color-primary);
   outline-offset: 2px;
 }
+
+/* ─── Tablas responsivas ─────────────────────────────────────────────────────
+   En pantallas pequeñas, las tablas de datos del contenido principal pasan a
+   scroll horizontal (en vez de aplastarse), conservando todas las columnas. */
+@media (max-width: 767px) {
+  main table {
+    display: block;
+    width: 100%;
+    overflow-x: auto;
+    -webkit-overflow-scrolling: touch;
+    white-space: nowrap;
+  }
+  main table thead,
+  main table tbody {
+    width: max-content;
+    min-width: 100%;
+  }
+}

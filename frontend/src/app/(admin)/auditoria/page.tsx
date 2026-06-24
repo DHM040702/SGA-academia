@@ -58,7 +58,7 @@ export default function AuditoriaPage() {
   const totalPages = page?.totalPages ?? 1
 
   return (
-    <div className="px-7 pt-[22px] pb-7 flex flex-col gap-4">
+    <div className="px-4 md:px-7 pt-4 md:pt-[22px] pb-7 flex flex-col gap-4">
       <PageHeader
         title="Auditoría del sistema"
         crumbs={[{ label: 'Administración' }, { label: 'Auditoría' }]}
@@ -97,7 +97,7 @@ export default function AuditoriaPage() {
 
       {/* ── Filtros ──────────────────────────────────────────── */}
       <Card pad={0}>
-        <div className="grid grid-cols-5 gap-3 p-3">
+        <div className="grid grid-cols-2 md:grid-cols-3 lg:grid-cols-5 gap-3 p-3">
           <Field label="Usuario (email)">
             <Input
               placeholder="buscar…"

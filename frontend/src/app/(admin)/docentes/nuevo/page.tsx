@@ -57,7 +57,7 @@ export default function NuevoDocentePage() {
 
       <form onSubmit={handleSubmit(onSubmit)}>
         <Card title="Datos personales">
-          <div className="grid grid-cols-2 gap-4 p-1">
+          <div className="grid grid-cols-1 sm:grid-cols-2 gap-4 p-1">
             <Field label="Nombres" required error={errors.nombres?.message}>
               <Input
                 placeholder="Carlos"
@@ -90,7 +90,7 @@ export default function NuevoDocentePage() {
         </Card>
 
         <Card title="Acceso al sistema" className="mt-4">
-          <div className="grid grid-cols-2 gap-4 p-1">
+          <div className="grid grid-cols-1 sm:grid-cols-2 gap-4 p-1">
             <Field label="Correo institucional" required error={errors.email?.message}>
               <Input
                 type="email"

@@ -189,14 +189,14 @@ function AlumnoInicio({ user }: { user: ReturnType<typeof useAuth>['user'] }) {
   const last15 = records.slice(0, 15).reverse()
 
   return (
-    <div className="px-8 pt-7 pb-8">
+    <div className="px-4 md:px-8 pt-5 md:pt-7 pb-8">
       {/* Hero */}
-      <div className="flex items-end justify-between mb-5">
+      <div className="flex flex-col gap-3 md:flex-row md:items-end md:justify-between mb-5">
         <div>
           <div className="text-[11.5px] text-text-mute mb-1 capitalize">
             {TODAY_STR}{cicloWeek ? ` · semana ${cicloWeek.week} de ${cicloWeek.total}` : ''}
           </div>
-          <h1 className="m-0 font-serif font-semibold text-[30px] tracking-[-0.02em] leading-[1.1]">
+          <h1 className="m-0 font-serif font-semibold text-[24px] md:text-[30px] tracking-[-0.02em] leading-[1.1]">
             {saludo()}, {firstName}.
           </h1>
           {todayHorarios.length > 0 ? (
@@ -216,14 +216,14 @@ function AlumnoInicio({ user }: { user: ReturnType<typeof useAuth>['user'] }) {
         >Descargar carnet</Btn>
       </div>
 
-      <div className="grid gap-4" style={{ gridTemplateColumns: 'minmax(0,1fr) minmax(0,1fr) minmax(0,1fr)' }}>
+      <div className="grid gap-4 grid-cols-1 md:grid-cols-3">
         {/* KPIs row */}
         <KPI label="Asistencia ciclo" value={`${pct}%`} sub={`${puntuales} / ${total} sesiones`} accent="var(--color-success)" />
         <KPI label="Puntualidad" value={`${puntualidadPct}%`} sub={`${tardanzas} tardanzas registradas`} accent="var(--color-primary)" />
         <KPI label="Total registros" value={total} sub="del ciclo actual" accent="var(--color-warning)" />
 
         {/* Left 2 columns */}
-        <div className="col-span-2 flex flex-col gap-4">
+        <div className="md:col-span-2 flex flex-col gap-4">
           {/* Today's classes */}
           <Card title="Hoy" subtitle={TODAY_STR}>
             {todayHorarios.length === 0 ? (
@@ -390,9 +390,9 @@ function AlumnoInicio({ user }: { user: ReturnType<typeof useAuth>['user'] }) {
         <Card
           title="Continuar estudiando"
           subtitle="Recursos recientes"
-          className="col-span-3"
+          className="md:col-span-3"
         >
-          <div className="px-[18px] pb-4 grid grid-cols-4 gap-3">
+          <div className="px-[18px] pb-4 grid grid-cols-2 md:grid-cols-4 gap-3">
             {recursosList.length === 0 && (
               <p className="col-span-4 text-[13px] text-text-mute py-2 text-center">Sin recursos disponibles.</p>
             )}
@@ -452,13 +452,13 @@ function ApoderadoInicio({ user }: { user: ReturnType<typeof useAuth>['user'] })
   const todayRecord = records.find((r) => r.fecha?.startsWith(today))
 
   return (
-    <div className="px-8 pt-7 pb-8">
+    <div className="px-4 md:px-8 pt-5 md:pt-7 pb-8">
       {/* Hero */}
       <div className="mb-5">
         <div className="text-[11.5px] text-text-mute mb-1 capitalize">{TODAY_STR}{cicloActivo ? ` · ciclo ${cicloActivo.nombre}` : ''}</div>
-        <div className="flex items-end justify-between">
+        <div className="flex flex-col gap-3 md:flex-row md:items-end md:justify-between">
           <div>
-            <h1 className="m-0 font-serif font-semibold text-[30px] tracking-[-0.02em] leading-[1.1]">
+            <h1 className="m-0 font-serif font-semibold text-[24px] md:text-[30px] tracking-[-0.02em] leading-[1.1]">
               {saludo()}, {firstName}.
             </h1>
             {todayRecord ? (
@@ -484,7 +484,7 @@ function ApoderadoInicio({ user }: { user: ReturnType<typeof useAuth>['user'] })
 
       <div className="flex flex-col gap-4">
         {/* KPIs */}
-        <div className="grid grid-cols-4 gap-3.5">
+        <div className="grid grid-cols-2 md:grid-cols-4 gap-3.5">
           <KPI label="Asistencia ciclo" value={`${pct}%`} sub={`${puntuales} / ${total} sesiones`} accent="var(--color-success)" />
           <KPI label="Puntualidad" value={`${total - tardanzas > 0 ? Math.round(((total - tardanzas) / total) * 100) : 0}%`} sub={`${tardanzas} tardanzas`} accent="var(--color-primary)" />
           <KPI label="Ausencias" value={0} sub="0 justificadas" accent="var(--color-info)" />
@@ -492,7 +492,7 @@ function ApoderadoInicio({ user }: { user: ReturnType<typeof useAuth>['user'] })
         </div>
 
         {/* Attendance + avisos */}
-        <div className="grid gap-4" style={{ gridTemplateColumns: 'minmax(0,1.5fr) minmax(0,1fr)' }}>
+        <div className="grid gap-4 grid-cols-1 md:grid-cols-[1.5fr_minmax(0,1fr)]">
           <Card
             title="Asistencia reciente"
             subtitle="Últimos registros"

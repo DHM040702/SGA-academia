@@ -164,14 +164,14 @@ export default function PortalHorarioPage() {
     + lastDay.toLocaleDateString('es-PE', { day: 'numeric', month: 'long' })
 
   return (
-    <div className="px-8 pt-7 pb-8">
+    <div className="px-4 md:px-8 pt-5 md:pt-7 pb-8">
       {/* Hero */}
-      <div className="flex items-end justify-between mb-5">
+      <div className="flex flex-col gap-3 md:flex-row md:items-end md:justify-between mb-5">
         <div>
           <div className="text-[11.5px] text-text-mute mb-1">
             Aula {aulaId ? 'activa' : '—'}{cicloActivo ? ` · Ciclo ${cicloActivo.nombre}` : ''}
           </div>
-          <h1 className="m-0 font-serif font-semibold text-[30px] tracking-[-0.02em] leading-[1.1]">
+          <h1 className="m-0 font-serif font-semibold text-[24px] md:text-[30px] tracking-[-0.02em] leading-[1.1]">
             Mi horario
           </h1>
         </div>
@@ -195,9 +195,10 @@ export default function PortalHorarioPage() {
         <div className="flex-1" />
       </div>
 
-      {/* Grid */}
+      {/* Grid — scroll horizontal en móvil para no aplastar las 6 columnas */}
+      <div className="overflow-x-auto mb-4 -mx-4 px-4 md:mx-0 md:px-0">
       <div
-        className="bg-surface border border-border rounded-3 shadow-1 overflow-hidden mb-4"
+        className="bg-surface border border-border rounded-3 shadow-1 overflow-hidden min-w-[640px]"
       >
         {/* Header row */}
         <div
@@ -281,9 +282,10 @@ export default function PortalHorarioPage() {
           ))
         )}
       </div>
+      </div>
 
       {/* Bottom cards */}
-      <div className="grid grid-cols-2 gap-4">
+      <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
         <Card title="Mis docentes">
           <div className="px-4 pb-3">
             {docentes.length === 0 && (

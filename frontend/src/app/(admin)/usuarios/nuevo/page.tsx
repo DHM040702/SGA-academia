@@ -90,7 +90,7 @@ export default function NuevoUsuarioPage() {
       <form onSubmit={handleSubmit(onSubmit)}>
         {/* Rol y estado — primero para que los campos de perfil se muestren/oculten */}
         <Card title="Rol y estado">
-          <div className="grid grid-cols-2 gap-4 p-1">
+          <div className="grid grid-cols-1 sm:grid-cols-2 gap-4 p-1">
             <Field label="Rol" required>
               <select {...register('rol')} className={SELECT_CLS}>
                 {ROLES_SISTEMA.map((r) => (
@@ -114,7 +114,7 @@ export default function NuevoUsuarioPage() {
 
         {/* Datos personales — todos los roles */}
         <Card title={esApoderado ? 'Datos del apoderado' : 'Datos personales'} className="mt-4">
-          <div className="grid grid-cols-2 gap-4 p-1">
+          <div className="grid grid-cols-1 sm:grid-cols-2 gap-4 p-1">
             <Field label="Nombres" required={esApoderado} error={errors.nombre?.message}>
               <Input
                 placeholder="Juan Carlos"

@@ -797,7 +797,7 @@ export default function ReportesPage() {
                 <KPI label="Con apoderado"  value={k.con_apoderado} sub={`${k.total>0?Math.round(k.con_apoderado/k.total*100):0}% del total`} accent="oklch(0.55 0.13 280)" />
               </div>
 
-              <div className="grid gap-3.5" style={{ gridTemplateColumns: '1fr 300px' }}>
+              <div className="grid gap-3.5 grid-cols-1 lg:grid-cols-[minmax(0,1fr)_300px]">
                 {/* Tabla aulas */}
                 <Card title="Matrícula por aula" subtitle={`${r.por_aula.length} aulas`}>
                   <table className="w-full border-collapse text-[13px]">
@@ -870,7 +870,7 @@ export default function ReportesPage() {
 
               {/* Gráfico por día */}
               <Card title="Distribución por día de semana">
-                <div className="grid gap-4" style={{ gridTemplateColumns: '1fr 200px' }}>
+                <div className="grid gap-4 grid-cols-1 sm:grid-cols-[minmax(0,1fr)_200px]">
                   <div className="px-4 pb-4">
                     <ResponsiveContainer width="100%" height={180}>
                       <BarChart data={r.por_dia} margin={{ top: 4, right: 8, bottom: 0, left: -16 }}>

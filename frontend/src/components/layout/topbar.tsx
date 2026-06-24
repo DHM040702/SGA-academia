@@ -334,16 +334,28 @@ function CicloSelector() {
 interface TopBarProps {
   search?: boolean
   className?: string
+  onMenuClick?: () => void
 }
 
-export function TopBar({ search = true, className }: TopBarProps) {
+export function TopBar({ search = true, className, onMenuClick }: TopBarProps) {
   return (
     <header
       className={cn(
-        'h-[60px] border-b border-border bg-surface flex items-center gap-4 px-[22px] shrink-0',
+        'h-[60px] border-b border-border bg-surface flex items-center gap-3 md:gap-4 px-4 md:px-[22px] shrink-0',
         className,
       )}
     >
+      {onMenuClick && (
+        <button
+          className="md:hidden text-text-mute hover:text-text shrink-0"
+          onClick={onMenuClick}
+          aria-label="Abrir menú"
+        >
+          <svg width="22" height="22" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round">
+            <line x1="3" y1="6" x2="21" y2="6" /><line x1="3" y1="12" x2="21" y2="12" /><line x1="3" y1="18" x2="21" y2="18" />
+          </svg>
+        </button>
+      )}
       {search && <SearchBox />}
 
       <div className="flex-1" />

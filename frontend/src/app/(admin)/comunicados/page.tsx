@@ -558,7 +558,7 @@ export default function ComunicadosPage() {
         }
       />
 
-      <div className="p-7 grid gap-3.5" style={{ gridTemplateColumns: '300px 1fr' }}>
+      <div className="p-4 md:p-7 grid gap-3.5 grid-cols-1 lg:grid-cols-[300px_minmax(0,1fr)]">
 
         {/* ── Lista ──────────────────────────────────────────────── */}
         <div className="flex flex-col bg-surface border border-border rounded-3 overflow-hidden shadow-1">
@@ -704,7 +704,7 @@ export default function ComunicadosPage() {
             </div>
 
             {/* Body */}
-            <div className="p-5 grid gap-5" style={{ gridTemplateColumns: '1.4fr 1fr' }}>
+            <div className="p-5 grid gap-5 grid-cols-1 lg:grid-cols-[1.4fr_1fr]">
               <div>
                 <div className="text-[11px] text-text-soft uppercase tracking-[0.05em] mb-2 font-semibold">
                   Mensaje

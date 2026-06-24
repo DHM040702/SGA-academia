@@ -116,12 +116,12 @@ export default function PortalAsistenciaPage() {
   }
 
   return (
-    <div className="px-8 pt-7 pb-8">
+    <div className="px-4 md:px-8 pt-5 md:pt-7 pb-8">
       {/* Hero */}
-      <div className="flex items-end justify-between mb-5">
+      <div className="flex flex-col gap-3 md:flex-row md:items-end md:justify-between mb-5">
         <div>
           <div className="text-[11.5px] text-text-mute mb-1">{cicloActivo ? `Ciclo ${cicloActivo.nombre} · ` : ''}seguimiento personal</div>
-          <h1 className="m-0 font-serif font-semibold text-[30px] tracking-[-0.02em] leading-[1.1]">
+          <h1 className="m-0 font-serif font-semibold text-[24px] md:text-[30px] tracking-[-0.02em] leading-[1.1]">
             Mi asistencia
           </h1>
         </div>
@@ -138,14 +138,14 @@ export default function PortalAsistenciaPage() {
       </div>
 
       {/* KPIs */}
-      <div className="grid grid-cols-4 gap-3.5 mb-4">
+      <div className="grid grid-cols-2 md:grid-cols-4 gap-3.5 mb-4">
         <KPI label="Asistencia ciclo" value={`${pct}%`} sub={`${puntuales} / ${total} sesiones`} accent="var(--color-success)" />
         <KPI label="Sesiones puntuales" value={puntuales} sub="del ciclo" accent="var(--color-primary)" />
         <KPI label="Tardanzas" value={tardanzas} sub="en el ciclo" accent="var(--color-warning)" />
         <KPI label="Ausencias" value={total - puntuales - tardanzas > 0 ? total - puntuales - tardanzas : 0} sub="no justificadas" accent="var(--color-danger)" />
       </div>
 
-      <div className="grid gap-4" style={{ gridTemplateColumns: '320px minmax(0,1fr)' }}>
+      <div className="grid gap-4 grid-cols-1 md:grid-cols-[320px_minmax(0,1fr)]">
         {/* Calendar */}
         <Card>
           <div className="px-4 pt-4 pb-2">

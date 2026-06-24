@@ -205,7 +205,7 @@ export default function EditarAlumnoPage() {
   }
 
   return (
-    <div className="px-7 pt-[22px] pb-7 flex flex-col gap-4 max-w-[680px]">
+    <div className="px-4 md:px-7 pt-4 md:pt-[22px] pb-7 flex flex-col gap-4 max-w-[680px]">
       <PageHeader
         title="Editar alumno"
         crumbs={[
@@ -234,7 +234,7 @@ export default function EditarAlumnoPage() {
               onDeleted={() => queryClient.invalidateQueries({ queryKey: ['alumnos', id] })}
             />
           </div>
-          <div className="grid grid-cols-2 gap-4 p-1">
+          <div className="grid grid-cols-1 sm:grid-cols-2 gap-4 p-1">
             <Field label="Nombres" required error={errors.nombres?.message}>
               <Input
                 placeholder="Lucía"
@@ -267,7 +267,7 @@ export default function EditarAlumnoPage() {
         </Card>
 
         <Card title="Acceso al sistema" className="mt-4">
-          <div className="grid grid-cols-2 gap-4 p-1">
+          <div className="grid grid-cols-1 sm:grid-cols-2 gap-4 p-1">
             <Field label="Correo institucional">
               <Input
                 type="email"
@@ -283,7 +283,7 @@ export default function EditarAlumnoPage() {
         </Card>
 
         <Card title="Aula y carrera" className="mt-4">
-          <div className="grid grid-cols-2 gap-4 p-1">
+          <div className="grid grid-cols-1 sm:grid-cols-2 gap-4 p-1">
             <Field label="Ciclo">
               <select {...register('ciclo_id')} className={SELECT_CLS}>
                 <option value="">Sin asignar</option>
@@ -472,7 +472,7 @@ export default function EditarAlumnoPage() {
 
             {/* ── Modo nuevo ── */}
             {apModo === 'nuevo' && (
-              <div className="grid grid-cols-2 gap-3">
+              <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
                 <Field label="Nombres" required>
                   <Input
                     placeholder="Juan Carlos"

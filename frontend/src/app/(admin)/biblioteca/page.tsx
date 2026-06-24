@@ -82,7 +82,7 @@ export default function BibliotecaPage() {
         ) : undefined}
       />
 
-      <div className="p-7 grid gap-4" style={{ gridTemplateColumns: '200px 1fr' }}>
+      <div className="p-4 md:p-7 grid gap-4 grid-cols-1 md:grid-cols-[200px_minmax(0,1fr)]">
 
         {/* Sidebar filtros */}
         <div>

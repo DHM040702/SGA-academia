@@ -160,7 +160,7 @@ function VigilanteInicio() {
   }
 
   return (
-    <div className="px-7 pt-[22px] pb-7 flex flex-col gap-4">
+    <div className="px-4 md:px-7 pt-4 md:pt-[22px] pb-7 flex flex-col gap-4">
       {/* Header */}
       <PageHeader
         title={`${horaStr}, ${capitalized}`}
@@ -183,7 +183,7 @@ function VigilanteInicio() {
       </p>
 
       {/* KPIs */}
-      <div className="grid grid-cols-4 gap-3.5">
+      <div className="grid grid-cols-2 md:grid-cols-4 gap-3.5">
         <KPI
           label="Presentes hoy"
           value={presentes}
@@ -233,7 +233,7 @@ function VigilanteInicio() {
       )}
 
       {/* Grid principal */}
-      <div className="grid gap-4" style={{ gridTemplateColumns: 'minmax(0,1fr) 340px' }}>
+      <div className="grid gap-4 grid-cols-1 lg:grid-cols-[minmax(0,1fr)_340px]">
         {/* Clases del día */}
         <Card
           title="Clases de hoy"
@@ -548,7 +548,7 @@ function AdminInicio() {
   const comunicadosRecientes: any[] = comunicadosData?.data ?? []
 
   return (
-    <div className="px-7 pt-[22px] pb-7 flex flex-col gap-4">
+    <div className="px-4 md:px-7 pt-4 md:pt-[22px] pb-7 flex flex-col gap-4">
       <PageHeader
         title={`${horaStr}, ${capitalized}`}
         crumbs={['Administración', 'Inicio']}
@@ -569,7 +569,7 @@ function AdminInicio() {
         {cicloTag ? ` · ${cicloTag}` : ''}
       </p>
 
-      <div className="grid grid-cols-4 gap-3.5">
+      <div className="grid grid-cols-2 md:grid-cols-4 gap-3.5">
         <KPI
           label="Alumnos activos"
           value={totalMatriculadosHoy > 0 ? String(totalMatriculadosHoy) : String(totalAlumnos)}
@@ -589,7 +589,7 @@ function AdminInicio() {
         <KPI label="Comunicados" value={String(totalComunicados)} sub={totalComunicados > 0 ? 'publicados en el sistema' : 'Sin comunicados'} accent="var(--color-danger)" />
       </div>
 
-      <div className="grid grid-cols-[2fr_1fr] gap-4">
+      <div className="grid grid-cols-1 lg:grid-cols-[2fr_1fr] gap-4">
         <Card
           title="Asistencia esta semana"
           subtitle="Promedio diario por ciclo y sección"
@@ -658,7 +658,7 @@ function AdminInicio() {
         </Card>
       </div>
 
-      <div className="grid grid-cols-3 gap-4">
+      <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
         <Card title="Alumnos en riesgo" subtitle="Asistencia bajo 75%" action={<Btn variant="ghost" size="sm" onClick={() => router.push('/alumnos')}>Ver todos</Btn>}>
           {alumnosRiesgo.length === 0 ? (
             <p className="text-[12.5px] text-text-mute py-4 text-center">{alumnosData ? 'Sin alumnos en riesgo' : 'Cargando…'}</p>
@@ -784,7 +784,7 @@ function DocenteInicio() {
   const comunicados: any[]  = comunicadosPage?.data ?? []
 
   return (
-    <div className="px-7 pt-[22px] pb-7 flex flex-col gap-4">
+    <div className="px-4 md:px-7 pt-4 md:pt-[22px] pb-7 flex flex-col gap-4">
       <PageHeader
         title={`${horaStr}, ${displayName.split(' ')[0]}`}
         crumbs={['Docente', 'Inicio']}
@@ -816,7 +816,7 @@ function DocenteInicio() {
         />
       </div>
 
-      <div className="grid gap-4" style={{ gridTemplateColumns: 'minmax(0,1fr) 340px' }}>
+      <div className="grid gap-4 grid-cols-1 lg:grid-cols-[minmax(0,1fr)_340px]">
         {/* Clases del día */}
         <Card
           title="Mis clases de hoy"

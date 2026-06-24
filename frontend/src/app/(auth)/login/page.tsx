@@ -44,10 +44,10 @@ export default function LoginPage() {
   }
 
   return (
-    <div className="w-full h-full grid grid-cols-[1.05fr_1fr] overflow-hidden font-sans">
-      {/* ── Brand panel ─────────────────────────────────────── */}
+    <div className="w-full h-full grid grid-cols-1 md:grid-cols-[1.05fr_1fr] overflow-hidden font-sans">
+      {/* ── Brand panel (oculto en móvil) ───────────────────── */}
       <div
-        className="relative flex flex-col justify-between p-[52px_60px] text-white overflow-hidden"
+        className="max-md:hidden relative flex flex-col justify-between p-[52px_60px] text-white overflow-hidden"
         style={{ background: 'linear-gradient(165deg, oklch(0.36 0.10 255) 0%, oklch(0.28 0.11 255) 100%)' }}
       >
         {/* Watermark rings */}

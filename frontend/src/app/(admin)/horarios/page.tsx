@@ -655,7 +655,7 @@ export default function HorariosPage() {
         ) : undefined}
       />
 
-      <div className="p-7 grid gap-3.5" style={{ gridTemplateColumns: '1fr 280px' }}>
+      <div className="p-4 md:p-7 grid gap-3.5 grid-cols-1 lg:grid-cols-[minmax(0,1fr)_280px]">
         {/* Main */}
         <div className="flex flex-col gap-3">
           {/* Toolbar */}

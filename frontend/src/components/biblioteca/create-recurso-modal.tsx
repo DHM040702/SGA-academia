@@ -168,7 +168,7 @@ export function CreateRecursoModal({ onClose }: Props) {
           </label>
 
           {/* Curso + Nivel */}
-          <div className="grid grid-cols-2 gap-3">
+          <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
             <label className="flex flex-col gap-1">
               <span className="text-[12px] font-medium text-text-mute">Curso (opcional)</span>
               <select value={cursoId} onChange={e => setCursoId(e.target.value)}

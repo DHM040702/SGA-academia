@@ -182,7 +182,7 @@ export default function AlumnosPage() {
   const page = filters.page ?? 1
 
   return (
-    <div className="px-7 pt-[22px] pb-7 flex flex-col gap-4">
+    <div className="px-4 md:px-7 pt-4 md:pt-[22px] pb-7 flex flex-col gap-4">
       <PageHeader
         title="Alumnos"
         crumbs={['Administración', 'Alumnos']}

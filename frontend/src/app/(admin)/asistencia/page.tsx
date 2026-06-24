@@ -798,7 +798,7 @@ export default function AsistenciaPage() {
         </div>
 
         {/* Content */}
-        <div className="grid gap-3.5" style={{ gridTemplateColumns: '1.5fr 1fr' }}>
+        <div className="grid gap-3.5 grid-cols-1 lg:grid-cols-[1.5fr_1fr]">
           {/* Tabla principal */}
           <Card
             title="Registros del día"

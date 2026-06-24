@@ -66,7 +66,7 @@ export default function UsuariosPage() {
   }
 
   return (
-    <div className="px-7 pt-[22px] pb-7 flex flex-col gap-4">
+    <div className="px-4 md:px-7 pt-4 md:pt-[22px] pb-7 flex flex-col gap-4">
       <PageHeader
         title="Usuarios del sistema"
         crumbs={[{ label: 'Usuarios' }]}

@@ -48,12 +48,12 @@ export default function PortalComunicadosPage() {
   ]
 
   return (
-    <div className="px-8 pt-7 pb-8 h-full flex flex-col">
+    <div className="px-4 md:px-8 pt-5 md:pt-7 pb-8 md:h-full flex flex-col">
       {/* Hero */}
-      <div className="flex items-end justify-between mb-5">
+      <div className="flex flex-col gap-3 md:flex-row md:items-end md:justify-between mb-5">
         <div>
           <div className="text-[11.5px] text-text-mute mb-1">{cicloActivo ? `Ciclo ${cicloActivo.nombre}` : ''}</div>
-          <h1 className="m-0 font-serif font-semibold text-[30px] tracking-[-0.02em] leading-[1.1]">
+          <h1 className="m-0 font-serif font-semibold text-[24px] md:text-[30px] tracking-[-0.02em] leading-[1.1]">
             Avisos y comunicados
           </h1>
         </div>
@@ -65,9 +65,9 @@ export default function PortalComunicadosPage() {
         )}
       </div>
 
-      <div className="flex-1 grid gap-4 min-h-0" style={{ gridTemplateColumns: '360px minmax(0,1fr)' }}>
+      <div className="flex-1 grid gap-4 min-h-0 grid-cols-1 md:grid-cols-[360px_minmax(0,1fr)]">
         {/* Left: list */}
-        <div className="flex flex-col min-h-0 bg-surface border border-border rounded-3 shadow-1 overflow-hidden">
+        <div className="flex flex-col min-h-0 max-md:h-[55vh] bg-surface border border-border rounded-3 shadow-1 overflow-hidden">
           {/* Tabs */}
           <div className="flex border-b border-border shrink-0">
             {TABS.map(({ key, label }) => (
@@ -159,7 +159,7 @@ export default function PortalComunicadosPage() {
         </div>
 
         {/* Right: detail */}
-        <div className="bg-surface border border-border rounded-3 shadow-1 overflow-hidden flex flex-col">
+        <div className="bg-surface border border-border rounded-3 shadow-1 overflow-hidden flex flex-col max-md:min-h-[50vh]">
           {!selected ? (
             <div className="flex-1 flex flex-col items-center justify-center text-text-mute gap-3">
               <Bell size={40} />
