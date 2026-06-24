@@ -3,9 +3,9 @@ services:
     image: postgres:16-alpine
     restart: unless-stopped
     environment:
-      POSTGRES_USER: sga_user
-      POSTGRES_PASSWORD: sga_pass_dev
-      POSTGRES_DB: sga_db
+      POSTGRES_USER: ${POSTGRES_USER:-sga_user}
+      POSTGRES_PASSWORD: ${POSTGRES_PASSWORD:-sga_pass_dev}
+      POSTGRES_DB: ${POSTGRES_DB:-sga_db}
     volumes:
       - postgres_data:/var/lib/postgresql/data
     ports:
@@ -24,8 +24,8 @@ services:
     restart: unless-stopped
     command: server /data --console-address ":9001"
     environment:
-      MINIO_ROOT_USER: minio_admin
-      MINIO_ROOT_PASSWORD: minio_pass_dev
+      MINIO_ROOT_USER: ${MINIO_ROOT_USER:-minio_admin}
+      MINIO_ROOT_PASSWORD: ${MINIO_ROOT_PASSWORD:-minio_pass_dev}
     volumes:
       - minio_data:/data
     ports:
