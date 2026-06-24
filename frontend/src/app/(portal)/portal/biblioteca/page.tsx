@@ -3,6 +3,7 @@
 import { useState } from 'react'
 import { useBiblioteca, useBibliotecaStats, type TipoRecurso, type RecursoBiblioteca } from '@/hooks/use-biblioteca'
 import { useActiveCiclo } from '@/hooks/use-ciclos'
+import { useAuth } from '@/contexts/auth-context'
 import { Card } from '@/components/ui/card'
 import { Pill } from '@/components/ui/pill'
 import { Btn } from '@/components/ui/btn'
@@ -47,11 +48,17 @@ export default function PortalBibliotecaPage() {
   const [search, setSearch] = useState('')
   const [page, setPage] = useState(1)
   const cicloActivo = useActiveCiclo()
+  const { user } = useAuth()
+
+  // Filtra por el área del alumno: ve los recursos de su área + los de "todas".
+  // Apoderados y otros roles ven todo (sin filtro de área).
+  const areaAlumno = user?.rol === 'alumno' ? user?.alumno?.aula?.area ?? undefined : undefined
 
   const { data: stats } = useBibliotecaStats()
   const { data: recursos, isLoading } = useBiblioteca({
     tipo: tipoFilter,
     q: search || undefined,
+    area: areaAlumno ?? undefined,
     page,
     limit: PAGE_SIZE,
   })

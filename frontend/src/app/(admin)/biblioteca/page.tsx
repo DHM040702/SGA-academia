@@ -205,6 +205,9 @@ export default function BibliotecaPage() {
                     <div className="mt-2 pt-2 border-t border-border-s flex items-center gap-1.5 flex-wrap">
                       {r.curso && <Pill tone="neutral" style={{ fontSize: 10 }}>{r.curso.nombre}</Pill>}
                       {r.nivel && <Pill tone="warning" style={{ fontSize: 10 }}>{r.nivel}</Pill>}
+                      <Pill tone="primary" style={{ fontSize: 10 }}>
+                        {r.area ? ({ ciencias: 'Ciencias', letras: 'Letras', medicas: 'Médicas' } as const)[r.area] : 'Todas las áreas'}
+                      </Pill>
                       <span className="flex-1" />
                       <span className="text-[10.5px] text-text-soft">{timeAgo(r.createdAt)}</span>
                     </div>

@@ -25,6 +25,7 @@ export function CreateRecursoModal({ onClose }: Props) {
   const [url,         setUrl]         = useState('')
   const [nivel,       setNivel]       = useState('')
   const [cursoId,     setCursoId]     = useState('')
+  const [area,        setArea]        = useState('')
   const [file,        setFile]        = useState<File | null>(null)
   const [drag,        setDrag]        = useState(false)
   const [error,       setError]       = useState('')
@@ -53,6 +54,7 @@ export function CreateRecursoModal({ onClose }: Props) {
         url: url.trim() || undefined,
         nivel: nivel.trim() || undefined,
         curso_id: cursoId || undefined,
+        area: area || undefined,
         file: file ?? undefined,
       })
       onClose()
@@ -184,6 +186,21 @@ export function CreateRecursoModal({ onClose }: Props) {
                 className="px-3 py-2 text-[13px] border border-border rounded-2 bg-surface" />
             </label>
           </div>
+
+          {/* Área de envío */}
+          <label className="flex flex-col gap-1">
+            <span className="text-[12px] font-medium text-text-mute">Enviar al área</span>
+            <select value={area} onChange={e => setArea(e.target.value)}
+              className="px-3 py-2 text-[13px] border border-border rounded-2 bg-surface">
+              <option value="">Todas las áreas</option>
+              <option value="ciencias">Ciencias</option>
+              <option value="letras">Letras</option>
+              <option value="medicas">Médicas</option>
+            </select>
+            <span className="text-[11px] text-text-mute">
+              Los alumnos de esa área verán el recurso. "Todas" lo muestra a todos.
+            </span>
+          </label>
 
           {error && <p className="text-[12px] text-danger">{error}</p>}
 

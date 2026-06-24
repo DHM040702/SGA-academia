@@ -11,6 +11,7 @@ export interface RecursoBiblioteca {
   url: string
   nivel?: string | null
   cursoId?: string | null
+  area?: 'ciencias' | 'letras' | 'medicas' | null
   activo: boolean
   descargas: number
   subidoPorId: string
@@ -46,6 +47,7 @@ export interface FilterBiblioteca {
   q?: string
   tipo?: TipoRecurso
   curso_id?: string
+  area?: 'ciencias' | 'letras' | 'medicas'
 }
 
 export function useBiblioteca(filters: FilterBiblioteca = {}) {
@@ -102,6 +104,7 @@ export function useCreateRecurso() {
       url?: string
       nivel?: string
       curso_id?: string
+      area?: string
       file?: File
     }) => {
       const { file, ...fields } = payload

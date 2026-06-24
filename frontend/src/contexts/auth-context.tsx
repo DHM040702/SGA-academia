@@ -17,6 +17,7 @@ export interface AuthUser {
     apellidos: string
     codigoBarras?: string | null
     aulaId?: string | null
+    aula?: { area?: 'ciencias' | 'letras' | 'medicas' | null } | null
   } | null
   docente?: { id: string; nombre: string; apellidos: string } | null
   apoderado?: { id: string; nombre: string; apellidos: string } | null

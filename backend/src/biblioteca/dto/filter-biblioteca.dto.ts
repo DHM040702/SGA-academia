@@ -1,6 +1,6 @@
 import { ApiPropertyOptional } from '@nestjs/swagger';
 import { IsEnum, IsOptional, IsUUID } from 'class-validator';
-import { TipoRecurso } from '@prisma/client';
+import { TipoRecurso, Area } from '@prisma/client';
 import { PaginationDto } from '../../common/dto/pagination.dto';
 
 export class FilterBibliotecaDto extends PaginationDto {
@@ -8,6 +8,11 @@ export class FilterBibliotecaDto extends PaginationDto {
   @IsOptional()
   @IsEnum(TipoRecurso)
   tipo?: TipoRecurso;
+
+  @ApiPropertyOptional({ enum: Area, description: 'Filtrar por área (incluye recursos para todas las áreas)' })
+  @IsOptional()
+  @IsEnum(Area)
+  area?: Area;
 
   @ApiPropertyOptional({ description: 'UUID del curso', format: 'uuid' })
   @IsOptional()

@@ -1,6 +1,6 @@
 import { ApiProperty, ApiPropertyOptional } from '@nestjs/swagger';
 import { IsEnum, IsOptional, IsString, IsUUID, MinLength } from 'class-validator';
-import { TipoRecurso } from '@prisma/client';
+import { TipoRecurso, Area } from '@prisma/client';
 
 export class CreateRecursoDto {
   @ApiProperty({ description: 'Título del recurso', minLength: 2 })
@@ -34,4 +34,9 @@ export class CreateRecursoDto {
   @IsOptional()
   @IsUUID()
   curso_id?: string;
+
+  @ApiPropertyOptional({ enum: Area, description: 'Área de destino. Si se omite, el recurso es para todas las áreas.' })
+  @IsOptional()
+  @IsEnum(Area)
+  area?: Area;
 }

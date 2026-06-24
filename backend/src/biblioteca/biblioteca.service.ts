@@ -36,18 +36,26 @@ export class BibliotecaService {
   /* ── Listar ───────────────────────────────────────────────────── */
 
   async findAll(dto: FilterBibliotecaDto) {
-    const { page = 1, limit = 20, q, tipo, curso_id } = dto;
+    const { page = 1, limit = 20, q, tipo, curso_id, area } = dto;
     const skip = (page - 1) * limit;
 
     const where: any = { activo: true };
     if (tipo)     where.tipo    = tipo;
     if (curso_id) where.cursoId = curso_id;
+
+    // Se combinan con AND para no pisar el OR del buscador con el del área
+    const and: any[] = [];
+    // Filtro por área: recursos del área pedida + los de "todas" (area null)
+    if (area) and.push({ OR: [{ area }, { area: null }] });
     if (q) {
-      where.OR = [
-        { titulo:      { contains: q, mode: 'insensitive' } },
-        { descripcion: { contains: q, mode: 'insensitive' } },
-      ];
+      and.push({
+        OR: [
+          { titulo:      { contains: q, mode: 'insensitive' } },
+          { descripcion: { contains: q, mode: 'insensitive' } },
+        ],
+      });
     }
+    if (and.length) where.AND = and;
 
     const [items, total] = await Promise.all([
       this.prisma.recursoBiblioteca.findMany({
@@ -107,6 +115,7 @@ export class BibliotecaService {
         url:         urlFinal,
         nivel:       dto.nivel,
         cursoId:     dto.curso_id ?? null,
+        area:        dto.area ?? null,
         subidoPorId,
         activo:      true,
       },

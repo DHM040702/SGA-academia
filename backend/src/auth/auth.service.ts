@@ -151,7 +151,7 @@ export class AuthService {
         nombre:    true,
         apellidos: true,
         dni:       true,
-        alumno:    { select: { id: true, nombre: true, apellidos: true, codigoBarras: true, aulaId: true } },
+        alumno:    { select: { id: true, nombre: true, apellidos: true, codigoBarras: true, aulaId: true, aula: { select: { area: true } } } },
         docente:   { select: { id: true, nombre: true, apellidos: true } },
         apoderado: { select: { id: true, nombre: true, apellidos: true } },
       },
