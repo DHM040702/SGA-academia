@@ -60,7 +60,11 @@ export class DocentesService {
       this.prisma.docente.count({ where }),
     ]);
 
-    return paginate(items, total, page, limit);
+    const firmados = await Promise.all(
+      items.map(async (d) => ({ ...d, fotoUrl: (await this.minio.presign(d.fotoUrl)) ?? d.fotoUrl })),
+    );
+
+    return paginate(firmados, total, page, limit);
   }
 
   async findOne(id: string) {
@@ -86,7 +90,7 @@ export class DocentesService {
     });
 
     if (!docente) throw new NotFoundException('Docente no encontrado');
-    return docente;
+    return { ...docente, fotoUrl: (await this.minio.presign(docente.fotoUrl)) ?? docente.fotoUrl };
   }
 
   async create(dto: CreateDocenteDto) {
@@ -206,7 +210,7 @@ export class DocentesService {
       data:  { fotoUrl: url },
     });
 
-    return { foto_url: url };
+    return { foto_url: (await this.minio.presign(url)) ?? url };
   }
 
   /** Elimina la foto del docente (pone fotoUrl en null) */

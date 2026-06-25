@@ -106,7 +106,7 @@ export class AlumnosService {
       }
     }
 
-    const enriched = items.map((a) => {
+    const enriched = await Promise.all(items.map(async (a) => {
       const diasAlumno = asistPerAlumno[a.id]?.size ?? 0;
       const diasAula   = a.aulaId ? (fechasPorAula[a.aulaId]?.size ?? diasAlumno) : diasAlumno;
       const pct        = diasAula > 0 ? Math.round((diasAlumno / diasAula) * 100) : 100;
@@ -114,10 +114,11 @@ export class AlumnosService {
         ...a,
         nombres:        a.nombre,
         codigo_barra:   a.codigoBarras,
+        fotoUrl:        (await this.minio.presign(a.fotoUrl)) ?? a.fotoUrl,
         asistencia_pct: pct,
         estado:         estadoFromPct(pct),
       };
-    });
+    }));
 
     const filtered = (dto as any).estado
       ? enriched.filter((a) => a.estado === (dto as any).estado)
@@ -192,6 +193,7 @@ export class AlumnosService {
       ...alumno,
       nombres:          alumno.nombre,
       codigo_barra:     alumno.codigoBarras,
+      fotoUrl:          (await this.minio.presign(alumno.fotoUrl)) ?? alumno.fotoUrl,
       fecha_nacimiento: alumno.fechaNacimiento?.toISOString().split('T')[0] ?? null,
       created_at:       alumno.createdAt.toISOString(),
       asistencia_pct:   pct,
@@ -470,7 +472,7 @@ export class AlumnosService {
       data:  { fotoUrl: url },
     });
 
-    return { foto_url: url };
+    return { foto_url: (await this.minio.presign(url)) ?? url };
   }
 
   /** Elimina la foto del alumno (pone fotoUrl en null) */

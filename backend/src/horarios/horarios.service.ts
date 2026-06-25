@@ -5,17 +5,20 @@ import { CreateHorarioDto } from './dto/create-horario.dto';
 import { UpdateHorarioDto } from './dto/update-horario.dto';
 import { FilterHorariosDto } from './dto/filter-horarios.dto';
 
+// Las horas se guardan y leen siempre en UTC, nunca en el timezone local del
+// proceso Node. Así el valor no depende de TZ del servidor y coincide con
+// cómo el frontend extrae la hora (toISOString().slice(11, 16)).
 function timeStringToDate(time: string): Date {
   const [hours, minutes] = time.split(':').map(Number);
-  return new Date(1970, 0, 1, hours, minutes, 0, 0);
+  return new Date(Date.UTC(1970, 0, 1, hours, minutes, 0, 0));
 }
 
 function getTimeMinutes(dt: Date): number {
-  return dt.getHours() * 60 + dt.getMinutes();
+  return dt.getUTCHours() * 60 + dt.getUTCMinutes();
 }
 
 function formatTime(dt: Date): string {
-  return `${dt.getHours().toString().padStart(2, '0')}:${dt.getMinutes().toString().padStart(2, '0')}`;
+  return `${dt.getUTCHours().toString().padStart(2, '0')}:${dt.getUTCMinutes().toString().padStart(2, '0')}`;
 }
 
 @Injectable()

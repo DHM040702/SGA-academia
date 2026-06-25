@@ -5,23 +5,15 @@ import * as Minio from 'minio';
 const FOTOS_BUCKET      = 'sga-fotos';
 const BIBLIOTECA_BUCKET = 'sga-biblioteca';
 
-const publicReadPolicy = (bucket: string) =>
-  JSON.stringify({
-    Version: '2012-10-17',
-    Statement: [
-      {
-        Effect:    'Allow',
-        Principal: { AWS: ['*'] },
-        Action:    ['s3:GetObject'],
-        Resource:  [`arn:aws:s3:::${bucket}/*`],
-      },
-    ],
-  });
+// Validez de las URLs prefirmadas (segundos). 6 horas: suficiente para una
+// sesión de uso; los navegadores reciben una URL nueva en cada carga.
+const PRESIGN_EXPIRY = 6 * 60 * 60;
 
 @Injectable()
 export class MinioService implements OnModuleInit {
   private readonly logger = new Logger(MinioService.name);
-  private client: Minio.Client;
+  private client: Minio.Client;        // conexión interna (subir/borrar)
+  private presignClient: Minio.Client; // firma URLs con el host público
 
   constructor(private readonly config: ConfigService) {}
 
@@ -29,6 +21,19 @@ export class MinioService implements OnModuleInit {
     this.client = new Minio.Client({
       endPoint:  this.config.get<string>('MINIO_ENDPOINT') ?? 'localhost',
       port:      Number(this.config.get<string>('MINIO_PORT') ?? 9000),
+      useSSL:    this.config.get<string>('MINIO_USE_SSL') === 'true',
+      accessKey: this.config.get<string>('MINIO_ACCESS_KEY') ?? '',
+      secretKey: this.config.get<string>('MINIO_SECRET_KEY') ?? '',
+    });
+
+    // Cliente solo para FIRMAR URLs: usa el endpoint PÚBLICO (sga.intranet) que
+    // abrirá el navegador del cliente. La firma es local (no hace red), por lo
+    // que no importa que el backend no resuelva ese host.
+    this.presignClient = new Minio.Client({
+      endPoint:  this.config.get<string>('MINIO_PUBLIC_ENDPOINT')
+              ?? this.config.get<string>('MINIO_ENDPOINT') ?? 'localhost',
+      port:      Number(this.config.get<string>('MINIO_PUBLIC_PORT')
+              ?? this.config.get<string>('MINIO_PORT') ?? 9000),
       useSSL:    this.config.get<string>('MINIO_USE_SSL') === 'true',
       accessKey: this.config.get<string>('MINIO_ACCESS_KEY') ?? '',
       secretKey: this.config.get<string>('MINIO_SECRET_KEY') ?? '',
@@ -46,12 +51,35 @@ export class MinioService implements OnModuleInit {
     try {
       const exists = await this.client.bucketExists(bucket);
       if (!exists) {
+        // Bucket PRIVADO (sin política pública). El acceso es solo vía URLs
+        // prefirmadas que genera el backend.
         await this.client.makeBucket(bucket);
-        await this.client.setBucketPolicy(bucket, publicReadPolicy(bucket));
-        this.logger.log(`Bucket '${bucket}' creado con política pública`);
+        this.logger.log(`Bucket '${bucket}' creado (privado)`);
       }
     } catch (err) {
       this.logger.warn(`No se pudo asegurar el bucket '${bucket}': ${err}`);
+    }
+  }
+
+  /**
+   * Convierte una URL almacenada (http://host/bucket/key) en una URL prefirmada
+   * temporal, válida aunque el bucket sea privado. Devuelve null si no hay URL.
+   */
+  async presign(storedUrl: string | null | undefined): Promise<string | null> {
+    if (!storedUrl) return null;
+    try {
+      const u = new URL(storedUrl);
+      const path = u.pathname.replace(/^\/+/, ''); // "bucket/key..."
+      const slash = path.indexOf('/');
+      if (slash < 0) return storedUrl;
+      const bucket = path.slice(0, slash);
+      // Solo firmamos archivos de NUESTROS buckets; las URLs externas
+      // (YouTube, enlaces, etc.) se devuelven sin tocar.
+      if (bucket !== FOTOS_BUCKET && bucket !== BIBLIOTECA_BUCKET) return storedUrl;
+      const key = decodeURIComponent(path.slice(slash + 1));
+      return await this.presignClient.presignedGetObject(bucket, key, PRESIGN_EXPIRY);
+    } catch {
+      return storedUrl; // si no es una URL parseable, devolver tal cual
     }
   }
 

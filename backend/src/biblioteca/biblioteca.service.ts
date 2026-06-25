@@ -68,7 +68,12 @@ export class BibliotecaService {
       this.prisma.recursoBiblioteca.count({ where }),
     ]);
 
-    return paginate(items, total, page, limit);
+    // Firmar las URLs de archivos en MinIO (los externos quedan igual)
+    const withUrls = await Promise.all(
+      items.map(async (r) => ({ ...r, url: (await this.minio.presign(r.url)) ?? r.url })),
+    );
+
+    return paginate(withUrls, total, page, limit);
   }
 
   /* ── Detalle ──────────────────────────────────────────────────── */
@@ -85,7 +90,7 @@ export class BibliotecaService {
       data: { descargas: { increment: 1 } },
     });
 
-    return recurso;
+    return { ...recurso, url: (await this.minio.presign(recurso.url)) ?? recurso.url };
   }
 
   /* ── Crear (con subida opcional de PDF) ───────────────────────── */
@@ -131,10 +136,10 @@ export class BibliotecaService {
         where: { id: recurso.id },
         data:  { url: urlFinal },
       });
-      return { ...recurso, url: urlFinal };
+      return { ...recurso, url: (await this.minio.presign(urlFinal)) ?? urlFinal };
     }
 
-    return recurso;
+    return { ...recurso, url: (await this.minio.presign(recurso.url)) ?? recurso.url };
   }
 
   /* ── Editar (con auditoría + control de propiedad para docentes) ─ */
@@ -185,7 +190,7 @@ export class BibliotecaService {
       nuevaUrl = await this.minio.subirPdfBiblioteca(id, file.buffer);
     }
 
-    return this.prisma.recursoBiblioteca.update({
+    const actualizado = await this.prisma.recursoBiblioteca.update({
       where: { id },
       data: {
         ...(dto.titulo       !== undefined && { titulo:       dto.titulo }),
@@ -198,6 +203,7 @@ export class BibliotecaService {
       },
       include: INCLUDE,
     });
+    return { ...actualizado, url: (await this.minio.presign(actualizado.url)) ?? actualizado.url };
   }
 
   /* ── Eliminar (soft delete + borrar PDF de MinIO) ─────────────── */

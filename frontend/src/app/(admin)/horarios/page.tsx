@@ -157,7 +157,7 @@ function HorarioModal({ horario, onClose }: ModalProps) {
       style={{ background: 'rgba(0,0,0,0.45)', backdropFilter: 'blur(2px)' }}
       onClick={(e) => { if (e.target === e.currentTarget) onClose() }}
     >
-      <div className="bg-surface border border-border rounded-3 shadow-3 w-full max-w-md p-6 flex flex-col gap-4">
+      <div className="bg-surface border border-border rounded-3 shadow-3 w-full max-w-md max-h-[90vh] overflow-y-auto p-6 flex flex-col gap-4">
         <div className="flex items-center justify-between">
           <div>
             <h2 className="text-[15px] font-semibold">{isEditing ? 'Editar clase' : 'Asignar clase'}</h2>
@@ -481,7 +481,7 @@ function ExportModal({ horarios, aulas, onClose }: ExportModalProps) {
       style={{ background: 'rgba(0,0,0,0.45)', backdropFilter: 'blur(2px)' }}
       onClick={(e) => { if (e.target === e.currentTarget) onClose() }}
     >
-      <div className="bg-surface border border-border rounded-3 shadow-3 w-full max-w-md p-6 flex flex-col gap-5">
+      <div className="bg-surface border border-border rounded-3 shadow-3 w-full max-w-md max-h-[90vh] overflow-y-auto p-6 flex flex-col gap-5">
         <div className="flex items-center justify-between">
           <h2 className="text-[15px] font-semibold">Exportar horario</h2>
           <button onClick={onClose} className="text-text-mute hover:text-text border-none bg-transparent cursor-pointer p-1 rounded-2 hover:bg-surface2"><X size={16} /></button>
