@@ -111,3 +111,53 @@ h1, h2, h3, h4 {
     min-width: 100%;
   }
 }
+
+/* ─── Fallback para navegadores SIN soporte de oklch() (Chrome < 111, etc.) ───
+   Los colores del tema (@theme, arriba) están en oklch(); los navegadores que no
+   lo entienden descartan esas variables y los botones/fondos quedan sin color
+   (invisibles). Este bloque SOLO se activa cuando oklch NO está soportado: en ese
+   caso redefine las MISMAS variables con equivalentes en hex, de modo que las
+   utilidades de Tailwind (bg-primary, text-*, border-*, etc.) vuelvan a tener color.
+
+   Importante:
+   - En navegadores modernos (con oklch) este bloque se IGNORA por completo → las
+     vistas actuales no cambian en absoluto.
+   - No se modifica ningún componente: el arreglo es global vía las variables.
+   - Los colores hex son aproximaciones del diseño (no pixel-perfect); el objetivo
+     es que los elementos sean visibles y usables en navegadores antiguos.        */
+@supports not (color: oklch(0% 0 0)) {
+  :root {
+    /* Brand */
+    --color-primary:       #2d426d;
+    --color-primary-dark:  #22304f;
+    --color-primary-light: #e9eef7;
+    --color-primary-fg:    #ffffff;
+
+    /* Surfaces */
+    --color-bg:       #fcfbf8;
+    --color-surface:  #ffffff;
+    --color-surface2: #f4f3ef;
+    --color-surface3: #eeebe5;
+
+    /* Borders */
+    --color-border:   #e2dfd8;
+    --color-border-s: #eae7e1;
+    --color-divider:  #dcd8d0;
+
+    /* Text */
+    --color-text:      #29251f;
+    --color-text-mute: #6a655d;
+    --color-text-soft: #8b867e;
+    --color-text-inv:  #f6f5f1;
+
+    /* Status */
+    --color-success:       #338a5a;
+    --color-success-light: #e2f2e6;
+    --color-warning:       #c89331;
+    --color-warning-light: #f7ecd5;
+    --color-danger:        #c03f2d;
+    --color-danger-light:  #f6e1db;
+    --color-info:          #3b72b5;
+    --color-info-light:    #dde9f5;
+  }
+}
