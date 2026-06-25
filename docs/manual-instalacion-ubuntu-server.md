@@ -523,7 +523,7 @@ MINIO_PUBLIC_PORT=9000
 # General
 PORT=3001
 NODE_ENV=production
-FRONTEND_URL=http://localhost:3000,http://192.168.137.1:3000,http://sga.intranet:3000,http://www.sga.intranet:3000
+FRONTEND_URL=http://localhost:3000,http://192.168.137.1:3000,http://sga.intranet:3000,http://www.sga.intranet:3000,http://sga.intranet,http://www.sga.intranet
 BACKEND_URL=http://192.168.137.1:3001
 ```
 
@@ -713,6 +713,380 @@ echo "Listo."
 ```bash
 chmod +x /home/sgaadmin/reiniciar-sga.sh
 ```
+
+### 6.6 Acceso por el nombre `sga.intranet` (sin puerto) en la red cableada
+
+Por defecto el sistema solo es accesible por `http://IP_DEL_SERVIDOR:3000`. Para
+entrar escribiendo simplemente `http://sga.intranet` (sin puerto) en la red
+**cableada** hacen falta **dos piezas**, ambas en el servidor:
+
+1. **Que algún DNS resuelva `sga.intranet` → IP del servidor.** El `dnsmasq` de la
+   sección 2.6 solo sirve ese nombre en el **hotspot WiFi** (`interface=wlo1`), no
+   en la red cableada. En cableado los clientes piden DNS al router de la red, que
+   no conoce `sga.intranet`.
+2. **Que algo escuche en el puerto 80.** La app corre en el `:3000`; el navegador,
+   al abrir `http://sga.intranet`, va al puerto 80. Se resuelve con un reverse
+   proxy (nginx) que reenvía 80 → 3000.
+
+Sigue los pasos **6.6.1 → 6.6.6 en orden**. Cada paso incluye cómo verificar que
+quedó bien antes de pasar al siguiente.
+
+---
+
+#### 6.6.1 Averiguar los datos reales de la red
+
+No asumas nombres ni IPs: obténlos del propio servidor.
+
+```bash
+# Nombre de la interfaz cableada y su estado (busca la que diga "state UP")
+ip -br link | grep -v lo
+# Ejemplo de salida:  enp0s25  UP  e8:6a:64:11:22:33
+
+# IP actual de esa interfaz (cámbiala por el nombre real si no es enp0s25)
+ip -4 addr show enp0s25 | grep inet
+# Ejemplo:  inet 192.168.1.50/24 ...   → IP = 192.168.1.50, máscara /24
+
+# Dirección MAC (la necesitas si reservas IP por DHCP en el router)
+ip link show enp0s25 | grep link/ether
+# Ejemplo:  link/ether e8:6a:64:11:22:33
+
+# Gateway (router) de la red cableada
+ip route | grep default
+# Ejemplo:  default via 192.168.1.1 dev enp0s25   → gateway = 192.168.1.1
+```
+
+Anota estos 4 valores; se usan en los pasos siguientes:
+
+| Dato | Ejemplo | El tuyo |
+|---|---|---|
+| Interfaz cableada | `enp0s25` | |
+| IP del servidor (`IP_SERVIDOR`) | `192.168.1.50` | |
+| MAC | `e8:6a:64:11:22:33` | |
+| Gateway / router | `192.168.1.1` | |
+
+> En el resto de la sección, donde diga `IP_SERVIDOR`, `GATEWAY` o `enp0s25`,
+> reemplázalos por **tus** valores reales de esta tabla.
+
+---
+
+#### 6.6.2 Fijar la IP del servidor (que no cambie)
+
+El nombre `sga.intranet` apuntará a una IP fija; si la IP del servidor cambia, deja
+de funcionar. Elige **una** de las dos formas:
+
+**Forma A — Reserva DHCP en el router (preferida).**
+En la administración del router: sección *DHCP / LAN / Address Reservation*. Asociar
+la **MAC** del servidor a la `IP_SERVIDOR` deseada. Reiniciar la interfaz del
+servidor para tomarla:
+```bash
+sudo netplan apply
+ip -4 addr show enp0s25 | grep inet   # confirmar que quedó la IP reservada
+```
+Ventaja: no hay riesgo de chocar con el rango DHCP del router.
+
+**Forma B — IP estática en netplan (si no puedes tocar el router).**
+Elige una IP **fuera del rango que reparte el DHCP** del router (pregunta al admin
+de red o revisa la config del router; típicamente el DHCP usa `.100`–`.200`, así que
+una IP baja como `.50` suele estar libre).
+
+```bash
+sudo nano /etc/netplan/01-network-config.yaml
+```
+```yaml
+network:
+  version: 2
+  ethernets:
+    enp0s25:
+      dhcp4: false
+      addresses: [192.168.1.50/24]      # IP_SERVIDOR/máscara  (ajustar)
+      routes:
+        - to: default
+          via: 192.168.1.1              # GATEWAY  (ajustar)
+      nameservers:
+        addresses: [8.8.8.8, 1.1.1.1]
+```
+```bash
+sudo chmod 600 /etc/netplan/01-network-config.yaml
+sudo netplan apply
+ping -c 3 google.com                    # confirmar que el servidor sigue con internet
+```
+
+> Si tras `netplan apply` se pierde el internet, revisar que `GATEWAY` y la máscara
+> (`/24`) sean los correctos de la LAN. Para volver atrás: poner `dhcp4: true` y quitar
+> `addresses`/`routes`, y `sudo netplan apply`.
+
+---
+
+#### 6.6.3 Hacer que `sga.intranet` resuelva en los clientes — elegir UNA opción
+
+**Opción 1 — Entrada DNS en el router (la más limpia, automática para todos).**
+En la administración del router, buscar *DNS local*, *Static DNS*, *Host names*,
+*DNS Host Mapping* o similar (varía según marca: en TP-Link suele estar en
+*Advanced → Network → DHCP Server → DNS*, en MikroTik en *IP → DNS → Static*).
+Agregar:
+```
+sga.intranet      → IP_SERVIDOR
+www.sga.intranet  → IP_SERVIDOR
+```
+No requiere tocar nada en cada cliente. Si el router no tiene esta función, usar la
+Opción 2 o 3.
+
+**Opción 2 — El servidor como DNS de la red (vía dnsmasq, requiere control del DHCP).**
+Hacer que `dnsmasq` (ya instalado en la sección 2.3) escuche también en la interfaz
+cableada y resuelva el nombre. Editar la config:
+```bash
+sudo nano /etc/dnsmasq.conf
+```
+Añadir al final (NO borrar lo del hotspot si lo hubiera):
+```ini
+# --- Resolución de sga.intranet en la red cableada ---
+interface=enp0s25
+listen-address=IP_SERVIDOR
+bind-interfaces
+address=/sga.intranet/IP_SERVIDOR
+address=/www.sga.intranet/IP_SERVIDOR
+server=8.8.8.8
+server=1.1.1.1
+```
+```bash
+sudo systemctl restart dnsmasq
+sudo systemctl status dnsmasq        # debe decir: active (running)
+# Si falla por el puerto 53 ya ocupado por systemd-resolved:
+sudo ss -tulpn | grep :53
+```
+> ⚠️ Si `dnsmasq` no arranca por conflicto en el puerto 53 con `systemd-resolved`,
+> desactivar el stub local:
+> ```bash
+> sudo nano /etc/systemd/resolved.conf      # poner: DNSStubListener=no
+> sudo systemctl restart systemd-resolved
+> sudo systemctl restart dnsmasq
+> ```
+
+Luego, **apuntar los clientes a `IP_SERVIDOR` como servidor DNS**: en el DHCP del
+router, fijar el DNS primario = `IP_SERVIDOR` (opción 6 de DHCP). Sin este paso los
+clientes seguirán usando el DNS del router y la Opción 2 no surte efecto.
+
+**Opción 3 — Archivo `hosts` por cliente (rápido, para pocas máquinas fijas).**
+No requiere router ni DNS, pero hay que repetirlo en cada equipo.
+
+- **Windows** (abrir el Bloc de notas **como administrador** → Archivo → Abrir):
+  `C:\Windows\System32\drivers\etc\hosts` y agregar al final:
+  ```
+  IP_SERVIDOR    sga.intranet www.sga.intranet
+  ```
+  Guardar. Luego en PowerShell: `ipconfig /flushdns`.
+
+- **Linux / macOS:** editar `/etc/hosts` (con `sudo`) y agregar la misma línea.
+
+**Verificar la resolución (desde un cliente, no desde el servidor):**
+```powershell
+nslookup sga.intranet
+# Esperado:  Address: IP_SERVIDOR   (la IP fija del servidor en la red cableada)
+ping sga.intranet
+# Esperado:  responde desde IP_SERVIDOR
+```
+Si `nslookup` devuelve otra IP o "no encontrado", el cliente aún no usa el DNS
+correcto (revisar la opción elegida) o falta `ipconfig /flushdns`.
+
+---
+
+#### 6.6.4 Instalar y configurar nginx (puerto 80 → 3000)
+
+```bash
+sudo apt update
+sudo apt install -y nginx
+sudo nano /etc/nginx/sites-available/sga
+```
+
+Pegar la configuración completa:
+
+```nginx
+server {
+    listen 80;
+    server_name sga.intranet www.sga.intranet;
+
+    # Permite subir archivos grandes (biblioteca limita PDFs a 50 MB)
+    client_max_body_size 60M;
+
+    # Aplicación (frontend Next.js, que a su vez proxea /api al backend)
+    location / {
+        proxy_pass http://127.0.0.1:3000;
+        proxy_http_version 1.1;
+        proxy_set_header Host              $host;
+        proxy_set_header X-Real-IP         $remote_addr;
+        proxy_set_header X-Forwarded-For   $proxy_add_x_forwarded_for;
+        proxy_set_header X-Forwarded-Proto $scheme;
+        proxy_set_header Upgrade           $http_upgrade;
+        proxy_set_header Connection        "upgrade";
+        proxy_read_timeout 300s;
+    }
+}
+```
+
+Activar el sitio y descartar el sitio por defecto de nginx:
+
+```bash
+sudo ln -s /etc/nginx/sites-available/sga /etc/nginx/sites-enabled/sga
+sudo rm -f /etc/nginx/sites-enabled/default
+sudo nginx -t                 # DEBE decir: syntax is ok / test is successful
+sudo systemctl restart nginx
+sudo systemctl enable nginx   # que arranque solo al reiniciar el servidor
+```
+
+**Verificar (en el propio servidor):**
+```bash
+curl -I -H "Host: sga.intranet" http://127.0.0.1
+# Esperado: HTTP/1.1 200 OK  (o 307/308 de Next, también es válido)
+```
+
+---
+
+#### 6.6.5 Accesibilidad de puertos (sin firewall ufw)
+
+> ⚠️ **En este despliegue NO se usa `ufw`.** Como PostgreSQL, Redis y **MinIO corren
+> en Docker**, y Docker inserta sus propias reglas de iptables **saltándose** la
+> cadena `INPUT` que controla `ufw`, activar `ufw` genera un conflicto conocido que
+> corta el acceso (SSH/app) o deja inconsistente el filtrado. Al estar el sistema en
+> una **LAN cableada institucional aislada** (sin exposición directa a internet),
+> operar sin `ufw` es aceptable. Por lo tanto **no hay que "abrir" puertos**: con
+> `ufw` inactivo, nada los está bloqueando.
+
+En vez de abrir puertos, solo hay que **verificar que son alcanzables** desde un
+cliente cableado:
+
+```powershell
+Test-NetConnection sga.intranet -Port 80      # TcpTestSucceeded: True  (reverse proxy)
+Test-NetConnection sga.intranet -Port 9000    # TcpTestSucceeded: True  (MinIO)
+```
+
+Si ambos dan `True`, los puertos están accesibles y puedes continuar.
+
+> **Sobre MinIO y el puerto 9000:** las fotos de alumnos/docentes y los PDFs de
+> biblioteca se cargan con **URLs prefirmadas** que el backend genera apuntando a
+> `http://sga.intranet:9000/...` (variables `MINIO_PUBLIC_ENDPOINT=sga.intranet` y
+> `MINIO_PUBLIC_PORT=9000`). El usuario **no escribe** ese `:9000` — va embebido en
+> las etiquetas `<img>` y enlaces de descarga, de forma transparente. La barra de
+> direcciones del navegador sigue mostrando `sga.intranet` sin puerto.
+>
+> *(Opcional avanzado)* Si se quiere que **ni siquiera** las imágenes usen `:9000`,
+> ver 6.6.7.
+
+> **Endurecimiento futuro (opcional):** si más adelante se quiere un firewall de host,
+> NO usar `ufw` con la config por defecto. La vía compatible con Docker es el proyecto
+> `ufw-docker` (reglas en `/etc/ufw/after.rules`) o gestionar las reglas en la cadena
+> `DOCKER-USER` de iptables. Debe probarse con una sesión SSH abierta de respaldo.
+
+---
+
+#### 6.6.6 Verificación final y CORS
+
+El `FRONTEND_URL` del backend (sección 5.2) ya incluye `http://sga.intranet` (sin
+puerto). Si se editó, reiniciar el backend para que tome el nuevo origen:
+```bash
+sudo systemctl restart sga-backend
+```
+
+Desde un **cliente cableado**, comprobar en orden:
+```powershell
+nslookup sga.intranet                               # → IP_SERVIDOR
+Test-NetConnection sga.intranet -Port 80            # → TcpTestSucceeded: True
+```
+Luego abrir en el navegador `http://sga.intranet` e iniciar sesión. Deben verse
+también las **fotos** (confirma que MinIO/9000 es accesible).
+
+---
+
+#### 6.6.7 Solución de problemas
+
+| Síntoma | Causa probable | Solución |
+|---|---|---|
+| `nslookup sga.intranet` no resuelve | El cliente usa el DNS del router, no el correcto | Revisar la opción de 6.6.3; en Windows `ipconfig /flushdns`. Con Opción 2, confirmar que el DHCP entrega `IP_SERVIDOR` como DNS |
+| Abre por IP:3000 pero no por `sga.intranet` | DNS sí resuelve, pero nginx no está sirviendo | `sudo nginx -t`, `sudo systemctl status nginx`; `curl -I -H "Host: sga.intranet" http://127.0.0.1` |
+| **502 Bad Gateway** | nginx levantó pero el frontend (3000) no responde | `sudo systemctl status sga-frontend`; `curl -I http://127.0.0.1:3000` |
+| Se ve la página "Welcome to nginx" | No se borró el sitio por defecto | `sudo rm -f /etc/nginx/sites-enabled/default && sudo systemctl restart nginx` |
+| Carga la app pero **no las fotos** | El nombre no resuelve para MinIO, o el contenedor de MinIO está caído | Verificar `MINIO_PUBLIC_ENDPOINT=sga.intranet`; `docker ps` (que MinIO esté `Up`); `Test-NetConnection sga.intranet -Port 9000` |
+| Login falla / "no autorizado" tras entrar | Origen no permitido en CORS o cookie sobre HTTP | Confirmar `http://sga.intranet` en `FRONTEND_URL` y reiniciar backend; mantener `COOKIE_SECURE=false` mientras no haya HTTPS (ver punto de HTTPS pendiente) |
+| Internet del servidor se cae tras IP estática | `GATEWAY`/máscara incorrectos en netplan | Corregir `via:` y `/24`, o volver a `dhcp4: true` temporalmente |
+
+**(Opcional avanzado) Servir también MinIO por el puerto 80 — sin `:9000`.**
+Si se quiere que las imágenes carguen desde `http://sga.intranet/...` (sin puerto),
+enrutar también los buckets en nginx y cambiar el puerto público de MinIO:
+
+1. Añadir dentro del mismo bloque `server { ... }` de 6.6.4, **antes** de `location /`:
+   ```nginx
+   # Archivos de MinIO (buckets sga-fotos y sga-biblioteca) por el puerto 80
+   location ~ ^/(sga-fotos|sga-biblioteca)/ {
+       proxy_pass http://127.0.0.1:9000;
+       proxy_http_version 1.1;
+       proxy_set_header Host $host;     # debe coincidir con el host firmado
+   }
+   ```
+2. En el `.env` del backend, cambiar:
+   ```env
+   MINIO_PUBLIC_PORT=80
+   ```
+3. `sudo nginx -t && sudo systemctl restart nginx && sudo systemctl restart sga-backend`.
+   Con esto las URLs firmadas pasan a ser `http://sga.intranet/sga-fotos/...` y ya
+   **no hace falta el puerto 9000**. El `Host` que reenvía nginx debe ser exactamente
+   `sga.intranet` para que la firma siga validando.
+
+---
+
+### 6.6.8 Caso "sin acceso al router y sin poder configurar los clientes" (celulares)
+
+Si los dispositivos (sobre todo **celulares**) se conectan al **WiFi del edificio**
+(no al hotspot del servidor) y **no hay acceso al router** ni se puede tocar cada
+cliente, hay una limitación de fondo que conviene tener clara:
+
+> **Un nombre DNS propio (`sga.intranet`) NO se puede imponer** en clientes que no
+> controlas con un router que no controlas: cada cliente usa como DNS el que le da el
+> router por DHCP, y el servidor no está en la ruta del tráfico DNS (no es el gateway),
+> así que no puede interceptarlo. mDNS (`.local`) es la única tecnología de cero-config,
+> pero **en Android es poco fiable**.
+
+Solución por capas que **sí** funciona sin tocar router ni clientes:
+
+**1. IP fija del servidor (imprescindible).** Todo dependerá de que la IP no cambie.
+Sin acceso al router no se puede reservar por DHCP, así que se fija en netplan
+(ver 6.6.2 Forma B). Elegir una IP fuera del rango DHCP y comprobar que esté libre
+**antes** (desde otro equipo, con el servidor apagado o con esa IP aún sin asignar):
+```bash
+ping 10.33.1.19      # NO debe responder nadie → IP libre
+```
+
+**2. Acceso universal por IP en el puerto 80 (funciona en TODO dispositivo).**
+Como nginx ya escucha en el puerto 80 (6.6.4), la dirección:
+```
+http://IP_SERVIDOR        (ej. http://10.33.1.19)
+```
+abre el sistema en cualquier celular o PC **sin DNS y sin configurar nada** (es una
+IP, no un nombre). Para los pocos equipos, crear un **acceso directo / marcador en la
+pantalla de inicio** del celular una sola vez. Es la vía más robusta en este escenario.
+
+> Añadir la IP a `FRONTEND_URL` del backend para CORS, p. ej. `http://10.33.1.19`,
+> y reiniciar el backend.
+
+**3. Nombre amigable opcional con mDNS (Avahi).** Da un nombre `*.local` que resuelve
+**sin router ni configurar el cliente**, nativo en **iPhone, Mac y Windows 10+**
+(en Android, solo si la versión lo soporta):
+```bash
+sudo apt install -y avahi-daemon
+sudo systemctl enable --now avahi-daemon
+hostname                      # ej. "sga-server" → el nombre será sga-server.local
+```
+Luego, desde un cliente compatible: `http://sga-server.local`. nginx ya responde a
+cualquier `Host`, así que funciona sin cambios adicionales. (Opcional: para publicar
+un alias extra como `sga.local`, usar `avahi-publish -a -R sga.local IP_SERVIDOR` en
+un servicio systemd.)
+
+**4. `sga.intranet` queda para los PCs de administración.** En los pocos equipos fijos
+(recepción, secretaría) donde sí se puede tocar el `hosts` o el DNS (6.6.3), se sigue
+usando `http://sga.intranet`. En el resto, la IP del punto 2 o el `.local` del punto 3.
+
+> **Resumen de qué usar en cada dispositivo:**
+> - Celular Android cualquiera → `http://IP_SERVIDOR` (marcador).
+> - iPhone / Mac / Windows → `http://sga-server.local` o la IP.
+> - PC de administración → `http://sga.intranet` (con `hosts`/DNS) o la IP.
 
 ---
 
@@ -1084,12 +1458,18 @@ Test-NetConnection -ComputerName sga.intranet -Port 3001
 
 Abrir el navegador en `http://sga.intranet:3000` e iniciar sesión.
 
+> Si se configuró el reverse proxy de la sección 6.6, también funciona
+> `http://sga.intranet` (sin puerto). En la red **cableada**, `nslookup sga.intranet`
+> debe devolver la IP fija del servidor en esa red (no `192.168.137.1`, que es la del
+> hotspot WiFi).
+
 ---
 
 ## Resumen de servicios y puertos
 
 | Servicio | Puerto | Descripción |
 |---|---|---|
+| nginx (reverse proxy) | 80 | `http://sga.intranet` sin puerto → reenvía al 3000 (sección 6.6) |
 | Next.js Frontend | 3000 | Interfaz web del sistema |
 | NestJS Backend | 3001 | API REST |
 | PostgreSQL | 5433 | Base de datos |
@@ -1102,6 +1482,6 @@ Abrir el navegador en `http://sga.intranet:3000` e iniciar sesión.
 
 | Servicio | URL | Credenciales |
 |---|---|---|
-| Sistema SGA | http://sga.intranet:3000 | credenciales del sistema |
+| Sistema SGA | http://sga.intranet (o :3000) | credenciales del sistema |
 | MinIO Consola | http://sga.intranet:9002 | minio_admin / minio_pass_dev |
 | SSH | ssh sgaadmin@sga.intranet | usuario del servidor |

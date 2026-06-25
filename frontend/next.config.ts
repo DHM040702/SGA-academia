@@ -6,11 +6,13 @@ const nextConfig: NextConfig = {
   allowedDevOrigins: ['172.29.172.7', '192.168.137.1', 'sga.intranet'],
 
   eslint: {
+    // TODO: activar (poner en false) una vez se corrijan los errores de lint.
     ignoreDuringBuilds: true,
   },
 
   typescript: {
-    ignoreBuildErrors: true,
+    // El build falla si hay errores de tipos — evita que bugs lleguen a producción.
+    ignoreBuildErrors: false,
   },
 
   async rewrites() {
