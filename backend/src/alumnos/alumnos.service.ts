@@ -50,8 +50,22 @@ export class AlumnosService {
         }
       : {};
 
-    const aulaWhere  = aula_id  ? { aulaId: aula_id } : {};
-    const cicloWhere = ciclo_id ? { aula: { cicloId: ciclo_id } } : {};
+    const aulaWhere = aula_id ? { aulaId: aula_id } : {};
+
+    // Scoping por ciclo: si se pide un ciclo explícito, ese; si no se pide ni
+    // ciclo ni aula, se limita al SEMESTRE ACTIVO (los alumnos de semestres
+    // cerrados no deben aparecer en el activo). Solo si no hay ciclo activo se
+    // muestran todos (estado legado / sin semestre en curso).
+    let cicloWhere: any = {};
+    if (ciclo_id) {
+      cicloWhere = { aula: { cicloId: ciclo_id } };
+    } else if (!aula_id) {
+      const activo = await this.prisma.ciclo.findFirst({
+        where: { activo: true },
+        select: { id: true },
+      });
+      if (activo) cicloWhere = { aula: { cicloId: activo.id } };
+    }
 
     const where = {
       deletedAt: null,

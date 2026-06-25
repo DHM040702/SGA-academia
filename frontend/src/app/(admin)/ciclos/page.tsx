@@ -13,7 +13,7 @@ import { Dot } from '@/components/ui/dot'
 import { Card } from '@/components/ui/card'
 import { Btn } from '@/components/ui/btn'
 import { PageHeader } from '@/components/layout/page-header'
-import { Plus, Eye, Calendar, MoreHorizontal, Edit, Trash, X, Check } from '@/components/icons'
+import { Plus, Eye, Calendar, MoreHorizontal, Edit, Trash, X, Check, ChevD } from '@/components/icons'
 
 /* ── Constantes ─────────────────────────────────────────────────── */
 const TURNO_OPTS = [
@@ -388,6 +388,14 @@ export default function CiclosPage() {
 
   const otrosCiclos = ciclos.filter((c) => !c.activo)
 
+  // Agrupar ciclos por año para el selector (más recientes primero, ya que
+  // useCiclos los devuelve ordenados por fechaInicio desc).
+  const ciclosPorAnio = ciclos.reduce<Record<string, Ciclo[]>>((acc, c) => {
+    const anio = String(c.fechaInicio).slice(0, 4) || 's/f'
+    ;(acc[anio] ??= []).push(c)
+    return acc
+  }, {})
+
   return (
     <>
       {/* ── Modales ── */}
@@ -436,27 +444,46 @@ export default function CiclosPage() {
           <div className="text-center py-10 text-text-mute text-[13px]">Cargando…</div>
         )}
 
-        {/* ── Selector de ciclo (si hay más de uno) ── */}
+        {/* ── Selector de ciclo (desplegable, escalable a muchos semestres) ── */}
         {ciclos.length > 1 && (
-          <div className="flex gap-1 flex-wrap">
-            {ciclos.map((c) => {
-              const isActive = c.id === (cicloSelected?.id ?? '')
-              return (
-                <button
-                  key={c.id}
-                  onClick={() => setSelectedId(c.id)}
-                  className="flex items-center gap-1.5 px-3 py-1.5 rounded-full text-[12.5px] font-medium transition-colors border-none cursor-pointer"
-                  style={{
-                    background: isActive ? 'var(--color-primary-l)' : 'var(--color-surface-2)',
-                    color:      isActive ? 'var(--color-primary)'   : 'var(--color-text-mute)',
-                    fontWeight: isActive ? 600 : 500,
-                  }}
+          <div className="flex items-center gap-3 flex-wrap">
+            <div className="flex items-center gap-2">
+              <span className="text-[12.5px] text-text-mute select-none">Ver ciclo</span>
+              <div className="relative">
+                <select
+                  value={cicloSelected?.id ?? ''}
+                  onChange={(e) => setSelectedId(e.target.value)}
+                  className="appearance-none cursor-pointer text-[12.5px] font-semibold pl-3 pr-8 py-1.5 rounded-2 border border-border bg-surface text-text hover:border-primary/40 focus:outline-none focus:border-primary focus:ring-1 focus:ring-primary/20 transition-colors"
                 >
-                  {c.activo && <Dot tone="success" size={6} />}
-                  Ciclo {c.nombre}
-                </button>
-              )
-            })}
+                  {Object.entries(ciclosPorAnio).map(([anio, lista]) => (
+                    <optgroup key={anio} label={anio}>
+                      {lista.map((c) => (
+                        <option key={c.id} value={c.id}>
+                          Ciclo {c.nombre}{c.activo ? '  ·  activo' : ''}
+                        </option>
+                      ))}
+                    </optgroup>
+                  ))}
+                </select>
+                <span className="pointer-events-none absolute right-2.5 top-1/2 -translate-y-1/2 text-text-mute">
+                  <ChevD size={12} />
+                </span>
+              </div>
+            </div>
+
+            {/* Atajo: volver al ciclo activo cuando estás viendo otro */}
+            {cicloActivo && cicloSelected?.id !== cicloActivo.id && (
+              <button
+                onClick={() => setSelectedId(cicloActivo.id)}
+                className="inline-flex items-center gap-1.5 text-[12px] font-medium text-primary hover:underline cursor-pointer bg-transparent border-none"
+              >
+                <Dot tone="success" size={6} /> Ir al ciclo activo
+              </button>
+            )}
+
+            <span className="text-[12px] text-text-mute ml-auto">
+              {ciclos.length} ciclos en total
+            </span>
           </div>
         )}
 

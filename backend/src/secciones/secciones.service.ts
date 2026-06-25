@@ -8,8 +8,21 @@ export class SeccionesService {
   constructor(private prisma: PrismaService) {}
 
   async findAll(ciclo_id?: string) {
+    // Si no se pide un ciclo explícito, limitar al SEMESTRE ACTIVO. Así las aulas
+    // de semestres cerrados no aparecen en los listados/desplegables del activo
+    // (horarios, asistencia, comunicados…). Solo si no hay ciclo activo se
+    // muestran todas (estado legado).
+    let cicloId = ciclo_id;
+    if (!cicloId) {
+      const activo = await this.prisma.ciclo.findFirst({
+        where: { activo: true },
+        select: { id: true },
+      });
+      cicloId = activo?.id;
+    }
+
     return this.prisma.aula.findMany({
-      where: ciclo_id ? { cicloId: ciclo_id } : undefined,
+      where: cicloId ? { cicloId } : undefined,
       orderBy: [{ ciclo: { fechaInicio: 'desc' } }, { area: 'asc' }, { turno: 'asc' }, { nombre: 'asc' }],
       include: {
         ciclo: { select: { id: true, nombre: true, activo: true } },

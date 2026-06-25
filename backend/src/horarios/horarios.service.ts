@@ -26,7 +26,7 @@ export class HorariosService {
   constructor(private prisma: PrismaService) {}
 
   async findAll(dto: FilterHorariosDto) {
-    const { page = 1, limit = 50, aula_id, docente_id, dia_semana, publicado } = dto;
+    const { page = 1, limit = 50, ciclo_id, aula_id, docente_id, dia_semana, publicado } = dto;
     const skip = (page - 1) * limit;
 
     const where: any = {};
@@ -34,6 +34,19 @@ export class HorariosService {
     if (docente_id)          where.docenteId = docente_id;
     if (dia_semana !== undefined) where.diaSemana = dia_semana;
     if (publicado !== undefined)  where.publicado  = publicado;
+
+    // Scoping por ciclo: explícito si se pide; si no se pide ciclo ni aula
+    // concreta, se limita al SEMESTRE ACTIVO (los horarios de semestres cerrados
+    // no deben aparecer en el activo).
+    if (ciclo_id) {
+      where.aula = { cicloId: ciclo_id };
+    } else if (!aula_id) {
+      const activo = await this.prisma.ciclo.findFirst({
+        where: { activo: true },
+        select: { id: true },
+      });
+      if (activo) where.aula = { cicloId: activo.id };
+    }
 
     const [items, total] = await Promise.all([
       this.prisma.horario.findMany({
@@ -142,7 +155,15 @@ export class HorariosService {
   }
 
   async findConflictos() {
+    // Solo dentro del semestre activo: no tiene sentido reportar conflictos
+    // entre horarios de semestres cerrados.
+    const activo = await this.prisma.ciclo.findFirst({
+      where: { activo: true },
+      select: { id: true },
+    });
+
     const todos = await this.prisma.horario.findMany({
+      where: activo ? { aula: { cicloId: activo.id } } : undefined,
       include: {
         docente: { select: { id: true, nombre: true, apellidos: true } },
         curso:   { select: { id: true, nombre: true } },
@@ -176,7 +197,16 @@ export class HorariosService {
     const finNuevo    = getTimeMinutes(timeStringToDate(dto.hora_fin));
     if (inicioNuevo >= finNuevo) throw new BadRequestException('hora_inicio debe ser anterior a hora_fin');
 
+    // Solo comparar dentro del MISMO ciclo que el aula del horario nuevo. Así un
+    // docente que dicta a la misma hora en el semestre nuevo no choca falsamente
+    // con su horario de un semestre cerrado.
+    const aulaNueva = await this.prisma.aula.findUnique({
+      where: { id: dto.aula_id },
+      select: { cicloId: true },
+    });
+
     const where: any = { diaSemana: dto.dia_semana };
+    if (aulaNueva) where.aula = { cicloId: aulaNueva.cicloId };
     if (excludeId) where.NOT = { id: excludeId };
 
     const horarios = await this.prisma.horario.findMany({

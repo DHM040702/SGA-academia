@@ -4,6 +4,11 @@ import { Transform, Type } from 'class-transformer';
 import { PaginationDto } from '../../common/dto/pagination.dto';
 
 export class FilterHorariosDto extends PaginationDto {
+  @ApiPropertyOptional({ description: 'Filtrar por ciclo (UUID). Por defecto, el ciclo activo.' })
+  @IsOptional()
+  @IsUUID()
+  ciclo_id?: string;
+
   @ApiPropertyOptional({ description: 'Filtrar por aula (UUID)' })
   @IsOptional()
   @IsUUID()

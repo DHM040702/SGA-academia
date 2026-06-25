@@ -170,6 +170,13 @@ export default function AlumnosPage() {
   const { data: ciclos = [] } = useCiclos()
   const { data: secciones = [] } = useAulas(cicloId || undefined)
 
+  /* ── Por defecto, mostrar el semestre ACTIVO (no todos los ciclos) ── */
+  React.useEffect(() => {
+    if (cicloId) return
+    const activo = ciclos.find((c) => c.activo)
+    if (activo) setCicloId(activo.id)
+  }, [ciclos, cicloId])
+
   const total = data?.total ?? 0
   const totalPages = data?.totalPages ?? 1
   const rawItems = data?.data ?? []
