@@ -326,7 +326,7 @@ function AlumnoInicio({ user }: { user: ReturnType<typeof useAuth>['user'] }) {
           <Card>
             <div
               className="rounded-t-3 px-[18px] pt-4 pb-[14px] relative overflow-hidden"
-              style={{ background: 'linear-gradient(160deg, var(--color-primary) 0%, oklch(0.28 0.10 255) 100%)', color: '#fff' }}
+              style={{ backgroundColor: '#2d426d', background: 'linear-gradient(160deg, var(--color-primary) 0%, oklch(0.28 0.10 255) 100%)', color: '#fff' }}
             >
               <svg
                 width="200" height="120" viewBox="0 0 200 120"

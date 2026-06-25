@@ -18,10 +18,11 @@ const AREA_LABEL: Record<string, string> = {
   letras:   'Área B — Letras',
   medicas:  'Área C — Médicas',
 }
+// Variables CSS con fallback hex solo para navegadores sin oklch (ver globals.css).
 const AREA_COLOR: Record<string, string> = {
-  ciencias: 'oklch(0.42 0.12 240)',
-  letras:   'oklch(0.50 0.13 50)',
-  medicas:  'oklch(0.42 0.12 155)',
+  ciencias: 'var(--area-ciencias)',
+  letras:   'var(--area-letras)',
+  medicas:  'var(--area-medicas)',
 }
 const DIAS: Record<number, string> = {
   1: 'Lunes', 2: 'Martes', 3: 'Miércoles',
@@ -78,7 +79,7 @@ export default function SeccionDetallePage() {
     )
   }
 
-  const col = AREA_COLOR[seccion.area] ?? 'oklch(0.42 0.10 255)'
+  const col = AREA_COLOR[seccion.area] ?? 'var(--area-default)'
   const pctCupo = seccion._count
     ? Math.round((seccion._count.alumnos / seccion.cupoMaximo) * 100)
     : 0

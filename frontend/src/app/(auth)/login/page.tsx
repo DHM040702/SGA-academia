@@ -48,7 +48,7 @@ export default function LoginPage() {
       {/* ── Brand panel (oculto en móvil) ───────────────────── */}
       <div
         className="max-md:hidden relative flex flex-col justify-between p-[52px_60px] text-white overflow-hidden"
-        style={{ background: 'linear-gradient(165deg, oklch(0.36 0.10 255) 0%, oklch(0.28 0.11 255) 100%)' }}
+        style={{ backgroundColor: '#2d426d', background: 'linear-gradient(165deg, oklch(0.36 0.10 255) 0%, oklch(0.28 0.11 255) 100%)' }}
       >
         {/* Watermark rings */}
         <svg

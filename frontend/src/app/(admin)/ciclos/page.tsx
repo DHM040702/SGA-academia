@@ -31,10 +31,12 @@ const AREA_LABEL:  Record<string, string> = {
   letras:   'Área B — Letras',
   medicas:  'Área C — Médicas',
 }
+// Variables CSS con fallback hex solo para navegadores sin oklch (ver globals.css).
+// En Chrome moderno resuelven al oklch original → render idéntico.
 const AREA_COLOR: Record<string, string> = {
-  ciencias: 'oklch(0.42 0.12 240)',
-  letras:   'oklch(0.50 0.13 50)',
-  medicas:  'oklch(0.42 0.12 155)',
+  ciencias: 'var(--area-ciencias)',
+  letras:   'var(--area-letras)',
+  medicas:  'var(--area-medicas)',
 }
 
 /* ── Helpers ─────────────────────────────────────────────────────── */
@@ -524,6 +526,7 @@ export default function CiclosPage() {
                       className="h-full rounded transition-all"
                       style={{
                         width: `${progress.pct}%`,
+                        backgroundColor: '#2d426d',
                         background: 'linear-gradient(90deg, var(--color-primary), oklch(0.29 0.09 255))',
                       }}
                     />
@@ -594,7 +597,7 @@ export default function CiclosPage() {
                 style={{ gridTemplateColumns: `repeat(${Math.min(aulas.length, 3)}, 1fr)` }}
               >
                 {aulas.map((a) => {
-                  const col = AREA_COLOR[a.area] ?? 'oklch(0.42 0.10 255)'
+                  const col = AREA_COLOR[a.area] ?? 'var(--area-default)'
                   const ocupPct = a._count && a.cupoMaximo > 0
                     ? Math.round((a._count.alumnos / a.cupoMaximo) * 100) : 0
                   return (

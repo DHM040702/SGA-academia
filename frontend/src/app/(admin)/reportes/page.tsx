@@ -75,10 +75,12 @@ const PERIODOS = [
 type PeriodoLabel = typeof PERIODOS[number]['label']
 
 const AREA_LABEL: Record<string, string> = { ciencias: 'Ciencias', letras: 'Letras', medicas: 'Médicas' }
+// Variables CSS con fallback hex solo para navegadores sin oklch (ver globals.css).
+// En Chrome moderno resuelven al oklch original → render idéntico.
 const AREA_COLOR: Record<string, string> = {
-  ciencias: 'oklch(0.55 0.13 240)',
-  letras:   'oklch(0.55 0.13 145)',
-  medicas:  'oklch(0.55 0.13 30)',
+  ciencias: 'var(--areachart-ciencias)',
+  letras:   'var(--areachart-letras)',
+  medicas:  'var(--areachart-medicas)',
 }
 
 /* ══════════════════════════════════════════════════════════════════

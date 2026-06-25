@@ -112,6 +112,22 @@ h1, h2, h3, h4 {
   }
 }
 
+/* ─── Colores de área (usados en estilos inline de ciclos/aulas/reportes) ─────
+   Se definen como variables para poder dar un fallback hex SOLO a navegadores
+   antiguos (ver bloque @supports más abajo), sin alterar el render moderno. */
+:root {
+  /* Set "oscuro" (badges de ciclos/secciones/aulas) */
+  --area-ciencias: oklch(0.42 0.12 240);
+  --area-letras:   oklch(0.50 0.13 50);
+  --area-medicas:  oklch(0.42 0.12 155);
+  --area-default:  oklch(0.42 0.10 255);
+
+  /* Set "claro" (barras de reportes) */
+  --areachart-ciencias: oklch(0.55 0.13 240);
+  --areachart-letras:   oklch(0.55 0.13 145);
+  --areachart-medicas:  oklch(0.55 0.13 30);
+}
+
 /* ─── Fallback para navegadores SIN soporte de oklch() (Chrome < 111, etc.) ───
    Los colores del tema (@theme, arriba) están en oklch(); los navegadores que no
    lo entienden descartan esas variables y los botones/fondos quedan sin color
@@ -159,5 +175,14 @@ h1, h2, h3, h4 {
     --color-danger-light:  #f6e1db;
     --color-info:          #3b72b5;
     --color-info-light:    #dde9f5;
+
+    /* Colores de área — equivalentes hex */
+    --area-ciencias: #285484;
+    --area-letras:   #8f581e;
+    --area-medicas:  #146e50;
+    --area-default:  #36507c;
+    --areachart-ciencias: #3b72b5;
+    --areachart-letras:   #338a5a;
+    --areachart-medicas:  #b85a47;
   }
 }
