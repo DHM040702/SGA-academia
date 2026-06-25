@@ -173,7 +173,7 @@ function AlumnoInicio({ user }: { user: ReturnType<typeof useAuth>['user'] }) {
 
   // Semana del ciclo (dinámica) y nombre real del aula
   const cicloWeek = cicloActivo ? cicloWeekInfo(cicloActivo.fechaInicio, cicloActivo.fechaFin) : null
-  const aulaNombre = allHorarios[0]?.aula ?? (aulaId ? 'Aula asignada' : 'Sin aula')
+  const aulaNombre = allHorarios[0]?.aula?.nombre ?? (aulaId ? 'Aula asignada' : 'Sin aula')
 
   const records = asistencias?.data ?? []
   const total = records.length
