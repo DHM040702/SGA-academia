@@ -94,8 +94,9 @@ export default function PortalLayout({ children }: { children: React.ReactNode }
         )}
       >
         {/* Brand */}
-        <div className="h-[60px] flex items-center px-[18px] border-b border-border-s">
-          <span className="font-serif font-bold text-primary text-[17px] tracking-tight leading-tight">
+        <div className="h-[60px] flex items-center gap-2.5 px-[18px] border-b border-border-s">
+          <img src="/logo.png" alt="CPU UNASAM" className="w-9 h-9 rounded-full object-contain shrink-0" />
+          <span className="font-serif font-bold text-primary text-[15px] tracking-tight leading-tight truncate">
             Centro Preuniversitario<br />
             <span className="text-[10.5px] font-sans font-normal text-text-mute tracking-[0.07em] uppercase">
               {isApoderado ? 'Portal del apoderado' : 'Portal del alumno'}

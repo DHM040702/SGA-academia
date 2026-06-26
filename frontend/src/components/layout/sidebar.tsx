@@ -173,14 +173,17 @@ export function Sidebar({ compact = false }: SidebarProps) {
         )}
       >
         {compact ? (
-          <span className="font-serif font-bold text-primary text-[20px]">S</span>
+          <img src="/logo.png" alt="CPU UNASAM" className="w-9 h-9 rounded-full object-contain" />
         ) : (
-          <span className="font-serif font-bold text-primary text-[18px] tracking-tight leading-none">
-            Centro Preuniversitario<br />
-            <span className="text-[11px] font-sans font-normal text-text-mute tracking-[0.08em] uppercase">
-              Sistema de Gestión
+          <div className="flex items-center gap-2.5 min-w-0">
+            <img src="/logo.png" alt="CPU UNASAM" className="w-9 h-9 rounded-full object-contain shrink-0" />
+            <span className="font-serif font-bold text-primary text-[15px] tracking-tight leading-tight truncate">
+              Centro Preuniversitario
+              <span className="block text-[10px] font-sans font-normal text-text-mute tracking-[0.08em] uppercase mt-0.5">
+                Sistema de Gestión
+              </span>
             </span>
-          </span>
+          </div>
         )}
       </div>
 

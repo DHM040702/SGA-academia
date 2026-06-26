@@ -62,8 +62,11 @@ export default function LoginPage() {
         </svg>
 
         {/* Logo */}
-        <div className="font-serif font-bold text-[22px] tracking-tight relative z-10">
-          Centro Preuniversitario
+        <div className="flex items-center gap-3 relative z-10">
+          <img src="/logo.png" alt="CPU UNASAM" className="w-12 h-12 rounded-full object-contain bg-white/95 p-0.5 shrink-0" />
+          <div className="font-serif font-bold text-[22px] tracking-tight leading-none">
+            Centro Preuniversitario
+          </div>
         </div>
 
         {/* Hero text */}
@@ -88,6 +91,8 @@ export default function LoginPage() {
       {/* ── Login form ─────────────────────────────────────────── */}
       <div className="flex items-center justify-center p-10 bg-bg">
         <div className="w-full max-w-[380px]">
+          {/* Logo (visible sobre todo en móvil, donde el panel de marca se oculta) */}
+          <img src="/logo.png" alt="CPU UNASAM" className="md:hidden w-14 h-14 rounded-full object-contain mb-5" />
           <h1 className="m-0 font-serif font-semibold text-[30px] text-text tracking-[-0.02em]">
             Iniciar sesión
           </h1>
