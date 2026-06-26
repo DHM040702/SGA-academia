@@ -516,23 +516,32 @@ function buildPrintHtml(
   opts: { scope: ExportScope; aulaId: string; dia: number; orientacion: 'landscape' | 'portrait'; conDocentes: boolean },
   horarios: Horario[],
   aulas: { id: string; nombre: string }[],
+  recesos: Receso[],
+  logoUrl: string,
 ): string {
   const css = `
-    @page { size: A4 ${opts.orientacion === 'landscape' ? 'landscape' : 'portrait'}; margin: 1.2cm; }
-    * { box-sizing: border-box; }
+    @page { size: A4 ${opts.orientacion === 'landscape' ? 'landscape' : 'portrait'}; margin: 1.1cm; }
+    * { box-sizing: border-box; -webkit-print-color-adjust: exact; print-color-adjust: exact; }
     body { font-family: Arial, sans-serif; font-size: 11px; color: #1e293b; margin: 0; }
-    h2 { font-size: 14px; font-weight: 700; margin: 0 0 3px; }
-    .sub { font-size: 10px; color: #64748b; margin: 0 0 12px; }
-    table { width: 100%; border-collapse: collapse; margin-bottom: 20px; }
-    th { background: #f1f5f9; font-size: 9.5px; font-weight: 600; text-transform: uppercase;
-         letter-spacing: 0.04em; color: #475569; padding: 5px 6px; border: 1px solid #cbd5e1; text-align: center; }
-    th.hora { text-align: left; width: 52px; }
-    td { border: 1px solid #e2e8f0; padding: 3px; vertical-align: top; height: 66px; }
-    td.hora { font-family: monospace; font-size: 10px; font-weight: 600; color: #94a3b8;
-              background: #f8fafc; padding: 5px 6px; border-right: 1px solid #cbd5e1; }
-    .card { height: 100%; padding: 3px 5px; font-size: 10px; line-height: 1.35; }
-    .cn { font-weight: 600; }
-    .cd { color: #64748b; }
+    h2 { font-size: 13.5px; font-weight: 700; margin: 0 0 2px; color: #1e3a5f; }
+    .sub { font-size: 9.5px; color: #64748b; margin: 0 0 10px; }
+    table { width: 100%; border-collapse: collapse; margin-bottom: 18px; table-layout: fixed; }
+    th { background: #1e3a5f; font-size: 9px; font-weight: 700; text-transform: uppercase;
+         letter-spacing: 0.04em; color: #fff; padding: 5px 6px; border: 1px solid #1e3a5f; text-align: center; }
+    th.hora { width: 46px; }
+    td { border: 1px solid #d8dee9; padding: 0; vertical-align: top; height: 58px; }
+    td.hora { font-family: monospace; font-size: 9px; font-weight: 700; color: #64748b;
+              background: #f1f5f9; padding: 4px 5px; text-align: center; vertical-align: middle; }
+    .card { height: 100%; padding: 4px 5px; font-size: 9.5px; line-height: 1.3;
+            border-left: 3px solid #2563eb; }
+    .cn { font-weight: 700; color: #1e293b; }
+    .cd { color: #64748b; font-size: 9px; margin-top: 1px; }
+    .ct { font-family: monospace; font-size: 8.5px; font-weight: 700; color: #2563eb; margin-top: 3px; }
+    td.receso { background: #f8fafc; }
+    .rcard { height: 100%; display: flex; flex-direction: column; align-items: center; justify-content: center;
+             border-left: 3px solid #cbd5e1; }
+    .rt { font-size: 8px; font-weight: 700; text-transform: uppercase; letter-spacing: 0.05em; color: #94a3b8; }
+    .rh { font-family: monospace; font-size: 8.5px; color: #64748b; margin-top: 1px; }
     .page-break { page-break-after: always; }
   `
   const fecha = new Date().toLocaleDateString('es-PE', { day: 'numeric', month: 'long', year: 'numeric' })
@@ -545,42 +554,62 @@ function buildPrintHtml(
   }
   function uniq(arr: string[]): string[] { return Array.from(new Set(arr)) }
 
-  function aulaTable(data: Horario[], nombre: string): string {
-    const slots = uniq(data.map(h => t(h.horaInicio))).sort()
+  function claseCell(h: Horario): string {
+    const doc = opts.conDocentes ? `<div class="cd">${h.docente.nombre} ${h.docente.apellidos}</div>` : ''
+    return `<td><div class="card"><div class="cn">${h.curso.nombre}</div>${doc}<div class="ct">${t(h.horaInicio)}–${t(h.horaFin)}</div></div></td>`
+  }
+  function recesoCell(r: Receso): string {
+    return `<td class="receso"><div class="rcard"><span class="rt">Receso</span><span class="rh">${t(r.hora_inicio)}–${t(r.hora_fin)}</span></div></td>`
+  }
+
+  // Vista por aula: días en columnas. Incluye los recesos de esa aula.
+  function aulaTable(data: Horario[], nombre: string, aulaId: string): string {
+    const recesosAula = recesos.filter(r => r.aula_id === aulaId)
+    const slots = uniq([
+      ...data.map(h => t(h.horaInicio)),
+      ...recesosAula.map(r => t(r.hora_inicio)),
+    ]).sort()
     if (!slots.length) return `<h2>Aula ${nombre}</h2><p class="sub">Sin horarios asignados.</p>`
     const rows = slots.map(s => {
-      const cells = [1,2,3,4,5,6].map(d => {
+      const cells = [1, 2, 3, 4, 5, 6].map(d => {
         const h = data.find(x => x.diaSemana === d && t(x.horaInicio) === s)
-        if (!h) return '<td></td>'
-        const doc = opts.conDocentes ? `<div class="cd">${h.docente.nombre} ${h.docente.apellidos}</div>` : ''
-        return `<td><div class="card"><div class="cn">${h.curso.nombre}</div>${doc}</div></td>`
+        if (h) return claseCell(h)
+        const r = recesosAula.find(x => x.dia_semana === d && t(x.hora_inicio) === s)
+        if (r) return recesoCell(r)
+        return '<td></td>'
       }).join('')
       return `<tr><td class="hora">${s}</td>${cells}</tr>`
     }).join('')
     return `
       <h2>Horario — Aula ${nombre}</h2>
-      <p class="sub">Sistema de Gestión Académica · ${fecha}</p>
+      <p class="sub">Centro Preuniversitario UNASAM · ${fecha}</p>
       <table>
         <thead><tr><th class="hora">Hora</th>${DIAS.map(d => `<th>${d}</th>`).join('')}</tr></thead>
         <tbody>${rows}</tbody>
       </table>`
   }
 
+  // Vista por día: aulas en columnas. Incluye los recesos de cada aula ese día.
   function diaTable(data: Horario[], diaNum: number): string {
-    const slots = uniq(data.map(h => t(h.horaInicio))).sort()
+    const recesosDia = recesos.filter(r => r.dia_semana === diaNum)
+    const slots = uniq([
+      ...data.map(h => t(h.horaInicio)),
+      ...recesosDia.map(r => t(r.hora_inicio)),
+    ]).sort()
     if (!slots.length) return `<h2>${DIAS[diaNum - 1]}</h2><p class="sub">Sin horarios asignados.</p>`
     const rows = slots.map(s => {
       const cells = aulas.map(a => {
         const h = data.find(x => x.aulaId === a.id && t(x.horaInicio) === s)
-        if (!h) return '<td></td>'
-        const doc = opts.conDocentes ? `<div class="cd">${h.docente.nombre} ${h.docente.apellidos}</div>` : ''
-        return `<td><div class="card"><div class="cn">${h.curso.nombre}</div>${doc}</div></td>`
+        if (h) return claseCell(h)
+        const r = recesosDia.find(x => x.aula_id === a.id && t(x.hora_inicio) === s)
+        if (r) return recesoCell(r)
+        return '<td></td>'
       }).join('')
       return `<tr><td class="hora">${s}</td>${cells}</tr>`
     }).join('')
     return `
       <h2>Horarios del ${DIAS[diaNum - 1]}</h2>
-      <p class="sub">Sistema de Gestión Académica · ${fecha}</p>
+      <p class="sub">Centro Preuniversitario UNASAM · ${fecha}</p>
       <table>
         <thead><tr><th class="hora">Hora</th>${aulas.map(a => `<th>${a.nombre}</th>`).join('')}</tr></thead>
         <tbody>${rows}</tbody>
@@ -590,7 +619,7 @@ function buildPrintHtml(
   let body = ''
   if (opts.scope === 'aula') {
     const aula = aulas.find(a => a.id === opts.aulaId)
-    body = aulaTable(horarios.filter(h => h.aulaId === opts.aulaId), aula?.nombre ?? '—')
+    body = aulaTable(horarios.filter(h => h.aulaId === opts.aulaId), aula?.nombre ?? '—', opts.aulaId)
   } else if (opts.scope === 'dia') {
     body = diaTable(horarios.filter(h => h.diaSemana === opts.dia), opts.dia)
   } else {
@@ -598,30 +627,35 @@ function buildPrintHtml(
     const conClases = aulas.filter(a => horarios.some(h => h.aulaId === a.id))
     body = conClases.length === 0
       ? `<p class="sub">No hay horarios registrados en este ciclo.</p>`
-      : conClases.map((a, i) =>
-          i < conClases.length - 1
-            ? `${aulaTable(horarios.filter(h => h.aulaId === a.id), a.nombre)}<div class="page-break"></div>`
-            : aulaTable(horarios.filter(h => h.aulaId === a.id), a.nombre),
-        ).join('')
+      : conClases.map((a, i) => {
+          const tabla = aulaTable(horarios.filter(h => h.aulaId === a.id), a.nombre, a.id)
+          return i < conClases.length - 1 ? `${tabla}<div class="page-break"></div>` : tabla
+        }).join('')
   }
 
   const encabezado = `
-    <div style="display:flex;align-items:center;gap:0;margin-bottom:16px;padding-bottom:12px;border-bottom:2px solid #1e3a5f">
-      <div style="background:#7B1D1D;color:#fff;width:44px;height:44px;display:flex;align-items:center;justify-content:center;border-radius:4px;font-weight:bold;font-size:9px;text-align:center;flex-shrink:0">UNASAM</div>
-      <div style="width:1px;height:44px;background:#e5e7eb;margin:0 8px;flex-shrink:0"></div>
-      <div style="background:#1e3a5f;color:#fff;width:44px;height:44px;display:flex;align-items:center;justify-content:center;border-radius:4px;font-weight:bold;font-size:9px;flex-shrink:0">CPre</div>
-      <div style="margin-left:10px;flex:1">
-        <div style="font-weight:bold;font-size:15px;color:#1e3a5f">Centro Preuniversitario</div>
+    <div style="display:flex;align-items:center;gap:12px;margin-bottom:16px;padding-bottom:11px;border-bottom:2px solid #1e3a5f">
+      <img src="${logoUrl}" style="width:46px;height:46px;border-radius:50%;object-fit:contain;flex-shrink:0" />
+      <div style="flex:1">
+        <div style="font-weight:bold;font-size:15px;color:#1e3a5f">Centro Preuniversitario UNASAM</div>
         <div style="font-size:8px;color:#6b7280;margin-top:2px">Universidad Nacional de San Martín · Sistema de Gestión Académica</div>
       </div>
       <div style="text-align:right;flex-shrink:0">
         <div style="font-size:8px;color:#6b7280">Generado: ${fecha}</div>
-        <div style="background:#4a6fa5;color:#fff;padding:2px 8px;border-radius:10px;font-size:7px;font-weight:bold;display:inline-block;margin-top:4px">HORARIO OFICIAL</div>
+        <div style="background:#1e3a5f;color:#fff;padding:2px 9px;border-radius:10px;font-size:7px;font-weight:bold;display:inline-block;margin-top:4px">HORARIO OFICIAL</div>
       </div>
     </div>`
 
+  // Imprimir solo cuando TODO (incluido el logo) haya cargado, para que el
+  // logo aparezca en el PDF. Hay un guardia para no imprimir dos veces.
+  const script = `<script>
+    window.__printed = false;
+    function __doPrint(){ if (window.__printed) return; window.__printed = true; window.focus(); window.print(); }
+    window.addEventListener('load', function(){ setTimeout(__doPrint, 150); });
+  </script>`
+
   return `<!DOCTYPE html><html lang="es"><head><meta charset="UTF-8">
-    <title>Horarios — Centro Preuniversitario</title><style>${css}</style>
+    <title>Horarios — Centro Preuniversitario</title><style>${css}</style>${script}
     </head><body>${encabezado}${body}</body></html>`
 }
 
@@ -631,6 +665,7 @@ function ExportModal({ onClose }: { onClose: () => void }) {
   // faltan clases por el filtro de la pantalla o por la paginación.
   const { data: horariosPage } = useHorarios({ limit: 3000 })
   const { data: aulas = [] }   = useAulas()
+  const { data: recesos = [] } = useRecesos({})
   const horarios: Horario[] = (horariosPage as any)?.data ?? horariosPage ?? []
 
   const [scope, setScope]             = useState<ExportScope>('completo')
@@ -652,13 +687,15 @@ function ExportModal({ onClose }: { onClose: () => void }) {
   }, [onClose])
 
   function handleExport() {
-    const html = buildPrintHtml({ scope, aulaId, dia, orientacion, conDocentes }, horarios, aulas)
+    const logoUrl = `${window.location.origin}/logo.png`
+    const html = buildPrintHtml({ scope, aulaId, dia, orientacion, conDocentes }, horarios, aulas, recesos, logoUrl)
     const w = window.open('', '_blank', 'width=960,height=720')
     if (!w) { alert('Habilita las ventanas emergentes para exportar.'); return }
     w.document.write(html)
     w.document.close()
     w.focus()
-    setTimeout(() => w.print(), 400)
+    // Respaldo: si el evento load no disparara la impresión, forzarla a los 2 s.
+    setTimeout(() => { try { (w as any).__doPrint ? (w as any).__doPrint() : w.print() } catch { /* */ } }, 2000)
     onClose()
   }
 
