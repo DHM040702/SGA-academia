@@ -166,7 +166,9 @@ function AlumnoInicio({ user }: { user: ReturnType<typeof useAuth>['user'] }) {
   const { data: comunicados } = useComunicados({ limit: 3 })
   const { data: recursos } = useBiblioteca({ limit: 4 })
 
-  const allHorarios: Horario[] = (horariosRes as any)?.data ?? []
+  // Solo los horarios de SU aula. Si no tiene aula asignada, no mostramos los de
+  // todas las aulas (sería dato incorrecto): queda vacío con aviso.
+  const allHorarios: Horario[] = aulaId ? ((horariosRes as any)?.data ?? []) : []
   const todayHorarios = allHorarios
     .filter((h) => h.diaSemana === TODAY_DAY)
     .sort((a, b) => a.horaInicio.localeCompare(b.horaInicio))
@@ -216,6 +218,13 @@ function AlumnoInicio({ user }: { user: ReturnType<typeof useAuth>['user'] }) {
         >Descargar carnet</Btn>
       </div>
 
+      {!aulaId && (
+        <div className="mb-5 flex items-start gap-3 p-3.5 rounded-3 border border-warning bg-warning-light/40 text-[12.5px]">
+          <span className="font-semibold text-warning">Sin aula asignada.</span>
+          <span className="text-text-mute">Aún no estás matriculado en un aula del ciclo activo, por eso no se muestra tu horario. Comunícate con administración.</span>
+        </div>
+      )}
+
       <div className="grid gap-4 grid-cols-1 md:grid-cols-3">
         {/* KPIs row */}
         <KPI label="Asistencia ciclo" value={`${pct}%`} sub={`${puntuales} / ${total} sesiones`} accent="var(--color-success)" />
@@ -252,7 +261,7 @@ function AlumnoInicio({ user }: { user: ReturnType<typeof useAuth>['user'] }) {
                         </div>
                         <div className="text-[12.5px] text-text-mute mt-0.5">
                           {h.docente ? `${h.docente.nombre} ${h.docente.apellidos}` : '—'}
-                          {h.aula ? ` · ${h.aula}` : ''}
+                          {h.aula?.nombre ? ` · ${h.aula.nombre}` : ''}
                         </div>
                       </div>
                       <Btn variant="ghost" size="sm" icon={<ChevR size={14} />} />

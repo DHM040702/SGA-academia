@@ -149,7 +149,8 @@ export default function PortalHorarioPage() {
     aulaId ? { aula_id: aulaId } : {}
   )
 
-  const allHorarios: Horario[] = (horariosRes as any)?.data ?? []
+  // Solo los horarios de SU aula; sin aula → vacío (no los de todas las aulas).
+  const allHorarios: Horario[] = aulaId ? ((horariosRes as any)?.data ?? []) : []
 
   // Collect unique docentes
   const docentes = Array.from(
@@ -185,6 +186,13 @@ export default function PortalHorarioPage() {
           <Btn variant="secondary" icon={<Calendar size={14} />} size="sm">Añadir a calendario</Btn>
         </div>
       </div>
+
+      {!aulaId && (
+        <div className="mb-4 flex items-start gap-3 p-3.5 rounded-3 border border-warning bg-warning-light/40 text-[12.5px]">
+          <span className="font-semibold text-warning">Sin aula asignada.</span>
+          <span className="text-text-mute">No estás matriculado en un aula del ciclo activo, por eso tu horario aparece vacío. Comunícate con administración.</span>
+        </div>
+      )}
 
       {/* Week nav */}
       <div className="flex items-center gap-2.5 mb-3.5">
