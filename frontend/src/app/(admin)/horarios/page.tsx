@@ -14,13 +14,16 @@ import { Dot } from '@/components/ui/dot'
 import { Card } from '@/components/ui/card'
 import { Btn } from '@/components/ui/btn'
 import { PageHeader } from '@/components/layout/page-header'
-import { Plus, Download, AlertTriangle, Edit, Trash, X, Eye } from '@/components/icons'
+import { Plus, Download, AlertTriangle, Edit, Trash, X, Eye, Search } from '@/components/icons'
 import { useAuth } from '@/contexts/auth-context'
 import { SearchableSelect } from '@/components/ui/searchable-select'
 import type { SelectOption } from '@/components/ui/searchable-select'
 
 const DIA_FULL = ['Lunes', 'Martes', 'Miércoles', 'Jueves', 'Viernes', 'Sábado']
 const DIAS_NUM = [1, 2, 3, 4, 5, 6]
+
+const TURNO_LABEL: Record<string, string> = { manana: 'Mañana', tarde: 'Tarde' }
+const AREA_LABEL:  Record<string, string> = { ciencias: 'Ciencias', letras: 'Letras', medicas: 'Médicas' }
 
 const PALETTE = [
   'oklch(0.55 0.13 240)', 'oklch(0.55 0.13 280)', 'oklch(0.55 0.13 200)',
@@ -584,6 +587,8 @@ export default function HorariosPage() {
   const docenteId   = isDocente ? user?.docente?.id : undefined
 
   const [aulaId, setAulaId]       = useState('')
+  const [turnoFiltro, setTurnoFiltro] = useState<'' | 'manana' | 'tarde'>('')
+  const [busqueda, setBusqueda]   = useState('')
   const [modal, setModal]         = useState<'create' | 'edit' | null>(null)
   const [selected, setSelected]   = useState<Horario | null>(null)
   const [diaVista, setDiaVista]   = useState(1)
@@ -602,11 +607,24 @@ export default function HorariosPage() {
   const updateMut                      = useUpdateHorario()
 
   const docentes = (docentesPage as any)?.data ?? []
-  const horarios: Horario[] = (horariosPage as any)?.data ?? horariosPage ?? []
+  const horariosRaw: Horario[] = (horariosPage as any)?.data ?? horariosPage ?? []
+
+  // ── Búsqueda por curso o docente ──────────────────────────────
+  const q = busqueda.trim().toLowerCase()
+  const matchBusqueda = (h: Horario) =>
+    !q ||
+    h.curso.nombre.toLowerCase().includes(q) ||
+    `${h.docente.nombre} ${h.docente.apellidos}`.toLowerCase().includes(q)
+
+  const horarios = horariosRaw.filter(matchBusqueda)
   const slots = getSlots(horarios)
 
-  // pivot view (all aulas): filter by selected day
-  const horariosDelDia = horarios.filter((h) => h.diaSemana === diaVista)
+  // ── Aulas filtradas por turno (columnas de la vista global y desplegable) ──
+  const aulasFiltradas = aulas.filter((a) => !turnoFiltro || a.turno === turnoFiltro)
+  const aulaIdsTurno   = new Set(aulasFiltradas.map((a) => a.id))
+
+  // pivot view (all aulas): filter by selected day + turno
+  const horariosDelDia = horarios.filter((h) => h.diaSemana === diaVista && aulaIdsTurno.has(h.aulaId))
   const slotsDelDia    = getSlots(horariosDelDia)
 
   function getCell(dia: number, slot: string) {
@@ -637,7 +655,7 @@ export default function HorariosPage() {
         <HorarioModal horario={modal === 'edit' ? selected : null} onClose={closeModal} />
       )}
       {showExport && (
-        <ExportModal horarios={horarios} aulas={aulas} onClose={() => setShowExport(false)} />
+        <ExportModal horarios={horariosRaw} aulas={aulas} onClose={() => setShowExport(false)} />
       )}
 
       <PageHeader
@@ -659,22 +677,73 @@ export default function HorariosPage() {
         {/* Main */}
         <div className="flex flex-col gap-3">
           {/* Toolbar */}
-          <div className="flex gap-2.5 items-center">
+          <div className="flex flex-wrap gap-2.5 items-center">
             {isDocente ? (
               <span className="text-[13px] font-medium text-text-mute">
                 Mi horario semanal
               </span>
             ) : (
-              <select
-                value={aulaId}
-                onChange={(e) => setAulaId(e.target.value)}
-                className="px-3 py-1.5 text-[13px] border border-border rounded-2 bg-surface"
-              >
-                <option value="">Todas las aulas</option>
-                {aulas.map((s) => (
-                  <option key={s.id} value={s.id}>{s.nombre}</option>
-                ))}
-              </select>
+              <>
+                {/* Aula — agrupada por turno y con área para desambiguar */}
+                <select
+                  value={aulaId}
+                  onChange={(e) => setAulaId(e.target.value)}
+                  className="px-3 py-1.5 text-[13px] border border-border rounded-2 bg-surface focus:outline-none focus:border-primary"
+                >
+                  <option value="">Todas las aulas</option>
+                  {(['manana', 'tarde'] as const).map((t) => {
+                    const list = aulas.filter((a) => a.turno === t)
+                    if (!list.length) return null
+                    return (
+                      <optgroup key={t} label={TURNO_LABEL[t]}>
+                        {list.map((a) => (
+                          <option key={a.id} value={a.id}>
+                            {a.nombre} · {AREA_LABEL[a.area]}
+                          </option>
+                        ))}
+                      </optgroup>
+                    )
+                  })}
+                </select>
+
+                {/* Filtro de turno — solo aplica a la vista global */}
+                {!aulaId && (
+                  <div className="flex rounded-2 border border-border overflow-hidden text-[12px]">
+                    {([['', 'Todos'], ['manana', 'Mañana'], ['tarde', 'Tarde']] as const).map(([val, lbl]) => (
+                      <button
+                        key={val}
+                        onClick={() => setTurnoFiltro(val)}
+                        className={`px-3 py-1.5 transition-colors ${
+                          turnoFiltro === val
+                            ? 'bg-primary text-white font-medium'
+                            : 'bg-surface hover:bg-surface-2 text-text-mute'
+                        }`}
+                      >
+                        {lbl}
+                      </button>
+                    ))}
+                  </div>
+                )}
+
+                {/* Búsqueda por curso o docente */}
+                <div className="relative">
+                  <Search size={13} className="absolute left-2.5 top-1/2 -translate-y-1/2 text-text-mute pointer-events-none" />
+                  <input
+                    value={busqueda}
+                    onChange={(e) => setBusqueda(e.target.value)}
+                    placeholder="Buscar curso o docente…"
+                    className="pl-8 pr-7 py-1.5 text-[13px] border border-border rounded-2 bg-surface w-[210px] focus:outline-none focus:border-primary"
+                  />
+                  {busqueda && (
+                    <button
+                      onClick={() => setBusqueda('')}
+                      className="absolute right-2 top-1/2 -translate-y-1/2 text-text-mute hover:text-text bg-transparent border-none cursor-pointer p-0"
+                    >
+                      <X size={13} />
+                    </button>
+                  )}
+                </div>
+              </>
             )}
             <div className="flex-1" />
             {conflictos.length > 0 && (
@@ -736,9 +805,12 @@ export default function HorariosPage() {
                       <th className="px-2 py-2.5 text-[11px] font-semibold text-text-mute uppercase tracking-[0.05em] w-[70px] text-left">
                         Hora
                       </th>
-                      {aulas.map((a) => (
-                        <th key={a.id} className="px-2 py-2.5 text-[11px] font-semibold text-text text-center">
-                          {a.nombre}
+                      {aulasFiltradas.map((a) => (
+                        <th key={a.id} className="px-2 py-2 text-center border-l border-border-s">
+                          <div className="text-[11px] font-semibold text-text leading-tight">{a.nombre}</div>
+                          <div className="text-[8.5px] font-medium text-text-mute uppercase tracking-wide">
+                            {TURNO_LABEL[a.turno]} · {AREA_LABEL[a.area]}
+                          </div>
                         </th>
                       ))}
                     </tr>
@@ -749,7 +821,7 @@ export default function HorariosPage() {
                         <td className="px-2 py-2.5 font-mono text-[11px] font-semibold text-text-mute border-r border-border-s align-top">
                           {slot}
                         </td>
-                        {aulas.map((a) => {
+                        {aulasFiltradas.map((a) => {
                           const cells = getCellAula(a.id, slot)
                           return (
                             <td key={a.id} className="p-1 border-r border-border-s align-top" style={{ minWidth: 120, height: 90 }}>
@@ -846,8 +918,8 @@ export default function HorariosPage() {
                                     <div className="font-semibold text-text leading-tight">{h.curso.nombre}</div>
                                     <div className="text-text-mute leading-tight">{h.docente.nombre} {h.docente.apellidos}</div>
                                     <div className="mt-auto flex items-center justify-between gap-1">
-                                      <span className="font-mono font-semibold" style={{ color: conflicto ? 'var(--color-danger)' : col }}>
-                                        {h.aula?.nombre ?? '—'}
+                                      <span className="font-mono text-[10px] font-semibold" style={{ color: conflicto ? 'var(--color-danger)' : col }}>
+                                        {slot}–{extractTime(h.horaFin)}
                                       </span>
                                       <div className="flex items-center gap-0.5">
                                         {conflicto && <AlertTriangle size={11} className="text-danger" />}
@@ -879,7 +951,7 @@ export default function HorariosPage() {
           <Card title="Aulas" subtitle="Resumen del ciclo">
             <div className="flex flex-col divide-y divide-border-s">
               {aulas.slice(0, 6).map((a) => {
-                const hCount = horarios.filter((h) => h.aulaId === a.id).length
+                const hCount = horariosRaw.filter((h) => h.aulaId === a.id).length
                 return (
                   <div key={a.id} className="flex items-center gap-2.5 py-2">
                     <Dot tone={hCount > 0 ? 'success' : 'neutral'} />
