@@ -994,8 +994,10 @@ export default function HorariosPage() {
   // Si es docente, filtrar siempre por su docente_id (ignora filtro aulaId)
   const { data: horariosPage, isLoading } = useHorarios(
     isDocente
-      ? { docente_id: docenteId, limit: 200 }
-      : { aula_id: aulaId || undefined }
+      ? { docente_id: docenteId, limit: 500 }
+      // Vista general: TODAS las aulas del ciclo → se necesita un límite alto para
+      // no cortar los últimos días (los horarios se ordenan por día ascendente).
+      : { aula_id: aulaId || undefined, limit: 3000 }
   )
   const { data: conflictos = [] }      = useConflictosHorario()
   // Recesos: si hay aula seleccionada, los de esa aula; si no, los del ciclo activo.
