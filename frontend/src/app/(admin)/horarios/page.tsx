@@ -377,7 +377,12 @@ function HorarioCalendario({
   let minM = Math.floor(Math.min(...starts) / 60) * 60
   let maxM = Math.ceil(Math.max(...ends) / 60) * 60
   if (maxM <= minM) maxM = minM + 60
-  const totalH = (maxM - minM) * PX_PER_MIN
+
+  // Padding superior para que la etiqueta de la primera hora no se encime con la
+  // cabecera. Todo el contenido se desplaza PAD px hacia abajo.
+  const PAD = 10
+  const bodyH = (maxM - minM) * PX_PER_MIN + PAD
+  const y = (min: number) => PAD + (min - minM) * PX_PER_MIN
 
   const hours: number[] = []
   for (let m = minM; m <= maxM; m += 60) hours.push(m)
@@ -400,12 +405,12 @@ function HorarioCalendario({
         {/* Cuerpo */}
         <div className="flex">
           {/* Eje de horas */}
-          <div className="shrink-0 w-[54px] relative" style={{ height: totalH }}>
+          <div className="shrink-0 w-[54px] relative" style={{ height: bodyH }}>
             {hours.map((m) => (
               <div
                 key={m}
                 className="absolute left-0 right-1 text-right pr-1 font-mono text-[10px] text-text-mute"
-                style={{ top: (m - minM) * PX_PER_MIN - 6 }}
+                style={{ top: y(m) - 6 }}
               >
                 {pad2(Math.floor(m / 60))}:{pad2(m % 60)}
               </div>
@@ -417,14 +422,14 @@ function HorarioCalendario({
             <div
               key={c.key}
               className="flex-1 min-w-[132px] relative border-l border-border-s"
-              style={{ height: totalH }}
+              style={{ height: bodyH }}
             >
               {/* Líneas de hora */}
               {hours.map((m) => (
                 <div
                   key={m}
                   className="absolute left-0 right-0 border-t border-border-s"
-                  style={{ top: (m - minM) * PX_PER_MIN }}
+                  style={{ top: y(m) }}
                 />
               ))}
 
@@ -437,7 +442,7 @@ function HorarioCalendario({
                     key={r.id}
                     className="absolute left-0.5 right-0.5 rounded-1 flex items-center justify-center overflow-hidden"
                     style={{
-                      top: (s - minM) * PX_PER_MIN,
+                      top: y(s),
                       height: Math.max(14, (e - s) * PX_PER_MIN - 2),
                       background: 'repeating-linear-gradient(45deg, var(--color-surface3) 0, var(--color-surface3) 6px, var(--color-surface2) 6px, var(--color-surface2) 12px)',
                       border: '1px dashed var(--color-border)',
@@ -460,9 +465,9 @@ function HorarioCalendario({
                 return (
                   <div
                     key={h.id}
-                    className="group absolute left-1 right-1 rounded-2 px-1.5 py-1 overflow-hidden flex flex-col gap-0.5 text-[11px]"
+                    className="group absolute left-1 right-1 rounded-2 px-1.5 py-1 flex flex-col gap-0.5 text-[11px]"
                     style={{
-                      top: (s - minM) * PX_PER_MIN,
+                      top: y(s),
                       height,
                       background: conflicto ? 'var(--color-danger-l)' : `color-mix(in oklch, ${col} 12%, white)`,
                       border: `1px solid ${conflicto ? 'var(--color-danger)' : col}`,
@@ -768,6 +773,7 @@ function RecesosModal({ aulas, onClose }: {
   const [inicio, setInicio] = useState('09:30')
   const [fin,    setFin]    = useState('09:50')
   const [error,  setError]  = useState('')
+  const [filtro, setFiltro] = useState('')
 
   useEffect(() => {
     function handler(e: KeyboardEvent) { if (e.key === 'Escape') onClose() }
@@ -861,30 +867,103 @@ function RecesosModal({ aulas, onClose }: {
           </Btn>
         </form>
 
-        {/* Lista */}
-        <div className="flex flex-col gap-1.5 border-t border-border-s pt-3">
-          <span className="text-[12px] font-medium text-text-mute uppercase tracking-wide">Recesos configurados</span>
+        {/* Lista agrupada por aula */}
+        <div className="flex flex-col gap-2 border-t border-border-s pt-3">
+          <div className="flex items-center justify-between gap-2 flex-wrap">
+            <span className="text-[12px] font-medium text-text-mute uppercase tracking-wide">
+              Recesos configurados
+            </span>
+            {recesos.length > 0 && (
+              <span className="text-[11px] text-text-mute">Clic en un día para editarlo</span>
+            )}
+          </div>
+
           {recesos.length === 0 ? (
             <p className="text-[12px] text-text-mute py-2">Aún no hay recesos. Agrega uno arriba.</p>
           ) : (
-            recesos.map((r) => (
-              <div key={r.id} className="flex items-center gap-2 py-1.5 border-b border-border-s last:border-0">
-                <span className="text-[12.5px] font-medium flex-1">
-                  {r.aula_nombre ?? nombreAula(r.aula_id)}
-                  <span className="text-text-mute font-normal"> · {DIA_FULL[r.dia_semana - 1]}</span>
-                </span>
-                <span className="font-mono text-[11.5px] text-text-mute">
-                  {extractTime(r.hora_inicio)}–{extractTime(r.hora_fin)}
-                </span>
-                <button
-                  onClick={() => del.mutate(r.id)}
-                  className="text-text-mute hover:text-danger p-1 rounded hover:bg-danger-l border-none bg-transparent cursor-pointer"
-                  title="Eliminar receso"
-                >
-                  <Trash size={13} />
-                </button>
+            <>
+              {/* Filtro por aula */}
+              <div className="relative">
+                <Search size={13} className="absolute left-2.5 top-1/2 -translate-y-1/2 text-text-mute pointer-events-none" />
+                <input
+                  value={filtro}
+                  onChange={(e) => setFiltro(e.target.value)}
+                  placeholder="Filtrar aula…"
+                  className="pl-8 pr-3 py-1.5 text-[12.5px] border border-border rounded-2 bg-surface w-full focus:outline-none focus:border-primary"
+                />
               </div>
-            ))
+
+              {(() => {
+                const q = filtro.trim().toLowerCase()
+                const byAula = new Map<string, { nombre: string; turno?: string; area?: string; items: Receso[] }>()
+                for (const r of recesos) {
+                  const nombre = r.aula_nombre ?? nombreAula(r.aula_id)
+                  if (q && !nombre.toLowerCase().includes(q)) continue
+                  if (!byAula.has(r.aula_id)) {
+                    byAula.set(r.aula_id, { nombre, turno: r.turno, area: r.area, items: [] })
+                  }
+                  byAula.get(r.aula_id)!.items.push(r)
+                }
+                const grupos = Array.from(byAula.values())
+                  .map((g) => ({ ...g, items: g.items.sort((a, b) => a.dia_semana - b.dia_semana) }))
+                  .sort((a, b) => a.nombre.localeCompare(b.nombre))
+
+                if (grupos.length === 0) {
+                  return <p className="text-[12px] text-text-mute py-1">Ningún aula coincide con “{filtro}”.</p>
+                }
+
+                return (
+                  <div className="flex flex-col divide-y divide-border-s">
+                    {grupos.map((g) => (
+                      <div key={g.nombre} className="py-2 flex flex-col gap-1.5">
+                        <span className="text-[12px] font-semibold">
+                          {g.nombre}
+                          {g.turno && (
+                            <span className="text-text-mute font-normal text-[11px]">
+                              {' '}· {TURNO_LABEL[g.turno] ?? g.turno}{g.area ? ` · ${AREA_LABEL[g.area] ?? g.area}` : ''}
+                            </span>
+                          )}
+                        </span>
+                        <div className="flex flex-wrap gap-1.5">
+                          {g.items.map((r) => (
+                            <div
+                              key={r.id}
+                              className="inline-flex items-center gap-1.5 pl-2 pr-1 py-1 rounded-2 border border-border bg-surface text-[11.5px]"
+                            >
+                              <button
+                                type="button"
+                                onClick={() => {
+                                  setAulaId(r.aula_id)
+                                  setDia(r.dia_semana)
+                                  setInicio(extractTime(r.hora_inicio))
+                                  setFin(extractTime(r.hora_fin))
+                                  setError('')
+                                }}
+                                className="inline-flex items-center gap-1.5 bg-transparent border-none cursor-pointer p-0 hover:text-primary"
+                                title="Editar este receso"
+                              >
+                                <span className="font-medium">{DIA_FULL[r.dia_semana - 1].slice(0, 3)}</span>
+                                <span className="font-mono text-text-mute">
+                                  {extractTime(r.hora_inicio)}–{extractTime(r.hora_fin)}
+                                </span>
+                              </button>
+                              <button
+                                type="button"
+                                onClick={() => del.mutate(r.id)}
+                                className="text-text-mute hover:text-danger bg-transparent border-none cursor-pointer p-0.5 rounded"
+                                title="Eliminar receso"
+                              >
+                                <X size={11} />
+                              </button>
+                            </div>
+                          ))}
+                        </div>
+                      </div>
+                    ))}
+                  </div>
+                )
+              })()}
+            </>
           )}
         </div>
       </div>
