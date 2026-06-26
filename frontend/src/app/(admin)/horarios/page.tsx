@@ -56,6 +56,16 @@ function getSlots(horarios: Horario[]): string[] {
   return Array.from(times).sort()
 }
 
+/** "HH:MM" → minutos desde medianoche (para posicionar en el calendario). */
+function toMin(dt: string | Date | undefined): number {
+  const [h, m] = extractTime(dt).split(':').map(Number)
+  return h * 60 + m
+}
+
+// Píxeles por minuto del eje vertical del calendario. 1.3 → una clase de 50'
+// mide ~65px (suficiente para curso + docente + rango horario).
+const PX_PER_MIN = 1.3
+
 // ─── Modal ────────────────────────────────────────────────────────────────────
 
 interface ModalProps {
@@ -325,6 +335,138 @@ function CellMenu({ horario, onEdit, onDelete, onPublicar }: {
           </button>
         </div>
       )}
+    </div>
+  )
+}
+
+// ─── Calendario proporcional ────────────────────────────────────────────────
+// Eje de horas continuo: cada clase se posiciona por su hora real y su altura
+// es proporcional a su duración. Elimina los huecos/desalineaciones de la rejilla
+// anterior (que usaba una fila por hora de inicio con altura fija).
+
+interface CalCol {
+  key: string
+  header: React.ReactNode
+  items: Horario[]
+}
+
+function HorarioCalendario({
+  columns, soloLectura, isConflicto, onEdit, onDelete, onPublicar,
+}: {
+  columns: CalCol[]
+  soloLectura: boolean
+  isConflicto: (id: string) => boolean
+  onEdit: (h: Horario) => void
+  onDelete: (h: Horario) => void
+  onPublicar: (h: Horario) => void
+}) {
+  const all = columns.flatMap((c) => c.items)
+  if (all.length === 0) return null
+
+  // Rango del eje, redondeado a horas completas para un eje limpio.
+  let minM = Math.floor(Math.min(...all.map((h) => toMin(h.horaInicio))) / 60) * 60
+  let maxM = Math.ceil(Math.max(...all.map((h) => toMin(h.horaFin))) / 60) * 60
+  if (maxM <= minM) maxM = minM + 60
+  const totalH = (maxM - minM) * PX_PER_MIN
+
+  const hours: number[] = []
+  for (let m = minM; m <= maxM; m += 60) hours.push(m)
+
+  return (
+    <div className="overflow-auto">
+      <div className="min-w-max">
+        {/* Cabecera (columnas) */}
+        <div className="flex sticky top-0 z-10 bg-surface-2 border-b border-border">
+          <div className="shrink-0 w-[54px] px-2 py-2 text-[11px] font-semibold text-text-mute uppercase tracking-[0.05em]">
+            Hora
+          </div>
+          {columns.map((c) => (
+            <div key={c.key} className="flex-1 min-w-[132px] px-2 py-1.5 text-center border-l border-border-s">
+              {c.header}
+            </div>
+          ))}
+        </div>
+
+        {/* Cuerpo */}
+        <div className="flex">
+          {/* Eje de horas */}
+          <div className="shrink-0 w-[54px] relative" style={{ height: totalH }}>
+            {hours.map((m) => (
+              <div
+                key={m}
+                className="absolute left-0 right-1 text-right pr-1 font-mono text-[10px] text-text-mute"
+                style={{ top: (m - minM) * PX_PER_MIN - 6 }}
+              >
+                {pad2(Math.floor(m / 60))}:{pad2(m % 60)}
+              </div>
+            ))}
+          </div>
+
+          {/* Columnas */}
+          {columns.map((c) => (
+            <div
+              key={c.key}
+              className="flex-1 min-w-[132px] relative border-l border-border-s"
+              style={{ height: totalH }}
+            >
+              {/* Líneas de hora */}
+              {hours.map((m) => (
+                <div
+                  key={m}
+                  className="absolute left-0 right-0 border-t border-border-s"
+                  style={{ top: (m - minM) * PX_PER_MIN }}
+                />
+              ))}
+
+              {/* Clases */}
+              {c.items.map((h) => {
+                const s = toMin(h.horaInicio)
+                const e = toMin(h.horaFin)
+                const col = cursoColor(h.curso.nombre)
+                const conflicto = isConflicto(h.id)
+                const height = Math.max(24, (e - s) * PX_PER_MIN - 3)
+                return (
+                  <div
+                    key={h.id}
+                    className="group absolute left-1 right-1 rounded-2 px-1.5 py-1 overflow-hidden flex flex-col gap-0.5 text-[11px]"
+                    style={{
+                      top: (s - minM) * PX_PER_MIN,
+                      height,
+                      background: conflicto ? 'var(--color-danger-l)' : `color-mix(in oklch, ${col} 12%, white)`,
+                      border: `1px solid ${conflicto ? 'var(--color-danger)' : col}`,
+                      borderLeft: `3px solid ${conflicto ? 'var(--color-danger)' : col}`,
+                    }}
+                  >
+                    <div className="flex items-start justify-between gap-1">
+                      <span className="font-semibold text-text leading-tight">{h.curso.nombre}</span>
+                      <span className="flex items-center gap-0.5 shrink-0">
+                        {conflicto && <AlertTriangle size={11} className="text-danger" />}
+                        {!h.publicado && !conflicto && (
+                          <span className="text-[8.5px] px-1 py-0.5 rounded bg-black/10 text-text-mute font-medium leading-none">
+                            Borrador
+                          </span>
+                        )}
+                        {!soloLectura && <CellMenu horario={h} onEdit={onEdit} onDelete={onDelete} onPublicar={onPublicar} />}
+                      </span>
+                    </div>
+                    {height > 40 && (
+                      <div className="text-text-mute leading-tight truncate">
+                        {h.docente.nombre} {h.docente.apellidos}
+                      </div>
+                    )}
+                    <span
+                      className="mt-auto font-mono text-[9.5px] font-semibold"
+                      style={{ color: conflicto ? 'var(--color-danger)' : col }}
+                    >
+                      {extractTime(h.horaInicio)}–{extractTime(h.horaFin)}
+                    </span>
+                  </div>
+                )
+              })}
+            </div>
+          ))}
+        </div>
+      </div>
     </div>
   )
 }
@@ -627,13 +769,6 @@ export default function HorariosPage() {
   const horariosDelDia = horarios.filter((h) => h.diaSemana === diaVista && aulaIdsTurno.has(h.aulaId))
   const slotsDelDia    = getSlots(horariosDelDia)
 
-  function getCell(dia: number, slot: string) {
-    return horarios.filter((h) => h.diaSemana === dia && extractTime(h.horaInicio) === slot)
-  }
-  function getCellAula(aid: string, slot: string) {
-    return horariosDelDia.filter((h) => h.aulaId === aid && extractTime(h.horaInicio) === slot)
-  }
-
   const isConflicto = (id: string) => conflictos.some((c: Horario) => c.id === id)
 
   function openCreate() { setSelected(null); setModal('create') }
@@ -799,71 +934,25 @@ export default function HorariosPage() {
                   </button></>)}
                 </div>
               ) : (
-                <table className="w-full border-collapse">
-                  <thead>
-                    <tr className="bg-surface-2 border-b border-border">
-                      <th className="px-2 py-2.5 text-[11px] font-semibold text-text-mute uppercase tracking-[0.05em] w-[70px] text-left">
-                        Hora
-                      </th>
-                      {aulasFiltradas.map((a) => (
-                        <th key={a.id} className="px-2 py-2 text-center border-l border-border-s">
-                          <div className="text-[11px] font-semibold text-text leading-tight">{a.nombre}</div>
-                          <div className="text-[8.5px] font-medium text-text-mute uppercase tracking-wide">
-                            {TURNO_LABEL[a.turno]} · {AREA_LABEL[a.area]}
-                          </div>
-                        </th>
-                      ))}
-                    </tr>
-                  </thead>
-                  <tbody>
-                    {slotsDelDia.map((slot) => (
-                      <tr key={slot} className="border-t border-border-s">
-                        <td className="px-2 py-2.5 font-mono text-[11px] font-semibold text-text-mute border-r border-border-s align-top">
-                          {slot}
-                        </td>
-                        {aulasFiltradas.map((a) => {
-                          const cells = getCellAula(a.id, slot)
-                          return (
-                            <td key={a.id} className="p-1 border-r border-border-s align-top" style={{ minWidth: 120, height: 90 }}>
-                              {cells.map((h) => {
-                                const col = cursoColor(h.curso.nombre)
-                                const conflicto = isConflicto(h.id)
-                                return (
-                                  <div
-                                    key={h.id}
-                                    className="group rounded-2 p-1.5 h-full flex flex-col gap-0.5 text-[11px]"
-                                    style={{
-                                      background: conflicto ? 'var(--color-danger-l)' : `color-mix(in oklch, ${col} 12%, white)`,
-                                      border: `1px solid ${conflicto ? 'var(--color-danger)' : col}`,
-                                      borderLeft: `3px solid ${conflicto ? 'var(--color-danger)' : col}`,
-                                    }}
-                                  >
-                                    <div className="font-semibold text-text leading-tight">{h.curso.nombre}</div>
-                                    <div className="text-text-mute leading-tight">{h.docente.nombre} {h.docente.apellidos}</div>
-                                    <div className="mt-auto flex items-center justify-between gap-1">
-                                      <span className="font-mono text-[10px] font-semibold" style={{ color: conflicto ? 'var(--color-danger)' : col }}>
-                                        {slot}–{extractTime(h.horaFin)}
-                                      </span>
-                                      <div className="flex items-center gap-0.5">
-                                        {conflicto && <AlertTriangle size={11} className="text-danger" />}
-                                        {!h.publicado && !conflicto && (
-                                          <span className="text-[8.5px] px-1 py-0.5 rounded bg-black/10 text-text-mute font-medium leading-none">
-                                            Borrador
-                                          </span>
-                                        )}
-                                        {!soloLectura && <CellMenu horario={h} onEdit={openEdit} onDelete={handleDelete} onPublicar={handlePublicar} />}
-                                      </div>
-                                    </div>
-                                  </div>
-                                )
-                              })}
-                            </td>
-                          )
-                        })}
-                      </tr>
-                    ))}
-                  </tbody>
-                </table>
+                <HorarioCalendario
+                  columns={aulasFiltradas.map((a) => ({
+                    key: a.id,
+                    header: (
+                      <>
+                        <div className="text-[11px] font-semibold text-text leading-tight">{a.nombre}</div>
+                        <div className="text-[8.5px] font-medium text-text-mute uppercase tracking-wide">
+                          {TURNO_LABEL[a.turno]} · {AREA_LABEL[a.area]}
+                        </div>
+                      </>
+                    ),
+                    items: horariosDelDia.filter((h) => h.aulaId === a.id),
+                  }))}
+                  soloLectura={soloLectura}
+                  isConflicto={isConflicto}
+                  onEdit={openEdit}
+                  onDelete={handleDelete}
+                  onPublicar={handlePublicar}
+                />
               )}
             </div>
           ) : (
@@ -879,68 +968,18 @@ export default function HorariosPage() {
                   </button></>)}
                 </div>
               ) : (
-                <table className="w-full border-collapse">
-                  <thead>
-                    <tr className="bg-surface-2 border-b border-border">
-                      <th className="px-2 py-2.5 text-[11px] font-semibold text-text-mute uppercase tracking-[0.05em] w-[70px] text-left">
-                        Hora
-                      </th>
-                      {DIA_FULL.map((d) => (
-                        <th key={d} className="px-2 py-2.5 text-[11px] font-semibold text-text text-center">
-                          {d}
-                        </th>
-                      ))}
-                    </tr>
-                  </thead>
-                  <tbody>
-                    {slots.map((slot) => (
-                      <tr key={slot} className="border-t border-border-s">
-                        <td className="px-2 py-2.5 font-mono text-[11px] font-semibold text-text-mute border-r border-border-s align-top">
-                          {slot}
-                        </td>
-                        {DIAS_NUM.map((dia) => {
-                          const cells = getCell(dia, slot)
-                          return (
-                            <td key={dia} className="p-1 border-r border-border-s align-top" style={{ minWidth: 110, height: 90 }}>
-                              {cells.map((h) => {
-                                const col = cursoColor(h.curso.nombre)
-                                const conflicto = isConflicto(h.id)
-                                return (
-                                  <div
-                                    key={h.id}
-                                    className="group rounded-2 p-1.5 h-full flex flex-col gap-0.5 text-[11px]"
-                                    style={{
-                                      background: conflicto ? 'var(--color-danger-l)' : `color-mix(in oklch, ${col} 12%, white)`,
-                                      border: `1px solid ${conflicto ? 'var(--color-danger)' : col}`,
-                                      borderLeft: `3px solid ${conflicto ? 'var(--color-danger)' : col}`,
-                                    }}
-                                  >
-                                    <div className="font-semibold text-text leading-tight">{h.curso.nombre}</div>
-                                    <div className="text-text-mute leading-tight">{h.docente.nombre} {h.docente.apellidos}</div>
-                                    <div className="mt-auto flex items-center justify-between gap-1">
-                                      <span className="font-mono text-[10px] font-semibold" style={{ color: conflicto ? 'var(--color-danger)' : col }}>
-                                        {slot}–{extractTime(h.horaFin)}
-                                      </span>
-                                      <div className="flex items-center gap-0.5">
-                                        {conflicto && <AlertTriangle size={11} className="text-danger" />}
-                                        {!h.publicado && !conflicto && (
-                                          <span className="text-[8.5px] px-1 py-0.5 rounded bg-black/10 text-text-mute font-medium leading-none">
-                                            Borrador
-                                          </span>
-                                        )}
-                                        {!soloLectura && <CellMenu horario={h} onEdit={openEdit} onDelete={handleDelete} onPublicar={handlePublicar} />}
-                                      </div>
-                                    </div>
-                                  </div>
-                                )
-                              })}
-                            </td>
-                          )
-                        })}
-                      </tr>
-                    ))}
-                  </tbody>
-                </table>
+                <HorarioCalendario
+                  columns={DIAS_NUM.map((dia) => ({
+                    key: String(dia),
+                    header: <span className="text-[11px] font-semibold text-text">{DIA_FULL[dia - 1]}</span>,
+                    items: horarios.filter((h) => h.diaSemana === dia),
+                  }))}
+                  soloLectura={soloLectura}
+                  isConflicto={isConflicto}
+                  onEdit={openEdit}
+                  onDelete={handleDelete}
+                  onPublicar={handlePublicar}
+                />
               )}
             </div>
           )}
