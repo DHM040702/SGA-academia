@@ -18,6 +18,7 @@ import { Plus, Download, AlertTriangle, Edit, Trash, X, Eye, Search } from '@/co
 import { useAuth } from '@/contexts/auth-context'
 import { SearchableSelect } from '@/components/ui/searchable-select'
 import type { SelectOption } from '@/components/ui/searchable-select'
+import { useRecesos, useUpsertReceso, useDeleteReceso, type Receso } from '@/hooks/use-recesos'
 
 const DIA_FULL = ['Lunes', 'Martes', 'Miércoles', 'Jueves', 'Viernes', 'Sábado']
 const DIAS_NUM = [1, 2, 3, 4, 5, 6]
@@ -62,9 +63,9 @@ function toMin(dt: string | Date | undefined): number {
   return h * 60 + m
 }
 
-// Píxeles por minuto del eje vertical del calendario. 1.3 → una clase de 50'
-// mide ~65px (suficiente para curso + docente + rango horario).
-const PX_PER_MIN = 1.3
+// Píxeles por minuto del eje vertical del calendario. 1.8 → una clase de 50'
+// mide ~90px, suficiente para curso (2 líneas) + docente (2 líneas) + rango.
+const PX_PER_MIN = 1.8
 
 // ─── Modal ────────────────────────────────────────────────────────────────────
 
@@ -348,6 +349,7 @@ interface CalCol {
   key: string
   header: React.ReactNode
   items: Horario[]
+  recesos?: Receso[]
 }
 
 function HorarioCalendario({
@@ -363,9 +365,17 @@ function HorarioCalendario({
   const all = columns.flatMap((c) => c.items)
   if (all.length === 0) return null
 
-  // Rango del eje, redondeado a horas completas para un eje limpio.
-  let minM = Math.floor(Math.min(...all.map((h) => toMin(h.horaInicio))) / 60) * 60
-  let maxM = Math.ceil(Math.max(...all.map((h) => toMin(h.horaFin))) / 60) * 60
+  // Rango del eje (incluye recesos), redondeado a horas completas.
+  const starts = [
+    ...all.map((h) => toMin(h.horaInicio)),
+    ...columns.flatMap((c) => (c.recesos ?? []).map((r) => toMin(r.hora_inicio))),
+  ]
+  const ends = [
+    ...all.map((h) => toMin(h.horaFin)),
+    ...columns.flatMap((c) => (c.recesos ?? []).map((r) => toMin(r.hora_fin))),
+  ]
+  let minM = Math.floor(Math.min(...starts) / 60) * 60
+  let maxM = Math.ceil(Math.max(...ends) / 60) * 60
   if (maxM <= minM) maxM = minM + 60
   const totalH = (maxM - minM) * PX_PER_MIN
 
@@ -418,6 +428,28 @@ function HorarioCalendario({
                 />
               ))}
 
+              {/* Recesos (banda) */}
+              {(c.recesos ?? []).map((r) => {
+                const s = toMin(r.hora_inicio)
+                const e = toMin(r.hora_fin)
+                return (
+                  <div
+                    key={r.id}
+                    className="absolute left-0.5 right-0.5 rounded-1 flex items-center justify-center overflow-hidden"
+                    style={{
+                      top: (s - minM) * PX_PER_MIN,
+                      height: Math.max(14, (e - s) * PX_PER_MIN - 2),
+                      background: 'repeating-linear-gradient(45deg, var(--color-surface3) 0, var(--color-surface3) 6px, var(--color-surface2) 6px, var(--color-surface2) 12px)',
+                      border: '1px dashed var(--color-border)',
+                    }}
+                  >
+                    <span className="text-[9px] font-semibold uppercase tracking-wide text-text-mute px-1 text-center leading-tight">
+                      Receso {extractTime(r.hora_inicio)}–{extractTime(r.hora_fin)}
+                    </span>
+                  </div>
+                )
+              })}
+
               {/* Clases */}
               {c.items.map((h) => {
                 const s = toMin(h.horaInicio)
@@ -438,7 +470,7 @@ function HorarioCalendario({
                     }}
                   >
                     <div className="flex items-start justify-between gap-1">
-                      <span className="font-semibold text-text leading-tight">{h.curso.nombre}</span>
+                      <span className="font-semibold text-text leading-tight line-clamp-2">{h.curso.nombre}</span>
                       <span className="flex items-center gap-0.5 shrink-0">
                         {conflicto && <AlertTriangle size={11} className="text-danger" />}
                         {!h.publicado && !conflicto && (
@@ -449,13 +481,13 @@ function HorarioCalendario({
                         {!soloLectura && <CellMenu horario={h} onEdit={onEdit} onDelete={onDelete} onPublicar={onPublicar} />}
                       </span>
                     </div>
-                    {height > 40 && (
-                      <div className="text-text-mute leading-tight truncate">
+                    {height > 46 && (
+                      <div className="text-[10.5px] text-text-mute leading-tight line-clamp-2">
                         {h.docente.nombre} {h.docente.apellidos}
                       </div>
                     )}
                     <span
-                      className="mt-auto font-mono text-[9.5px] font-semibold"
+                      className="mt-auto font-mono text-[10px] font-semibold"
                       style={{ color: conflicto ? 'var(--color-danger)' : col }}
                     >
                       {extractTime(h.horaInicio)}–{extractTime(h.horaFin)}
@@ -719,6 +751,147 @@ function ExportModal({ horarios, aulas, onClose }: ExportModalProps) {
   )
 }
 
+// ─── Recesos ──────────────────────────────────────────────────────────────────
+
+interface RecesoAula { id: string; nombre: string; turno: 'manana' | 'tarde'; area: string }
+
+function RecesosModal({ aulas, onClose }: {
+  aulas: RecesoAula[]
+  onClose: () => void
+}) {
+  const { data: recesos = [] } = useRecesos({})   // todos los del ciclo activo
+  const upsert = useUpsertReceso()
+  const del    = useDeleteReceso()
+
+  const [aulaId, setAulaId] = useState(aulas[0]?.id ?? '')
+  const [dia,    setDia]    = useState(1)
+  const [inicio, setInicio] = useState('09:30')
+  const [fin,    setFin]    = useState('09:50')
+  const [error,  setError]  = useState('')
+
+  useEffect(() => {
+    function handler(e: KeyboardEvent) { if (e.key === 'Escape') onClose() }
+    document.addEventListener('keydown', handler)
+    return () => document.removeEventListener('keydown', handler)
+  }, [onClose])
+
+  async function guardar(e: React.FormEvent) {
+    e.preventDefault()
+    if (!aulaId) { setError('Elige un aula.'); return }
+    if (inicio >= fin) { setError('La hora de inicio debe ser anterior a la de fin.'); return }
+    try {
+      await upsert.mutateAsync({ aula_id: aulaId, dia_semana: dia, hora_inicio: inicio, hora_fin: fin })
+      setError('')
+    } catch (err: any) {
+      const msg = err?.response?.data?.message
+      setError(Array.isArray(msg) ? msg.join(', ') : (msg ?? 'No se pudo guardar el receso.'))
+    }
+  }
+
+  const nombreAula = (id: string) => aulas.find((a) => a.id === id)?.nombre ?? '—'
+
+  return (
+    <div
+      className="fixed inset-0 z-50 flex items-center justify-center"
+      style={{ background: 'rgba(0,0,0,0.45)', backdropFilter: 'blur(2px)' }}
+      onClick={(e) => { if (e.target === e.currentTarget) onClose() }}
+    >
+      <div className="bg-surface border border-border rounded-3 shadow-3 w-full max-w-lg max-h-[90vh] overflow-y-auto p-6 flex flex-col gap-4">
+        <div className="flex items-center justify-between">
+          <div>
+            <h2 className="text-[15px] font-semibold">Recesos</h2>
+            <p className="text-[11.5px] text-text-mute mt-0.5">Un receso por aula y día · se repite cada semana · bloquea clases que se solapen</p>
+          </div>
+          <button onClick={onClose} className="text-text-mute hover:text-text p-1 rounded-2 hover:bg-surface2 border-none bg-transparent cursor-pointer">
+            <X size={16} />
+          </button>
+        </div>
+
+        {/* Form */}
+        <form onSubmit={guardar} className="flex flex-col gap-3">
+          <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
+            <label className="flex flex-col gap-1">
+              <span className="text-[12px] font-medium text-text-mute">Aula</span>
+              <select
+                value={aulaId}
+                onChange={(e) => setAulaId(e.target.value)}
+                className="px-3 py-2 text-[13px] border border-border rounded-2 bg-surface focus:outline-none focus:border-primary"
+              >
+                {(['manana', 'tarde'] as const).map((t) => {
+                  const list = aulas.filter((a) => a.turno === t)
+                  if (!list.length) return null
+                  return (
+                    <optgroup key={t} label={TURNO_LABEL[t]}>
+                      {list.map((a) => (
+                        <option key={a.id} value={a.id}>{a.nombre} · {AREA_LABEL[a.area]}</option>
+                      ))}
+                    </optgroup>
+                  )
+                })}
+              </select>
+            </label>
+            <label className="flex flex-col gap-1">
+              <span className="text-[12px] font-medium text-text-mute">Día</span>
+              <select
+                value={dia}
+                onChange={(e) => setDia(Number(e.target.value))}
+                className="px-3 py-2 text-[13px] border border-border rounded-2 bg-surface focus:outline-none focus:border-primary"
+              >
+                {DIA_FULL.map((d, i) => <option key={i + 1} value={i + 1}>{d}</option>)}
+              </select>
+            </label>
+            <label className="flex flex-col gap-1">
+              <span className="text-[12px] font-medium text-text-mute">Hora inicio</span>
+              <input type="time" value={inicio} onChange={(e) => setInicio(e.target.value)}
+                className="px-3 py-2 text-[13px] border border-border rounded-2 bg-surface focus:outline-none focus:border-primary" required />
+            </label>
+            <label className="flex flex-col gap-1">
+              <span className="text-[12px] font-medium text-text-mute">Hora fin</span>
+              <input type="time" value={fin} onChange={(e) => setFin(e.target.value)}
+                className="px-3 py-2 text-[13px] border border-border rounded-2 bg-surface focus:outline-none focus:border-primary" required />
+            </label>
+          </div>
+
+          {error && (
+            <p className="text-[12px] text-danger bg-danger-light/40 px-3 py-2 rounded-2">{error}</p>
+          )}
+
+          <Btn type="submit" size="sm" icon={<Plus size={14} />} disabled={upsert.isPending}>
+            {upsert.isPending ? 'Guardando…' : 'Guardar receso'}
+          </Btn>
+        </form>
+
+        {/* Lista */}
+        <div className="flex flex-col gap-1.5 border-t border-border-s pt-3">
+          <span className="text-[12px] font-medium text-text-mute uppercase tracking-wide">Recesos configurados</span>
+          {recesos.length === 0 ? (
+            <p className="text-[12px] text-text-mute py-2">Aún no hay recesos. Agrega uno arriba.</p>
+          ) : (
+            recesos.map((r) => (
+              <div key={r.id} className="flex items-center gap-2 py-1.5 border-b border-border-s last:border-0">
+                <span className="text-[12.5px] font-medium flex-1">
+                  {r.aula_nombre ?? nombreAula(r.aula_id)}
+                  <span className="text-text-mute font-normal"> · {DIA_FULL[r.dia_semana - 1]}</span>
+                </span>
+                <span className="font-mono text-[11.5px] text-text-mute">
+                  {extractTime(r.hora_inicio)}–{extractTime(r.hora_fin)}
+                </span>
+                <button
+                  onClick={() => del.mutate(r.id)}
+                  className="text-text-mute hover:text-danger p-1 rounded hover:bg-danger-l border-none bg-transparent cursor-pointer"
+                  title="Eliminar receso"
+                >
+                  <Trash size={13} />
+                </button>
+              </div>
+            ))
+          )}
+        </div>
+      </div>
+    </div>
+  )
+}
+
 // ─── Page ─────────────────────────────────────────────────────────────────────
 
 export default function HorariosPage() {
@@ -735,6 +908,7 @@ export default function HorariosPage() {
   const [selected, setSelected]   = useState<Horario | null>(null)
   const [diaVista, setDiaVista]   = useState(1)
   const [showExport, setShowExport] = useState(false)
+  const [showRecesos, setShowRecesos] = useState(false)
 
   const { data: aulas = [] }           = useAulas()
   const { data: docentesPage }         = useDocentes({ limit: 100 })
@@ -745,6 +919,8 @@ export default function HorariosPage() {
       : { aula_id: aulaId || undefined }
   )
   const { data: conflictos = [] }      = useConflictosHorario()
+  // Recesos: si hay aula seleccionada, los de esa aula; si no, los del ciclo activo.
+  const { data: recesos = [] }         = useRecesos(isDocente ? {} : { aula_id: aulaId || undefined })
   const deleteMut                      = useDeleteHorario()
   const updateMut                      = useUpdateHorario()
 
@@ -792,12 +968,18 @@ export default function HorariosPage() {
       {showExport && (
         <ExportModal horarios={horariosRaw} aulas={aulas} onClose={() => setShowExport(false)} />
       )}
+      {showRecesos && (
+        <RecesosModal aulas={aulas} onClose={() => setShowRecesos(false)} />
+      )}
 
       <PageHeader
         title="Horarios"
         crumbs={[{ label: 'Horarios' }]}
         action={!soloLectura ? (
           <>
+            <Btn variant="secondary" size="sm" onClick={() => setShowRecesos(true)}>
+              Recesos
+            </Btn>
             <Btn variant="secondary" icon={<Download size={14} />} size="sm" onClick={() => setShowExport(true)}>
               Exportar PDF
             </Btn>
@@ -946,6 +1128,7 @@ export default function HorariosPage() {
                       </>
                     ),
                     items: horariosDelDia.filter((h) => h.aulaId === a.id),
+                    recesos: recesos.filter((r) => r.aula_id === a.id && r.dia_semana === diaVista),
                   }))}
                   soloLectura={soloLectura}
                   isConflicto={isConflicto}
@@ -973,6 +1156,7 @@ export default function HorariosPage() {
                     key: String(dia),
                     header: <span className="text-[11px] font-semibold text-text">{DIA_FULL[dia - 1]}</span>,
                     items: horarios.filter((h) => h.diaSemana === dia),
+                    recesos: recesos.filter((r) => r.dia_semana === dia),
                   }))}
                   soloLectura={soloLectura}
                   isConflicto={isConflicto}

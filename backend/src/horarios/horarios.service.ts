@@ -197,6 +197,24 @@ export class HorariosService {
     const finNuevo    = getTimeMinutes(timeStringToDate(dto.hora_fin));
     if (inicioNuevo >= finNuevo) throw new BadRequestException('hora_inicio debe ser anterior a hora_fin');
 
+    // Bloqueo: la clase no puede solaparse con el receso del aula ese día.
+    try {
+      const receso = await this.prisma.$queryRaw<{ id: string }[]>`
+        SELECT id FROM recesos
+        WHERE aula_id = ${dto.aula_id}::uuid
+          AND dia_semana = ${dto.dia_semana}
+          AND hora_inicio < ${dto.hora_fin}::time
+          AND hora_fin    > ${dto.hora_inicio}::time
+        LIMIT 1`;
+      if (receso.length > 0) {
+        throw new BadRequestException('La clase se solapa con el receso de esa aula ese día');
+      }
+    } catch (e) {
+      // Si es el error de validación, propagarlo; si la tabla recesos aún no
+      // existe en este servidor, ignorar el chequeo.
+      if (e instanceof BadRequestException) throw e;
+    }
+
     // Solo comparar dentro del MISMO ciclo que el aula del horario nuevo. Así un
     // docente que dicta a la misma hora en el semestre nuevo no choca falsamente
     // con su horario de un semestre cerrado.

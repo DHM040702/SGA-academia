@@ -13,6 +13,7 @@ import { CiclosModule } from './ciclos/ciclos.module';
 import { SeccionesModule } from './secciones/secciones.module';
 import { CursosModule } from './cursos/cursos.module';
 import { HorariosModule } from './horarios/horarios.module';
+import { RecesosModule } from './recesos/recesos.module';
 import { AsistenciaModule } from './asistencia/asistencia.module';
 import { ComunicadosModule } from './comunicados/comunicados.module';
 import { BibliotecaModule } from './biblioteca/biblioteca.module';
@@ -37,6 +38,7 @@ import { AuditoriaModule } from './auditoria/auditoria.module';
     SeccionesModule,
     CursosModule,
     HorariosModule,
+    RecesosModule,
     AsistenciaModule,
     ComunicadosModule,
     BibliotecaModule,

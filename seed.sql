@@ -146,6 +146,20 @@ CREATE TABLE IF NOT EXISTS "horarios" (
     CONSTRAINT "horarios_pkey" PRIMARY KEY ("id")
 );
 
+-- Recesos: una pausa por aula y día (recurrente semana a semana). Bloquea la
+-- asignación de clases que se solapen (validado en el backend).
+CREATE TABLE IF NOT EXISTS "recesos" (
+    "id"          UUID        NOT NULL DEFAULT gen_random_uuid(),
+    "aula_id"     UUID        NOT NULL,
+    "dia_semana"  SMALLINT    NOT NULL,
+    "hora_inicio" TIME        NOT NULL,
+    "hora_fin"    TIME        NOT NULL,
+    "created_at"  TIMESTAMPTZ NOT NULL DEFAULT NOW(),
+    CONSTRAINT "recesos_pkey" PRIMARY KEY ("id"),
+    CONSTRAINT "recesos_aula_dia_unique" UNIQUE ("aula_id", "dia_semana"),
+    CONSTRAINT "recesos_aula_fkey" FOREIGN KEY ("aula_id") REFERENCES "aulas"("id") ON DELETE CASCADE
+);
+
 CREATE TABLE IF NOT EXISTS "asistencias" (
     "id"                  UUID          NOT NULL DEFAULT gen_random_uuid(),
     "tipo_persona"        "TipoPersona" NOT NULL,
