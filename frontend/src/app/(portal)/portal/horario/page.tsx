@@ -86,7 +86,6 @@ async function exportarHorarioPDF(horarios: Horario[], aulaLabel: string, cicloA
 /* ─── helpers ─────────────────────────────────────────────────── */
 const DIAS_LABEL = ['', 'Lunes', 'Martes', 'Miércoles', 'Jueves', 'Viernes', 'Sábado']
 const DIAS_SHORT = ['', 'Lun', 'Mar', 'Mié', 'Jue', 'Vie', 'Sáb']
-const HOUR_SLOTS = ['07:00', '08:00', '09:00', '10:00', '11:00', '12:00', '13:00', '14:00', '15:00', '16:00', '17:00', '18:00', '19:00']
 
 const COURSE_COLORS = [
   'oklch(0.55 0.13 240)',
@@ -105,9 +104,9 @@ function colorFor(name: string) {
 
 function fmtTime(t?: string | null) {
   if (!t) return '—'
-  if (/^\d{2}:\d{2}/.test(t)) return t.slice(0, 5)
-  const d = new Date(t)
-  return isNaN(d.getTime()) ? t : d.toLocaleTimeString('es-PE', { hour: '2-digit', minute: '2-digit' })
+  // Extrae HH:MM SIN convertir zona horaria (las horas se guardan en UTC puro).
+  if (t.includes('T')) return t.slice(11, 16)
+  return t.slice(0, 5)
 }
 
 function getWeekDates(offsetWeeks = 0) {
@@ -128,11 +127,9 @@ function isToday(date: Date) {
 }
 
 function horarioInSlot(horarios: Horario[], dia: number, slot: string): Horario | undefined {
-  return horarios.find((h) => {
-    if (h.diaSemana !== dia) return false
-    const hStart = fmtTime(h.horaInicio)
-    return hStart.startsWith(slot.slice(0, 2))
-  })
+  // Coincidencia EXACTA por hora de inicio (las filas son las horas reales de
+  // clase, no horas en punto), para no ocultar clases que comparten la hora.
+  return horarios.find((h) => h.diaSemana === dia && fmtTime(h.horaInicio) === slot)
 }
 
 /* ─── page ─────────────────────────────────────────────────────── */
@@ -151,6 +148,9 @@ export default function PortalHorarioPage() {
 
   // Solo los horarios de SU aula; sin aula → vacío (no los de todas las aulas).
   const allHorarios: Horario[] = aulaId ? ((horariosRes as any)?.data ?? []) : []
+
+  // Filas = horas reales de inicio de sus clases (ordenadas), no horas en punto.
+  const slots = Array.from(new Set(allHorarios.map((h) => fmtTime(h.horaInicio)))).sort()
 
   // Collect unique docentes
   const docentes = Array.from(
@@ -235,8 +235,12 @@ export default function PortalHorarioPage() {
         {/* Hour rows */}
         {isLoading ? (
           <div className="py-12 text-center text-text-mute text-[13px]">Cargando horario…</div>
+        ) : slots.length === 0 ? (
+          <div className="py-12 text-center text-text-mute text-[13px]">
+            {aulaId ? 'No hay clases registradas para tu aula.' : 'Sin aula asignada.'}
+          </div>
         ) : (
-          HOUR_SLOTS.map((slot) => (
+          slots.map((slot) => (
             <div
               key={slot}
               className="grid"
@@ -276,11 +280,9 @@ export default function PortalHorarioPage() {
                         <div className="text-[10px] text-text-mute">
                           {h.docente ? `${h.docente.nombre} ${h.docente.apellidos}` : '—'}
                         </div>
-                        {h.aula && (
-                          <div className="mt-auto text-[9.5px] font-mono font-semibold" style={{ color: col }}>
-                            {h.aula.nombre}
-                          </div>
-                        )}
+                        <div className="mt-auto text-[9.5px] font-mono font-semibold" style={{ color: col }}>
+                          {fmtTime(h.horaInicio)}–{fmtTime(h.horaFin)}
+                        </div>
                       </div>
                     )}
                   </div>

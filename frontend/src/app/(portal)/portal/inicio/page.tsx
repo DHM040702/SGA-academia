@@ -103,10 +103,10 @@ function colorFor(name: string) {
 
 function fmtTime(t?: string | null) {
   if (!t) return '—'
-  // handle "HH:MM:SS" or ISO
-  if (/^\d{2}:\d{2}/.test(t)) return t.slice(0, 5)
-  const d = new Date(t)
-  return isNaN(d.getTime()) ? t : d.toLocaleTimeString('es-PE', { hour: '2-digit', minute: '2-digit' })
+  // Extrae HH:MM SIN convertir zona horaria (las horas se guardan en UTC puro).
+  // "1970-01-01T14:00:00.000Z" → "14:00"  |  "14:00:00" → "14:00"  |  "14:00" → "14:00"
+  if (t.includes('T')) return t.slice(11, 16)
+  return t.slice(0, 5)
 }
 
 function timeAgo(iso: string) {
@@ -210,12 +210,6 @@ function AlumnoInicio({ user }: { user: ReturnType<typeof useAuth>['user'] }) {
             <p className="mt-1.5 text-[13.5px] text-text-mute">No tienes clases hoy.</p>
           )}
         </div>
-        <Btn
-          variant="secondary"
-          icon={<Download size={14} />}
-          size="sm"
-          onClick={() => alumno && descargarCarnetPortal(alumno)}
-        >Descargar carnet</Btn>
       </div>
 
       {!aulaId && (
