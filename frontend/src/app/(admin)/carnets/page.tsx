@@ -192,7 +192,7 @@ export default function CarnetsPage() {
   }
 
   const selCount    = Object.values(selAlumnos).length
-  const selPagesCnt = Math.ceil(selCount / 9)
+  const selPagesCnt = Math.ceil(selCount / 10)
 
   /* ══════════════════════════════════════════════════════════════
      RENDER
@@ -280,7 +280,7 @@ export default function CarnetsPage() {
       {/* ══ 2. LOTE POR AULA ══════════════════════════════════════ */}
       <Card
         title="Carnets por aula"
-        subtitle="Todos los alumnos de un aula — tarjetón individual (9.3 × 5.6 cm) o hoja A4 con 9 carnets"
+        subtitle="Todos los alumnos de un aula — tarjetón individual (9.3 × 5.6 cm) o hoja A4 con 10 carnets"
       >
         <div className="p-4 flex flex-wrap gap-3 items-end">
           {/* Ciclo */}
@@ -336,7 +336,7 @@ export default function CarnetsPage() {
           {aulaId && (
             <div className="self-center text-[11px] text-text-mute flex flex-col gap-0.5 leading-snug">
               <span>Tarjetón: 1 alumno por página (9.3 × 5.6 cm)</span>
-              <span>Hoja A4: 9 carnets por página · guías de corte</span>
+              <span>Hoja A4: 10 carnets por página · guías de corte</span>
             </div>
           )}
         </div>
@@ -345,7 +345,7 @@ export default function CarnetsPage() {
       {/* ══ 3. CICLO COMPLETO ══════════════════════════════════════ */}
       <Card
         title="Ciclo completo — Hoja A4"
-        subtitle="Genera los carnets de un ciclo entero en hojas A4 apaisadas (9 carnets por página, guías de corte para guillotina)"
+        subtitle="Genera los carnets de un ciclo entero en hojas A4 verticales (10 carnets por página, guías de corte para guillotina)"
       >
         <div className="p-4 flex flex-wrap gap-3 items-end">
           {/* Ciclo */}
@@ -392,7 +392,7 @@ export default function CarnetsPage() {
           {/* Hint */}
           {cicloCicloId && (
             <div className="self-center text-[11px] text-text-mute flex flex-col gap-0.5 leading-snug">
-              <span className="font-medium text-text">9 carnets por página A4 apaisada</span>
+              <span className="font-medium text-text">10 carnets por página A4 vertical</span>
               <span>
                 {cicloAulaId
                   ? `Solo aula ${cicloAulas.find((a) => a.id === cicloAulaId)?.nombre ?? ''}`
@@ -496,7 +496,7 @@ export default function CarnetsPage() {
             </Btn>
             {selCount > 0 ? (
               <p className="text-[11.5px] text-text-mute">
-                {selPagesCnt} {selPagesCnt === 1 ? 'hoja A4' : 'hojas A4'} · 9 carnets por página
+                {selPagesCnt} {selPagesCnt === 1 ? 'hoja A4' : 'hojas A4'} · 10 carnets por página
               </p>
             ) : (
               <p className="text-[11.5px] text-text-mute">

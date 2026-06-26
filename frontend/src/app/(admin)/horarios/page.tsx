@@ -512,12 +512,6 @@ function HorarioCalendario({
 
 type ExportScope = 'completo' | 'aula' | 'dia'
 
-interface ExportModalProps {
-  horarios: Horario[]
-  aulas: { id: string; nombre: string }[]
-  onClose: () => void
-}
-
 function buildPrintHtml(
   opts: { scope: ExportScope; aulaId: string; dia: number; orientacion: 'landscape' | 'portrait'; conDocentes: boolean },
   horarios: Horario[],
@@ -600,10 +594,15 @@ function buildPrintHtml(
   } else if (opts.scope === 'dia') {
     body = diaTable(horarios.filter(h => h.diaSemana === opts.dia), opts.dia)
   } else {
-    body = aulas.map((a, i) => {
-      const table = aulaTable(horarios.filter(h => h.aulaId === a.id), a.nombre)
-      return i < aulas.length - 1 ? `${table}<div class="page-break"></div>` : table
-    }).join('')
+    // Solo aulas que tienen al menos una clase (evita páginas vacías).
+    const conClases = aulas.filter(a => horarios.some(h => h.aulaId === a.id))
+    body = conClases.length === 0
+      ? `<p class="sub">No hay horarios registrados en este ciclo.</p>`
+      : conClases.map((a, i) =>
+          i < conClases.length - 1
+            ? `${aulaTable(horarios.filter(h => h.aulaId === a.id), a.nombre)}<div class="page-break"></div>`
+            : aulaTable(horarios.filter(h => h.aulaId === a.id), a.nombre),
+        ).join('')
   }
 
   const encabezado = `
@@ -626,12 +625,24 @@ function buildPrintHtml(
     </head><body>${encabezado}${body}</body></html>`
 }
 
-function ExportModal({ horarios, aulas, onClose }: ExportModalProps) {
+function ExportModal({ onClose }: { onClose: () => void }) {
+  // El export carga SIEMPRE todos los horarios y aulas del ciclo activo, sin
+  // importar qué aula esté seleccionada en la vista. Así nunca sale vacío ni
+  // faltan clases por el filtro de la pantalla o por la paginación.
+  const { data: horariosPage } = useHorarios({ limit: 3000 })
+  const { data: aulas = [] }   = useAulas()
+  const horarios: Horario[] = (horariosPage as any)?.data ?? horariosPage ?? []
+
   const [scope, setScope]             = useState<ExportScope>('completo')
-  const [aulaId, setAulaId]           = useState(aulas[0]?.id ?? '')
+  const [aulaId, setAulaId]           = useState('')
   const [dia, setDia]                 = useState(1)
   const [orientacion, setOrientacion] = useState<'landscape' | 'portrait'>('landscape')
   const [conDocentes, setConDocentes] = useState(true)
+
+  // Al cargar las aulas, seleccionar la primera por defecto (para scope 'aula').
+  useEffect(() => {
+    if (!aulaId && aulas.length) setAulaId(aulas[0].id)
+  }, [aulas, aulaId])
 
   // Cerrar con Escape
   useEffect(() => {
@@ -1047,7 +1058,7 @@ export default function HorariosPage() {
         <HorarioModal horario={modal === 'edit' ? selected : null} onClose={closeModal} />
       )}
       {showExport && (
-        <ExportModal horarios={horariosRaw} aulas={aulas} onClose={() => setShowExport(false)} />
+        <ExportModal onClose={() => setShowExport(false)} />
       )}
       {showRecesos && (
         <RecesosModal aulas={aulas} onClose={() => setShowRecesos(false)} />

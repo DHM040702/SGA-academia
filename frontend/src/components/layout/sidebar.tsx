@@ -8,7 +8,7 @@ import { useAuth } from '@/contexts/auth-context'
 import {
   Home, Users, Teacher, Grid, Calendar, Check,
   Megaphone, Book, Chart, LogOut, Layers, ScanLine,
-  Clock, Shield, CreditCard, FileText,
+  Clock, Shield, CreditCard, FileText, Award,
 } from '@/components/icons'
 
 /* ─── Tipos ────────────────────────────────────────────────── */
@@ -29,6 +29,7 @@ const GROUPS_ADMIN: NavGroup[] = [
       { href: '/docentes', icon: Teacher,  label: 'Docentes' },
       { href: '/ciclos',   icon: Grid,     label: 'Ciclos y aulas' },
       { href: '/cursos',   icon: Layers,   label: 'Cursos' },
+      { href: '/carreras', icon: Award,    label: 'Carreras' },
       { href: '/horarios', icon: Calendar, label: 'Horarios' },
     ],
   },
@@ -64,6 +65,7 @@ const GROUPS_DIRECTOR: NavGroup[] = [
   {
     label: 'Académico',
     items: [
+      { href: '/carreras', icon: Award,    label: 'Carreras' },
       { href: '/horarios', icon: Calendar, label: 'Horarios' },
     ],
   },

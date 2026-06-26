@@ -19,13 +19,13 @@ const BARCODE_COL_W = 50       // columna derecha (código de barras vertical)
 const BARCODE_BAR_W = 40       // ancho visual de la barra dentro del SVG
 const BARCODE_SVG_H = 112      // alto del SVG (≈ alto del cuerpo menos texto inferior)
 
-/* ─── Hoja A4 apaisada — 3 × 3 = 9 carnets por página ────────── */
-const SHEET_COLS     = 3
-const SHEET_ROWS     = 3
-const A4_LAND_W      = 841.89
-const A4_LAND_H      = 595.28
-const SHEET_H_MARGIN = (A4_LAND_W - SHEET_COLS * CARD_W) / 2
-const SHEET_V_MARGIN = (A4_LAND_H - SHEET_ROWS * CARD_H) / 2
+/* ─── Hoja A4 vertical — 2 × 5 = 10 carnets por página ────────── */
+const SHEET_COLS     = 2
+const SHEET_ROWS     = 5
+const A4_PORT_W      = 595.28
+const A4_PORT_H      = 841.89
+const SHEET_H_MARGIN = (A4_PORT_W - SHEET_COLS * CARD_W) / 2
+const SHEET_V_MARGIN = (A4_PORT_H - SHEET_ROWS * CARD_H) / 2
 
 /* ─── Code128B ────────────────────────────────────────────────── */
 // 106 patrones (índice = valor Code128). Cada cadena = 11 módulos binarios.
@@ -451,7 +451,7 @@ export function CarnetSheetPDF({ alumnos, cicloLabel = '2026-I' }: CarnetSheetPD
       subject="Carnets estudiantiles — hoja A4"
     >
       {pages.map((grupo, pi) => (
-        <Page key={pi} size="A4" orientation="landscape"
+        <Page key={pi} size="A4" orientation="portrait"
           style={{ fontFamily: 'Helvetica', backgroundColor: C.white, position: 'relative' }}>
 
           {grupo.map((alumno, ci) => {
