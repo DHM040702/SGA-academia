@@ -8,6 +8,7 @@ import { useAsistencia } from '@/hooks/use-asistencia'
 import { useHorarios, type Horario } from '@/hooks/use-horarios'
 import { useComunicados, type Comunicado } from '@/hooks/use-comunicados'
 import { useBiblioteca, type RecursoBiblioteca } from '@/hooks/use-biblioteca'
+import { useAvisosLeidos } from '@/hooks/use-avisos-leidos'
 import { KPI } from '@/components/ui/kpi'
 import { Card } from '@/components/ui/card'
 import { Btn } from '@/components/ui/btn'
@@ -462,14 +463,17 @@ function ApoderadoInicio({ user }: { user: ReturnType<typeof useAuth>['user'] })
 
   // Asistencia DEL HIJO (antes se pedía sin alumno_id → datos ajenos/vacíos).
   const { data: asistencias } = useAsistencia(hijoId ? { alumno_id: hijoId, limit: 30 } : {})
-  const { data: comunicados } = useComunicados({ limit: 3 })
+  const { data: comunicados } = useComunicados({ limit: 50 })
+  const { countUnread } = useAvisosLeidos(user?.id)
 
   const records = hijoId ? (asistencias?.data ?? []) : []
   const total = records.length
   const puntuales = records.filter((r) => !r.esTardanza).length
   const tardanzas = records.filter((r) => r.esTardanza).length
   const pct = total > 0 ? Math.round((puntuales / total) * 100) : 0
-  const avisos: Comunicado[] = comunicados?.data ?? []
+  const avisosAll: Comunicado[] = comunicados?.data ?? []
+  const avisos = avisosAll.slice(0, 3)                      // recientes para la tarjeta
+  const avisosSinLeer = countUnread(avisosAll.map((a) => a.id))
 
   // Find today's record
   const today = new Date().toISOString().split('T')[0]
@@ -533,7 +537,7 @@ function ApoderadoInicio({ user }: { user: ReturnType<typeof useAuth>['user'] })
           <KPI label="Asistencia ciclo" value={`${pct}%`} sub={`${puntuales} / ${total} sesiones`} accent="var(--color-success)" />
           <KPI label="Puntualidad" value={`${total - tardanzas > 0 ? Math.round(((total - tardanzas) / total) * 100) : 0}%`} sub={`${tardanzas} tardanzas`} accent="var(--color-primary)" />
           <KPI label="Ausencias" value={0} sub="0 justificadas" accent="var(--color-info)" />
-          <KPI label="Avisos sin leer" value={avisos.length} sub="avisos recientes" accent="var(--color-warning)" />
+          <KPI label="Avisos sin leer" value={avisosSinLeer} sub="avisos del ciclo" accent="var(--color-warning)" />
         </div>
 
         {/* Attendance + avisos */}
@@ -589,7 +593,7 @@ function ApoderadoInicio({ user }: { user: ReturnType<typeof useAuth>['user'] })
             {/* Avisos */}
             <Card
               title="Avisos para apoderados"
-              action={avisos.length > 0 ? <Pill tone="danger">{avisos.length} nuevos</Pill> : undefined}
+              action={avisosSinLeer > 0 ? <Pill tone="danger">{avisosSinLeer} nuevos</Pill> : undefined}
             >
               <div className="px-4 pb-3">
                 {avisos.length === 0 && (

@@ -6,6 +6,8 @@ import Link from 'next/link'
 import { useAuth } from '@/contexts/auth-context'
 import { useActiveCiclo } from '@/hooks/use-ciclos'
 import { cicloWeekInfo } from '@/contexts/ciclo-context'
+import { useComunicados } from '@/hooks/use-comunicados'
+import { useAvisosLeidos } from '@/hooks/use-avisos-leidos'
 import { Avatar } from '@/components/ui/avatar'
 import { Pill } from '@/components/ui/pill'
 import { Dot } from '@/components/ui/dot'
@@ -33,6 +35,11 @@ export default function PortalLayout({ children }: { children: React.ReactNode }
   const pathname = usePathname()
   const [navOpen, setNavOpen] = useState(false)
   const cicloActivo = useActiveCiclo()
+
+  // Avisos no leídos → punto en la campana (antes era un punto rojo fijo).
+  const { data: comunicadosRes } = useComunicados({ limit: 50 })
+  const { countUnread } = useAvisosLeidos(user?.id)
+  const avisosSinLeer = countUnread((comunicadosRes?.data ?? []).map((c: { id: string }) => c.id))
   const cicloWeek   = cicloActivo
     ? cicloWeekInfo(cicloActivo.fechaInicio, cicloActivo.fechaFin)
     : null
@@ -196,13 +203,19 @@ export default function PortalLayout({ children }: { children: React.ReactNode }
               {cicloTag}
             </Pill>
           )}
-          <button className="relative p-1.5 text-text-mute hover:text-text transition-colors bg-transparent border-none cursor-pointer">
+          <Link
+            href="/portal/comunicados"
+            className="relative p-1.5 text-text-mute hover:text-text transition-colors cursor-pointer"
+            title={avisosSinLeer > 0 ? `${avisosSinLeer} aviso(s) sin leer` : 'Avisos'}
+          >
             <Bell size={18} />
-            <span
-              className="absolute top-1 right-1 w-1.5 h-1.5 bg-danger rounded-full"
-              style={{ border: '1.5px solid var(--color-surface)' }}
-            />
-          </button>
+            {avisosSinLeer > 0 && (
+              <span
+                className="absolute top-1 right-1 w-1.5 h-1.5 bg-danger rounded-full"
+                style={{ border: '1.5px solid var(--color-surface)' }}
+              />
+            )}
+          </Link>
         </header>
 
         {/* Content */}

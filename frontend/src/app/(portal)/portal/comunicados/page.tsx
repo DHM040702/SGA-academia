@@ -3,6 +3,8 @@
 import { useState } from 'react'
 import { useComunicados, type Comunicado } from '@/hooks/use-comunicados'
 import { useActiveCiclo } from '@/hooks/use-ciclos'
+import { useAuth } from '@/contexts/auth-context'
+import { useAvisosLeidos } from '@/hooks/use-avisos-leidos'
 import { Pill } from '@/components/ui/pill'
 import { Dot } from '@/components/ui/dot'
 import { Btn } from '@/components/ui/btn'
@@ -27,20 +29,21 @@ export default function PortalComunicadosPage() {
   const [tab, setTab] = useState<TabKey>('todos')
   const [selected, setSelected] = useState<Comunicado | null>(null)
   const cicloActivo = useActiveCiclo()
+  const { user } = useAuth()
 
   const { data: comunicadosRes, isLoading } = useComunicados({ limit: 50 })
   const all: Comunicado[] = comunicadosRes?.data ?? []
 
-  // Simulate "read" state in memory (in a real app this would be server-side)
-  const [readIds, setReadIds] = useState<Set<string>>(new Set())
-  const unreadCount = all.filter((c) => !readIds.has(c.id)).length
+  // Estado "leído" persistido en localStorage (por usuario).
+  const { isRead, markRead, markAllRead } = useAvisosLeidos(user?.id)
+  const unreadCount = all.filter((c) => !isRead(c.id)).length
 
   function openComunicado(c: Comunicado) {
     setSelected(c)
-    setReadIds((prev) => new Set([...prev, c.id]))
+    markRead(c.id)
   }
 
-  const list = tab === 'nuevos' ? all.filter((c) => !readIds.has(c.id)) : all
+  const list = tab === 'nuevos' ? all.filter((c) => !isRead(c.id)) : all
 
   const TABS: { key: TabKey; label: string }[] = [
     { key: 'todos', label: 'Todos' },
@@ -58,10 +61,16 @@ export default function PortalComunicadosPage() {
           </h1>
         </div>
         {unreadCount > 0 && (
-          <Pill tone="danger">
-            <Dot tone="danger" size={6} />
-            {unreadCount} sin leer
-          </Pill>
+          <div className="flex items-center gap-2.5">
+            <Pill tone="danger">
+              <Dot tone="danger" size={6} />
+              {unreadCount} sin leer
+            </Pill>
+            <Btn variant="secondary" size="sm" icon={<Check size={14} />}
+              onClick={() => markAllRead(all.map((c) => c.id))}>
+              Marcar todas como leídas
+            </Btn>
+          </div>
         )}
       </div>
 
@@ -108,7 +117,7 @@ export default function PortalComunicadosPage() {
               </div>
             )}
             {list.map((c) => {
-              const isRead = readIds.has(c.id)
+              const leido = isRead(c.id)
               const isActive = selected?.id === c.id
               return (
                 <button
@@ -123,18 +132,18 @@ export default function PortalComunicadosPage() {
                   }}
                 >
                   <div className="flex items-start gap-2.5">
-                    {!isRead && (
+                    {!leido && (
                       <div
                         className="mt-1.5 w-2 h-2 rounded-full shrink-0"
                         style={{ background: 'var(--color-primary)' }}
                       />
                     )}
-                    {isRead && <div className="mt-1.5 w-2 h-2 shrink-0" />}
+                    {leido && <div className="mt-1.5 w-2 h-2 shrink-0" />}
                     <div className="flex-1 min-w-0">
                       <div className="flex items-baseline gap-2">
                         <span
                           className="text-[13px] truncate flex-1"
-                          style={{ fontWeight: isRead ? 500 : 700 }}
+                          style={{ fontWeight: leido ? 500 : 700 }}
                         >
                           {c.titulo}
                         </span>
