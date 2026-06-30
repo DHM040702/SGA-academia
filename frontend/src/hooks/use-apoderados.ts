@@ -121,6 +121,42 @@ export function useUpdateApoderado() {
   })
 }
 
+export function useCreateApoderado() {
+  const qc = useQueryClient()
+  return useMutation({
+    mutationFn: (dto: Record<string, unknown>) =>
+      api.post('/apoderados', dto).then((r) => r.data),
+    onSuccess: () => qc.invalidateQueries({ queryKey: ['apoderados'] }),
+  })
+}
+
+export function useDeleteApoderado() {
+  const qc = useQueryClient()
+  return useMutation({
+    mutationFn: (id: string) => api.delete(`/apoderados/${id}`).then((r) => r.data),
+    onSuccess: () => qc.invalidateQueries({ queryKey: ['apoderados'] }),
+  })
+}
+
+/** Vincular un estudiante a un apoderado (reusa el endpoint del lado del alumno). */
+export function useVincularEstudiante() {
+  const qc = useQueryClient()
+  return useMutation({
+    mutationFn: ({ alumnoId, ...dto }: { alumnoId: string } & Record<string, unknown>) =>
+      api.post(`/alumnos/${alumnoId}/apoderados`, dto).then((r) => r.data),
+    onSuccess: () => qc.invalidateQueries({ queryKey: ['apoderados'] }),
+  })
+}
+
+export function useDesvincularEstudiante() {
+  const qc = useQueryClient()
+  return useMutation({
+    mutationFn: ({ alumnoId, apoderadoId }: { alumnoId: string; apoderadoId: string }) =>
+      api.delete(`/alumnos/${alumnoId}/apoderados/${apoderadoId}`).then((r) => r.data),
+    onSuccess: () => qc.invalidateQueries({ queryKey: ['apoderados'] }),
+  })
+}
+
 // ── Hooks ────────────────────────────────────────────────────────────
 
 /** Apoderados vinculados a un alumno */
