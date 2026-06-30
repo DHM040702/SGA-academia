@@ -109,6 +109,10 @@ export function useDeleteAlumno() {
 
 export interface ImportResult {
   ok: number
+  /** Altas nuevas (alumnos que no existían) */
+  creados?: number
+  /** Re-matrículas (alumnos existentes movidos al aula del ciclo activo) */
+  actualizados?: number
   errores: { fila: number; msg: string }[]
 }
 

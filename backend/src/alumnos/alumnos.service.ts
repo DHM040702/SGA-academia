@@ -440,10 +440,40 @@ export class AlumnosService {
   }
 
   async importar(rows: CreateAlumnoDto[]) {
-    const results = { ok: 0, errores: [] as { fila: number; msg: string }[] };
+    // `ok` = total de filas procesadas con éxito (creados + actualizados),
+    // se mantiene por compatibilidad con el frontend; el desglose permite
+    // distinguir altas nuevas de re-matrículas al ciclo activo.
+    const results = {
+      ok: 0,
+      creados: 0,
+      actualizados: 0,
+      errores: [] as { fila: number; msg: string }[],
+    };
+
     for (let i = 0; i < rows.length; i++) {
+      const dto = rows[i];
       try {
-        await this.create(rows[i]);
+        // Sin aula no se puede matricular: el aulaMap ya está scopeado al
+        // ciclo activo, así que un aula vacía significa que el AULA/TURNO del
+        // Excel no existe en el ciclo en curso.
+        if (!dto.aula_id) {
+          throw new BadRequestException('Aula no encontrada en el ciclo activo (revisa AULA y TURNO)');
+        }
+
+        // El DNI es único global → un alumno que regresa YA existe (incluso si
+        // fue dado de baja). En vez de rechazarlo, se re-matricula al aula del
+        // ciclo activo. Esto desbloquea los portales del nuevo semestre.
+        const existente = await this.prisma.alumno.findFirst({
+          where: { dni: dto.dni },
+        });
+
+        if (existente) {
+          await this.rematricular(existente.id, dto);
+          results.actualizados++;
+        } else {
+          await this.create(dto);
+          results.creados++;
+        }
         results.ok++;
       } catch (e: any) {
         results.errores.push({ fila: i + 1, msg: e.message });
@@ -452,9 +482,47 @@ export class AlumnosService {
     return results;
   }
 
-  /** Mapa (nombre_aula_lower|turno) → aulaId para el controller de importación */
+  /**
+   * Re-matrícula: mueve un alumno existente al aula del ciclo activo.
+   * Reactiva su cuenta si estaba dada de baja y refresca nombres si vienen
+   * en el Excel (correcciones), pero NO toca email ni contraseña.
+   */
+  private async rematricular(id: string, dto: CreateAlumnoDto) {
+    return this.prisma.$transaction(async (tx) => {
+      const alumno = await tx.alumno.findUnique({ where: { id } });
+      if (!alumno) throw new NotFoundException('Alumno no encontrado');
+
+      await tx.alumno.update({
+        where: { id },
+        data: {
+          aulaId:    dto.aula_id,
+          deletedAt: null,
+          ...(dto.nombres   && { nombre:    dto.nombres }),
+          ...(dto.apellidos && { apellidos: dto.apellidos }),
+        },
+      });
+
+      // Reactivar la cuenta de acceso por si el alumno estaba inactivo.
+      await tx.usuario.update({
+        where: { id: alumno.usuarioId },
+        data:  { activo: true, deletedAt: null },
+      });
+    });
+  }
+
+  /**
+   * Mapa (nombre_aula_lower|turno) → aulaId para el controller de importación.
+   * Scopeado al CICLO ACTIVO: los nombres de aula (p. ej. "A-101") se repiten
+   * entre ciclos, así que sin este filtro el Map resolvía al aula de un ciclo
+   * viejo y los alumnos quedaban fuera del semestre en curso.
+   */
   async getAulaMap(): Promise<Map<string, string>> {
+    const activo = await this.prisma.ciclo.findFirst({
+      where: { activo: true },
+      select: { id: true },
+    });
     const aulas = await this.prisma.aula.findMany({
+      where: activo ? { cicloId: activo.id } : {},
       select: { id: true, nombre: true, turno: true },
     });
     const map = new Map<string, string>();

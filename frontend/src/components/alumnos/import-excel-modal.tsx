@@ -392,12 +392,19 @@ function StepResult({ result, onClose }: { result: ImportResult; onClose: () => 
         </div>
         <div className="text-[15px] font-semibold text-text">
           {success
-            ? `alumno${result.ok !== 1 ? 's' : ''} importado${result.ok !== 1 ? 's' : ''} correctamente`
+            ? `alumno${result.ok !== 1 ? 's' : ''} procesado${result.ok !== 1 ? 's' : ''} correctamente`
             : 'No se pudo importar ningún alumno'}
         </div>
-        {success && (
+        {success && (result.creados != null || result.actualizados != null) && (
           <div className="text-[12.5px] text-text-mute">
-            La contraseña inicial de cada alumno es su DNI de 8 dígitos.
+            {result.creados ? `${result.creados} nuevo${result.creados !== 1 ? 's' : ''}` : null}
+            {result.creados && result.actualizados ? ' · ' : null}
+            {result.actualizados ? `${result.actualizados} re-matriculado${result.actualizados !== 1 ? 's' : ''} al ciclo activo` : null}
+          </div>
+        )}
+        {success && (result.creados ?? 0) > 0 && (
+          <div className="text-[12.5px] text-text-mute">
+            La contraseña inicial de los alumnos nuevos es su DNI de 8 dígitos.
           </div>
         )}
       </div>
