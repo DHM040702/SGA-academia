@@ -138,6 +138,13 @@ export function useDeleteApoderado() {
   })
 }
 
+export function useResetPasswordApoderado() {
+  return useMutation({
+    mutationFn: ({ id, password }: { id: string; password: string }) =>
+      api.post(`/apoderados/${id}/reset-password`, { password }).then((r) => r.data),
+  })
+}
+
 /** Vincular un estudiante a un apoderado (reusa el endpoint del lado del alumno). */
 export function useVincularEstudiante() {
   const qc = useQueryClient()

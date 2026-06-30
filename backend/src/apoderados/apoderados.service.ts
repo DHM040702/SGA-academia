@@ -111,20 +111,66 @@ export class ApoderadosService {
   }
 
   async update(id: string, dto: UpdateApoderadoDto) {
-    await this.findOne(id);
-    return this.prisma.apoderado.update({
-      where: { id },
-      data: {
-        ...(dto.nombre            !== undefined && { nombre:           dto.nombre }),
-        ...(dto.apellidos         !== undefined && { apellidos:        dto.apellidos }),
-        ...(dto.telefono_whatsapp !== undefined && { telefonoWhatsapp: dto.telefono_whatsapp }),
-      },
-      select: {
-        id: true, nombre: true, apellidos: true, dni: true, telefonoWhatsapp: true,
-        usuario: { select: { email: true, activo: true } },
-        _count: { select: { alumnos: true } },
-      },
+    const ap = await this.prisma.apoderado.findFirst({
+      where: { id, deletedAt: null },
+      select: { id: true, usuarioId: true },
     });
+    if (!ap) throw new NotFoundException('Apoderado no encontrado');
+
+    // Si cambia el correo, verificar que no esté en uso por otra cuenta.
+    if (dto.email !== undefined) {
+      const otro = await this.prisma.usuario.findFirst({
+        where: { email: dto.email, NOT: { id: ap.usuarioId } },
+      });
+      if (otro) throw new BadRequestException('Ya existe un usuario con ese email');
+    }
+
+    return this.prisma.$transaction(async (tx) => {
+      // Datos de la cuenta (correo / estado)
+      if (dto.email !== undefined || dto.activo !== undefined) {
+        await tx.usuario.update({
+          where: { id: ap.usuarioId },
+          data: {
+            ...(dto.email  !== undefined && { email:  dto.email }),
+            ...(dto.activo !== undefined && { activo: dto.activo }),
+          },
+        });
+      }
+      // Perfil del apoderado
+      return tx.apoderado.update({
+        where: { id },
+        data: {
+          ...(dto.nombre            !== undefined && { nombre:           dto.nombre }),
+          ...(dto.apellidos         !== undefined && { apellidos:        dto.apellidos }),
+          ...(dto.telefono_whatsapp !== undefined && { telefonoWhatsapp: dto.telefono_whatsapp }),
+        },
+        select: {
+          id: true, nombre: true, apellidos: true, dni: true, telefonoWhatsapp: true,
+          usuario: { select: { email: true, activo: true } },
+          _count: { select: { alumnos: true } },
+        },
+      });
+    });
+  }
+
+  /** Restablece la contraseña de la cuenta del apoderado (fuerza cambio al ingresar). */
+  async resetPassword(id: string, password: string) {
+    const ap = await this.prisma.apoderado.findFirst({
+      where: { id, deletedAt: null },
+      select: { usuarioId: true },
+    });
+    if (!ap) throw new NotFoundException('Apoderado no encontrado');
+
+    const passwordHash = await bcrypt.hash(password, 10);
+    await this.prisma.usuario.update({
+      where: { id: ap.usuarioId },
+      data: { passwordHash, debeCambiarPassword: true },
+    });
+    // Cerrar sesiones activas por seguridad (si la tabla existe).
+    try {
+      await this.prisma.$executeRaw`DELETE FROM refresh_tokens WHERE usuario_id = ${ap.usuarioId}::uuid`;
+    } catch { /* tabla aún no creada */ }
+    return { success: true };
   }
 
   /** Elimina el apoderado: quita sus vínculos, lo marca como borrado y desactiva su cuenta. */

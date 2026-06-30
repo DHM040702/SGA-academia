@@ -9,7 +9,7 @@ import { RolesGuard } from '../common/guards/roles.guard';
 import { Roles } from '../common/decorators/roles.decorator';
 import { ApoderadosService } from './apoderados.service';
 import { FilterApoderadosDto } from './dto/filter-apoderados.dto';
-import { UpdateApoderadoDto } from './dto/update-apoderado.dto';
+import { UpdateApoderadoDto, ResetPasswordApoderadoDto } from './dto/update-apoderado.dto';
 import { CreateApoderadoDto } from './dto/create-apoderado.dto';
 
 @ApiTags('Apoderados')
@@ -45,6 +45,14 @@ export class ApoderadosController {
   @ApiOperation({ summary: 'Actualizar datos del apoderado (nombre, apellidos, WhatsApp)' })
   update(@Param('id', ParseUUIDPipe) id: string, @Body() dto: UpdateApoderadoDto) {
     return this.service.update(id, dto);
+  }
+
+  @Post(':id/reset-password')
+  @HttpCode(HttpStatus.OK)
+  @Roles(Rol.admin, Rol.director)
+  @ApiOperation({ summary: 'Restablecer la contraseña de la cuenta del apoderado' })
+  resetPassword(@Param('id', ParseUUIDPipe) id: string, @Body() dto: ResetPasswordApoderadoDto) {
+    return this.service.resetPassword(id, dto.password);
   }
 
   @Delete(':id')

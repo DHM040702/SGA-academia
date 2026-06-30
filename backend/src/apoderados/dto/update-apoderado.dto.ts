@@ -1,5 +1,5 @@
 import { ApiPropertyOptional } from '@nestjs/swagger';
-import { IsOptional, IsString, MaxLength, MinLength } from 'class-validator';
+import { IsBoolean, IsEmail, IsOptional, IsString, MaxLength, MinLength } from 'class-validator';
 
 export class UpdateApoderadoDto {
   @ApiPropertyOptional({ example: 'María' })
@@ -20,4 +20,22 @@ export class UpdateApoderadoDto {
   @MinLength(6)
   @MaxLength(20)
   telefono_whatsapp?: string;
+
+  @ApiPropertyOptional({ example: 'apoderado@correo.com', description: 'Correo de acceso de la cuenta' })
+  @IsOptional()
+  @IsEmail()
+  email?: string;
+
+  @ApiPropertyOptional({ description: 'Activar/desactivar la cuenta de acceso' })
+  @IsOptional()
+  @IsBoolean()
+  activo?: boolean;
+}
+
+export class ResetPasswordApoderadoDto {
+  @ApiPropertyOptional({ example: 'NuevaClave123', minLength: 8 })
+  @IsString()
+  @MinLength(8)
+  @MaxLength(72)
+  password: string;
 }

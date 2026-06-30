@@ -6,7 +6,7 @@ import { useQuery } from '@tanstack/react-query'
 import api from '@/lib/api'
 import {
   useApoderados, useApoderado, useUpdateApoderado, useCreateApoderado, useDeleteApoderado,
-  useVincularEstudiante, useDesvincularEstudiante, PARENTESCO_OPTS,
+  useVincularEstudiante, useDesvincularEstudiante, useResetPasswordApoderado, PARENTESCO_OPTS,
   type Apoderado,
 } from '@/hooks/use-apoderados'
 import { PageHeader } from '@/components/layout/page-header'
@@ -159,15 +159,23 @@ function ApoderadoModal({ id, onClose }: { id: string; onClose: () => void }) {
   const updateMut = useUpdateApoderado()
   const deleteMut = useDeleteApoderado()
   const desvincularMut = useDesvincularEstudiante()
+  const resetMut = useResetPasswordApoderado()
 
   const [edit, setEdit] = useState(false)
   const [nombre, setNombre] = useState('')
   const [apellidos, setApellidos] = useState('')
   const [whatsapp, setWhatsapp] = useState('')
+  const [email, setEmail] = useState('')
+  const [activo, setActivo] = useState(true)
+  const [nuevaPass, setNuevaPass] = useState('')
+  const [okMsg, setOkMsg] = useState('')
   const [error, setError] = useState('')
 
   useEffect(() => {
-    if (ap) { setNombre(ap.nombre); setApellidos(ap.apellidos); setWhatsapp(ap.telefonoWhatsapp) }
+    if (ap) {
+      setNombre(ap.nombre); setApellidos(ap.apellidos); setWhatsapp(ap.telefonoWhatsapp)
+      setEmail(ap.usuario?.email ?? ''); setActivo(ap.usuario?.activo ?? true)
+    }
   }, [ap])
 
   useEffect(() => {
@@ -179,10 +187,23 @@ function ApoderadoModal({ id, onClose }: { id: string; onClose: () => void }) {
   async function guardar(e: React.FormEvent) {
     e.preventDefault()
     if (!nombre.trim() || !apellidos.trim()) { setError('Nombre y apellidos son obligatorios.'); return }
+    if (!email.trim()) { setError('El correo es obligatorio.'); return }
     try {
-      await updateMut.mutateAsync({ id, nombre: nombre.trim(), apellidos: apellidos.trim(), telefono_whatsapp: whatsapp.trim() })
-      setEdit(false); setError('')
+      await updateMut.mutateAsync({
+        id,
+        nombre: nombre.trim(), apellidos: apellidos.trim(), telefono_whatsapp: whatsapp.trim(),
+        email: email.trim(), activo,
+      })
+      setEdit(false); setError(''); setOkMsg('Datos actualizados.')
     } catch (err: any) { setError(errMsg(err, 'No se pudo guardar.')) }
+  }
+
+  async function resetearPassword() {
+    if (nuevaPass.trim().length < 8) { setError('La contraseña debe tener al menos 8 caracteres.'); return }
+    try {
+      await resetMut.mutateAsync({ id, password: nuevaPass.trim() })
+      setNuevaPass(''); setError(''); setOkMsg('Contraseña restablecida. El apoderado deberá cambiarla al ingresar.')
+    } catch (err: any) { setError(errMsg(err, 'No se pudo restablecer la contraseña.')) }
   }
 
   async function eliminar() {
@@ -219,13 +240,43 @@ function ApoderadoModal({ id, onClose }: { id: string; onClose: () => void }) {
               <label className="flex flex-col gap-1"><span className="text-[12px] font-medium text-text-mute">Apellidos</span>
                 <input value={apellidos} onChange={(e) => setApellidos(e.target.value)} className={input} required /></label>
             </div>
-            <label className="flex flex-col gap-1"><span className="text-[12px] font-medium text-text-mute">WhatsApp</span>
-              <input value={whatsapp} onChange={(e) => setWhatsapp(e.target.value)} className={input} /></label>
-            <p className="text-[11.5px] text-text-mute">El DNI y el correo de acceso se gestionan desde el módulo de Usuarios.</p>
+            <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
+              <label className="flex flex-col gap-1"><span className="text-[12px] font-medium text-text-mute">WhatsApp</span>
+                <input value={whatsapp} onChange={(e) => setWhatsapp(e.target.value)} className={input} /></label>
+              <label className="flex flex-col gap-1"><span className="text-[12px] font-medium text-text-mute">Correo de acceso</span>
+                <input type="email" value={email} onChange={(e) => setEmail(e.target.value)} className={input} required /></label>
+            </div>
+            <label className="flex items-center justify-between py-1">
+              <span className="text-[13px]">Cuenta activa</span>
+              <button type="button" onClick={() => setActivo((v) => !v)}
+                className={`w-9 h-5 rounded-full transition-colors relative ${activo ? 'bg-primary' : 'bg-border'}`}>
+                <span className={`absolute top-0.5 w-4 h-4 rounded-full bg-white shadow transition-transform ${activo ? 'translate-x-[18px]' : 'translate-x-0.5'}`} />
+              </button>
+            </label>
+            <p className="text-[11.5px] text-text-mute">El DNI no es editable. Si lo necesitas cambiar, hazlo desde el módulo de Usuarios.</p>
             {error && <p className="text-[12px] text-danger bg-danger-light/40 px-3 py-2 rounded-2">{error}</p>}
+            {okMsg && <p className="text-[12px] text-success bg-success-light/40 px-3 py-2 rounded-2">{okMsg}</p>}
             <div className="flex gap-2 pt-1">
-              <Btn type="button" variant="secondary" className="flex-1" onClick={() => { setEdit(false); setError('') }}>Cancelar</Btn>
+              <Btn type="button" variant="secondary" className="flex-1" onClick={() => { setEdit(false); setError(''); setOkMsg('') }}>Cancelar</Btn>
               <Btn type="submit" className="flex-1" disabled={updateMut.isPending}>{updateMut.isPending ? 'Guardando…' : 'Guardar cambios'}</Btn>
+            </div>
+
+            {/* Restablecer contraseña */}
+            <div className="flex flex-col gap-2 border-t border-border-s pt-3 mt-1">
+              <span className="text-[12px] font-medium text-text-mute uppercase tracking-wide">Restablecer contraseña</span>
+              <div className="flex gap-2">
+                <input
+                  type="text"
+                  value={nuevaPass}
+                  onChange={(e) => setNuevaPass(e.target.value)}
+                  placeholder="Nueva contraseña (mín. 8)"
+                  className={`${input} flex-1`}
+                />
+                <Btn type="button" variant="secondary" disabled={resetMut.isPending || nuevaPass.trim().length < 8} onClick={resetearPassword}>
+                  {resetMut.isPending ? '…' : 'Restablecer'}
+                </Btn>
+              </div>
+              <p className="text-[11px] text-text-mute">El apoderado deberá cambiarla en su primer ingreso.</p>
             </div>
           </form>
         ) : (
@@ -277,9 +328,10 @@ function ApoderadoModal({ id, onClose }: { id: string; onClose: () => void }) {
             <VincularEstudiante apoderadoId={id} />
 
             {error && <p className="text-[12px] text-danger">{error}</p>}
+            {okMsg && <p className="text-[12px] text-success">{okMsg}</p>}
 
             <div className="flex gap-2 pt-2 border-t border-border-s">
-              <Btn variant="secondary" className="flex-1" icon={<Edit size={14} />} onClick={() => setEdit(true)}>Editar datos</Btn>
+              <Btn variant="secondary" className="flex-1" icon={<Edit size={14} />} onClick={() => { setEdit(true); setOkMsg(''); setError('') }}>Editar datos</Btn>
               <Btn variant="ghost" className="text-danger hover:bg-danger-l" icon={<Trash size={14} />}
                 onClick={eliminar} disabled={deleteMut.isPending}>
                 {deleteMut.isPending ? 'Eliminando…' : 'Eliminar'}
