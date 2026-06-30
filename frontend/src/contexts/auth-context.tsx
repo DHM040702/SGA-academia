@@ -20,7 +20,29 @@ export interface AuthUser {
     aula?: { area?: 'ciencias' | 'letras' | 'medicas' | null } | null
   } | null
   docente?: { id: string; nombre: string; apellidos: string } | null
-  apoderado?: { id: string; nombre: string; apellidos: string } | null
+  apoderado?: {
+    id: string
+    nombre: string
+    apellidos: string
+    alumnos?: {
+      parentesco?: string
+      esPrincipal?: boolean
+      alumno: {
+        id: string
+        nombre: string
+        apellidos: string
+        codigoBarras?: string | null
+        dni?: string | null
+        aulaId?: string | null
+        aula?: {
+          nombre?: string | null
+          area?: 'ciencias' | 'letras' | 'medicas' | null
+          turno?: string | null
+          ciclo?: { nombre: string; activo: boolean } | null
+        } | null
+      }
+    }[]
+  } | null
 }
 
 interface AuthState {

@@ -1217,7 +1217,9 @@ export default function HorariosPage() {
           )}
 
           {/* Grid */}
-          {!aulaId ? (
+          {/* El docente ve SIEMPRE su semana (días como columnas); la vista
+              global por aulas requiere /aulas, al que el docente no tiene acceso. */}
+          {(!aulaId && !isDocente) ? (
             /* ── Vista global: aulas como columnas, selector de día ── */
             <div className="bg-surface border border-border rounded-3 shadow-1 overflow-auto">
               <div className="flex gap-1 p-3 border-b border-border-s overflow-x-auto">
@@ -1274,7 +1276,7 @@ export default function HorariosPage() {
                 <div className="text-center py-10 text-text-mute text-[13px]">Cargando horarios…</div>
               ) : slots.length === 0 ? (
                 <div className="text-center py-10 text-text-mute text-[13px]">
-                  No hay horarios registrados para esta aula.{!soloLectura && (<><br />
+                  {isDocente ? 'No tienes clases asignadas en el ciclo activo.' : 'No hay horarios registrados para esta aula.'}{!soloLectura && (<><br />
                   <button onClick={openCreate} className="mt-2 text-primary text-[12px] hover:underline">
                     + Asignar primera clase
                   </button></>)}
@@ -1285,7 +1287,9 @@ export default function HorariosPage() {
                     key: String(dia),
                     header: <span className="text-[11px] font-semibold text-text">{DIA_FULL[dia - 1]}</span>,
                     items: horarios.filter((h) => h.diaSemana === dia),
-                    recesos: recesos.filter((r) => r.dia_semana === dia),
+                    // El docente cruza varias aulas; los recesos son por aula, así
+                    // que no se muestran en su vista semanal.
+                    recesos: isDocente ? [] : recesos.filter((r) => r.dia_semana === dia),
                   }))}
                   soloLectura={soloLectura}
                   isConflicto={isConflicto}

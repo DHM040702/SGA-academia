@@ -1,5 +1,6 @@
 'use client'
 
+import { useState } from 'react'
 import { useAuth } from '@/contexts/auth-context'
 import { useActiveCiclo } from '@/hooks/use-ciclos'
 import { cicloWeekInfo } from '@/contexts/ciclo-context'
@@ -103,10 +104,18 @@ function colorFor(name: string) {
 
 function fmtTime(t?: string | null) {
   if (!t) return '—'
-  // Extrae HH:MM SIN convertir zona horaria (las horas se guardan en UTC puro).
+  // Hora de CLASE (@db.Time): extrae HH:MM SIN convertir zona (UTC puro).
   // "1970-01-01T14:00:00.000Z" → "14:00"  |  "14:00:00" → "14:00"  |  "14:00" → "14:00"
   if (t.includes('T')) return t.slice(11, 16)
   return t.slice(0, 5)
+}
+
+// Hora de un INSTANTE real (ej. hora de ingreso de asistencia, timestamptz):
+// aquí SÍ se convierte a la zona local.
+function fmtHoraReal(t?: string | null) {
+  if (!t) return '—'
+  const d = new Date(t)
+  return isNaN(d.getTime()) ? '—' : d.toLocaleTimeString('es-PE', { hour: '2-digit', minute: '2-digit' })
 }
 
 function timeAgo(iso: string) {
@@ -159,12 +168,16 @@ function AlumnoInicio({ user }: { user: ReturnType<typeof useAuth>['user'] }) {
   const aulaId: string | undefined = (alumno as any)?.aulaId ?? undefined
   const alumnoId: string | undefined = alumno?.id
   const codigoBarras: string = alumno?.codigoBarras ?? '000000'
+  // Recursos solo de SU área (+ los generales). Sin área → solo generales.
+  const areaAlumno: 'ciencias' | 'letras' | 'medicas' | undefined = (alumno as any)?.aula?.area ?? undefined
 
   const cicloActivo = useActiveCiclo()
   const { data: horariosRes } = useHorarios(aulaId ? { aula_id: aulaId } : {})
   const { data: asistencias } = useAsistencia(alumnoId ? { alumno_id: alumnoId, limit: 15 } : {})
   const { data: comunicados } = useComunicados({ limit: 3 })
-  const { data: recursos } = useBiblioteca({ limit: 4 })
+  const { data: recursos } = useBiblioteca(
+    areaAlumno ? { limit: 4, area: areaAlumno } : { limit: 4, solo_generales: true },
+  )
 
   // Solo los horarios de SU aula. Si no tiene aula asignada, no mostramos los de
   // todas las aulas (sería dato incorrecto): queda vacío con aviso.
@@ -440,10 +453,18 @@ function ApoderadoInicio({ user }: { user: ReturnType<typeof useAuth>['user'] })
   const firstName = nombre.split(' ')[0]
   const cicloActivo = useActiveCiclo()
 
-  const { data: asistencias } = useAsistencia({ limit: 7 })
+  // Hijos vinculados (vienen en /auth/me). Se sigue al seleccionado.
+  const hijos = apoderado?.alumnos ?? []
+  const [hijoIdx, setHijoIdx] = useState(0)
+  const hijo = hijos[hijoIdx]?.alumno
+  const hijoId = hijo?.id
+  const hijoNombre = hijo ? `${hijo.nombre} ${hijo.apellidos}` : ''
+
+  // Asistencia DEL HIJO (antes se pedía sin alumno_id → datos ajenos/vacíos).
+  const { data: asistencias } = useAsistencia(hijoId ? { alumno_id: hijoId, limit: 30 } : {})
   const { data: comunicados } = useComunicados({ limit: 3 })
 
-  const records = asistencias?.data ?? []
+  const records = hijoId ? (asistencias?.data ?? []) : []
   const total = records.length
   const puntuales = records.filter((r) => !r.esTardanza).length
   const tardanzas = records.filter((r) => r.esTardanza).length
@@ -464,24 +485,45 @@ function ApoderadoInicio({ user }: { user: ReturnType<typeof useAuth>['user'] })
             <h1 className="m-0 font-serif font-semibold text-[24px] md:text-[30px] tracking-[-0.02em] leading-[1.1]">
               {saludo()}, {firstName}.
             </h1>
-            {todayRecord ? (
-              <p className="mt-1.5 text-[13.5px] text-text-mute">
-                Su hijo/a ingresó hoy a las{' '}
-                <strong className="text-success">{fmtTime(todayRecord.horaIngreso)}</strong>.
-              </p>
+            {hijo ? (
+              <>
+                <div className="mt-1.5 flex items-center gap-2 flex-wrap text-[13.5px] text-text-mute">
+                  <span>Seguimiento de <strong className="text-text">{hijoNombre}</strong>{hijo.aula?.nombre ? ` · ${hijo.aula.nombre}` : ''}.</span>
+                  {hijos.length > 1 && (
+                    <select
+                      value={hijoIdx}
+                      onChange={(e) => setHijoIdx(Number(e.target.value))}
+                      className="text-[12.5px] px-2 py-1 border border-border rounded-2 bg-surface focus:outline-none focus:border-primary"
+                    >
+                      {hijos.map((h, i) => (
+                        <option key={i} value={i}>{h.alumno.nombre} {h.alumno.apellidos}</option>
+                      ))}
+                    </select>
+                  )}
+                </div>
+                <p className="mt-1 text-[13px] text-text-mute">
+                  {todayRecord
+                    ? <>Ingresó hoy a las <strong className="text-success">{fmtHoraReal(todayRecord.horaIngreso)}</strong>.</>
+                    : 'Aún no hay registro de asistencia hoy.'}
+                </p>
+              </>
             ) : (
-              <p className="mt-1.5 text-[13.5px] text-text-mute">Aún no hay registro de asistencia hoy.</p>
+              <p className="mt-1.5 text-[13.5px] text-warning font-medium">
+                No tienes hijos vinculados a tu cuenta. Comunícate con administración.
+              </p>
             )}
           </div>
-          <Btn
-            variant="secondary"
-            icon={<Download size={14} />}
-            size="sm"
-            onClick={() => descargarReporteCicloApoderado(
-              records, `${apoderado?.nombre ?? nombre} (apoderado)`,
-              total, puntuales, tardanzas,
-            )}
-          >Reporte del ciclo</Btn>
+          {hijo && (
+            <Btn
+              variant="secondary"
+              icon={<Download size={14} />}
+              size="sm"
+              onClick={() => descargarReporteCicloApoderado(
+                records, hijoNombre,
+                total, puntuales, tardanzas,
+              )}
+            >Reporte del ciclo</Btn>
+          )}
         </div>
       </div>
 
@@ -529,7 +571,7 @@ function ApoderadoInicio({ user }: { user: ReturnType<typeof useAuth>['user'] })
                       {new Date(r.fecha).toLocaleDateString('es-PE', { weekday: 'short', day: '2-digit', month: 'short' })}
                     </td>
                     <td className="px-[18px] py-2.5 font-mono text-[12px]">
-                      {r.horaIngreso ? fmtTime(r.horaIngreso) : '—'}
+                      {r.horaIngreso ? fmtHoraReal(r.horaIngreso) : '—'}
                     </td>
                     <td className="px-[18px] py-2.5">
                       <Pill tone={r.esTardanza ? 'warning' : 'success'}>

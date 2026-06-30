@@ -135,8 +135,10 @@ function horarioInSlot(horarios: Horario[], dia: number, slot: string): Horario 
 /* ─── page ─────────────────────────────────────────────────────── */
 export default function PortalHorarioPage() {
   const { user } = useAuth()
-  const alumno = user?.alumno
-  const aulaId: string | undefined = (alumno as any)?.aulaId ?? undefined
+  // Para apoderado, el aula es la de su hijo vinculado; para alumno, la suya.
+  const isApoderado = user?.rol === 'apoderado'
+  const alumno: any = (isApoderado ? user?.apoderado?.alumnos?.[0]?.alumno : user?.alumno) ?? null
+  const aulaId: string | undefined = alumno?.aulaId ?? undefined
   const cicloActivo = useActiveCiclo()
 
   const [weekOffset, setWeekOffset] = useState(0)

@@ -74,7 +74,9 @@ const MONTHS_ES = ['Enero','Febrero','Marzo','Abril','Mayo','Junio','Julio','Ago
 /* ─── page ─────────────────────────────────────────────────────── */
 export default function PortalAsistenciaPage() {
   const { user } = useAuth()
-  const alumno = user?.alumno
+  // Para apoderado, el "sujeto" seguido es su hijo vinculado; para alumno, él mismo.
+  const isApoderado = user?.rol === 'apoderado'
+  const alumno: any = (isApoderado ? user?.apoderado?.alumnos?.[0]?.alumno : user?.alumno) ?? null
   const alumnoId: string | undefined = alumno?.id
   const cicloActivo = useActiveCiclo()
 

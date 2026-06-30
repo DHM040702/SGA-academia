@@ -153,7 +153,31 @@ export class AuthService {
         dni:       true,
         alumno:    { select: { id: true, nombre: true, apellidos: true, codigoBarras: true, aulaId: true, aula: { select: { area: true } } } },
         docente:   { select: { id: true, nombre: true, apellidos: true } },
-        apoderado: { select: { id: true, nombre: true, apellidos: true } },
+        apoderado: {
+          select: {
+            id: true, nombre: true, apellidos: true,
+            // Hijos vinculados, para que el portal del apoderado muestre sus datos.
+            alumnos: {
+              where: { alumno: { deletedAt: null } },
+              orderBy: { esPrincipal: 'desc' },
+              select: {
+                parentesco: true,
+                esPrincipal: true,
+                alumno: {
+                  select: {
+                    id: true, nombre: true, apellidos: true, codigoBarras: true, dni: true, aulaId: true,
+                    aula: {
+                      select: {
+                        nombre: true, area: true, turno: true,
+                        ciclo: { select: { nombre: true, activo: true } },
+                      },
+                    },
+                  },
+                },
+              },
+            },
+          },
+        },
       },
     });
   }
