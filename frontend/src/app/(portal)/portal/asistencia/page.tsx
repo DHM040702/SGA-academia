@@ -122,9 +122,16 @@ export default function PortalAsistenciaPage() {
       {/* Hero */}
       <div className="flex flex-col gap-3 md:flex-row md:items-end md:justify-between mb-5">
         <div>
-          <div className="text-[11.5px] text-text-mute mb-1">{cicloActivo ? `Ciclo ${cicloActivo.nombre} · ` : ''}seguimiento personal</div>
+          <div className="text-[11.5px] text-text-mute mb-1">
+            {cicloActivo ? `Ciclo ${cicloActivo.nombre} · ` : ''}
+            {isApoderado
+              ? `seguimiento del estudiante${alumno?.aula?.nombre ? ` · ${alumno.aula.nombre}` : ''}`
+              : 'seguimiento personal'}
+          </div>
           <h1 className="m-0 font-serif font-semibold text-[24px] md:text-[30px] tracking-[-0.02em] leading-[1.1]">
-            Mi asistencia
+            {isApoderado
+              ? `Asistencia de ${alumno ? `${alumno.nombre} ${alumno.apellidos}` : 'tu hijo/a'}`
+              : 'Mi asistencia'}
           </h1>
         </div>
         <Btn

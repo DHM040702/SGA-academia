@@ -172,10 +172,12 @@ export default function PortalHorarioPage() {
       <div className="flex flex-col gap-3 md:flex-row md:items-end md:justify-between mb-5">
         <div>
           <div className="text-[11.5px] text-text-mute mb-1">
-            Aula {aulaId ? 'activa' : '—'}{cicloActivo ? ` · Ciclo ${cicloActivo.nombre}` : ''}
+            Aula {alumno?.aula?.nombre ?? (aulaId ? 'activa' : '—')}{cicloActivo ? ` · Ciclo ${cicloActivo.nombre}` : ''}
           </div>
           <h1 className="m-0 font-serif font-semibold text-[24px] md:text-[30px] tracking-[-0.02em] leading-[1.1]">
-            Mi horario
+            {isApoderado
+              ? `Horario de ${alumno ? `${alumno.nombre} ${alumno.apellidos}` : 'tu hijo/a'}`
+              : 'Mi horario'}
           </h1>
         </div>
         <div className="flex gap-2">
