@@ -47,6 +47,80 @@ export const PARENTESCO_OPTS = [
   'Padre', 'Madre', 'Abuelo/a', 'Tío/a', 'Hermano/a mayor', 'Tutor legal', 'Otro',
 ] as const
 
+// ── Gestión de apoderados (admin) ─────────────────────────────────────
+
+export interface Apoderado {
+  id: string
+  nombre: string
+  apellidos: string
+  dni: string
+  telefonoWhatsapp: string
+  createdAt?: string
+  usuario?: { id?: string; email: string; activo: boolean }
+  _count?: { alumnos: number }
+}
+
+export interface HijoVinculado {
+  parentesco: string
+  esPrincipal: boolean
+  alumno: {
+    id: string
+    nombre: string
+    apellidos: string
+    codigoBarras?: string | null
+    dni?: string | null
+    aula?: {
+      nombre?: string | null
+      turno?: string | null
+      area?: string | null
+      ciclo?: { nombre: string; activo: boolean } | null
+    } | null
+  }
+}
+
+export interface ApoderadoDetalle extends Apoderado {
+  alumnos: HijoVinculado[]
+}
+
+export interface PaginatedApoderados {
+  data: Apoderado[]
+  total: number
+  page: number
+  limit: number
+  totalPages: number
+}
+
+export function useApoderados(params: { page?: number; limit?: number; search?: string } = {}) {
+  return useQuery<PaginatedApoderados>({
+    queryKey: ['apoderados', params],
+    queryFn: async () => {
+      const { data } = await api.get('/apoderados', { params })
+      return data
+    },
+    placeholderData: (prev) => prev,
+  })
+}
+
+export function useApoderado(id?: string) {
+  return useQuery<ApoderadoDetalle>({
+    queryKey: ['apoderados', id],
+    queryFn: async () => {
+      const { data } = await api.get(`/apoderados/${id}`)
+      return data
+    },
+    enabled: Boolean(id),
+  })
+}
+
+export function useUpdateApoderado() {
+  const qc = useQueryClient()
+  return useMutation({
+    mutationFn: ({ id, ...dto }: { id: string } & Record<string, unknown>) =>
+      api.patch(`/apoderados/${id}`, dto).then((r) => r.data),
+    onSuccess: () => qc.invalidateQueries({ queryKey: ['apoderados'] }),
+  })
+}
+
 // ── Hooks ────────────────────────────────────────────────────────────
 
 /** Apoderados vinculados a un alumno */

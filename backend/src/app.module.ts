@@ -9,6 +9,7 @@ import { MinioModule } from './minio/minio.module';
 import { AuthModule } from './auth/auth.module';
 import { AlumnosModule } from './alumnos/alumnos.module';
 import { DocentesModule } from './docentes/docentes.module';
+import { ApoderadosModule } from './apoderados/apoderados.module';
 import { CiclosModule } from './ciclos/ciclos.module';
 import { SeccionesModule } from './secciones/secciones.module';
 import { CursosModule } from './cursos/cursos.module';
@@ -34,6 +35,7 @@ import { AuditoriaModule } from './auditoria/auditoria.module';
     UsuariosModule,
     AlumnosModule,
     DocentesModule,
+    ApoderadosModule,
     CiclosModule,
     SeccionesModule,
     CursosModule,
