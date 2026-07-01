@@ -4,12 +4,15 @@ import { useMemo, useState } from 'react'
 import { useAsistencia, type FilterAsistencia } from '@/hooks/use-asistencia'
 import { useAulas } from '@/hooks/use-ciclos'
 import { useAuth } from '@/contexts/auth-context'
+import type { AsistenciaRecord } from '@/hooks/use-asistencia'
 import { Avatar } from '@/components/ui/avatar'
 import { Pill } from '@/components/ui/pill'
 import { Dot } from '@/components/ui/dot'
 import { Btn } from '@/components/ui/btn'
 import { PageHeader } from '@/components/layout/page-header'
-import { Calendar } from '@/components/icons'
+import { CorrectModal } from '@/components/asistencia/correct-modal'
+import { JustificarModal } from '@/components/asistencia/justificar-modal'
+import { Calendar, Users, Teacher, Edit, FileText } from '@/components/icons'
 
 // ─── helpers ──────────────────────────────────────────────────────────────────
 
@@ -36,6 +39,13 @@ function fmtHora(iso?: string | null) {
 export default function RegistrosPage() {
   const { user } = useAuth()
   const isDocente = user?.rol === 'docente'
+  // Solo admin y director pueden editar registros; el vigilante solo justifica faltas.
+  const canEdit    = user?.rol === 'admin' || user?.rol === 'director'
+  const canJustify = canEdit || user?.rol === 'vigilante'
+  const conAcciones = canEdit || canJustify
+
+  const [correctTarget, setCorrectTarget] = useState<AsistenciaRecord | null>(null)
+  const [justifyTarget, setJustifyTarget] = useState<AsistenciaRecord | null>(null)
 
   const hoy = useMemo(() => new Date(), [])
   const hace30 = useMemo(() => new Date(Date.now() - 30 * 24 * 60 * 60 * 1000), [])
@@ -62,6 +72,9 @@ export default function RegistrosPage() {
 
   return (
     <div className="p-5 flex flex-col gap-5">
+      {correctTarget && <CorrectModal registro={correctTarget} onClose={() => setCorrectTarget(null)} />}
+      {justifyTarget && <JustificarModal registro={justifyTarget} onClose={() => setJustifyTarget(null)} />}
+
       <PageHeader title="Registros de asistencia" crumbs={[{ label: 'Registros' }]} />
 
       {isDocente && (
@@ -70,18 +83,27 @@ export default function RegistrosPage() {
         </p>
       )}
 
-      {/* Toggle tipo — oculto para docente (solo ve alumnos de sus aulas) */}
+      {/* Selector tipo — segmented control; oculto para docente (solo ve sus alumnos) */}
       {!isDocente && (
-        <div className="flex gap-1 p-1 bg-surface-2 rounded-2 w-fit">
-          {(['alumno', 'docente'] as const).map(t => (
-            <button key={t}
-              onClick={() => updateFilter(() => setTipo(t))}
-              className={`px-4 py-1.5 text-[13px] font-medium rounded-2 transition-colors ${
-                tipo === t ? 'bg-surface shadow-1 text-text' : 'text-text-mute hover:text-text'
-              }`}>
-              {t === 'alumno' ? 'Alumnos' : 'Docentes'}
-            </button>
-          ))}
+        <div className="inline-flex p-1 gap-1 bg-surface-2 border border-border rounded-3 w-fit">
+          {([
+            { key: 'alumno',  label: 'Alumnos',  Icon: Users },
+            { key: 'docente', label: 'Docentes', Icon: Teacher },
+          ] as const).map(({ key, label, Icon }) => {
+            const active = tipo === key
+            return (
+              <button key={key}
+                onClick={() => updateFilter(() => setTipo(key))}
+                className={`flex items-center gap-2 px-4 py-2 text-[13px] font-medium rounded-2 transition-all ${
+                  active
+                    ? 'bg-primary text-white shadow-1'
+                    : 'text-text-mute hover:text-text hover:bg-surface'
+                }`}>
+                <Icon size={15} />
+                {label}
+              </button>
+            )
+          })}
         </div>
       )}
 
@@ -117,8 +139,8 @@ export default function RegistrosPage() {
         <table className="w-full border-collapse text-[13px]">
           <thead>
             <tr className="bg-surface-2">
-              {['Fecha', 'Hora', 'Persona', tipo === 'alumno' ? 'Aula' : 'DNI', 'Estado'].map(h => (
-                <th key={h} className="text-left px-3.5 py-2 text-[11px] text-text-mute uppercase tracking-[0.04em] font-semibold">
+              {['Fecha', 'Hora', 'Persona', tipo === 'alumno' ? 'Aula' : 'DNI', 'Estado', ...(conAcciones ? ['Acciones'] : [])].map(h => (
+                <th key={h} className={`px-3.5 py-2 text-[11px] text-text-mute uppercase tracking-[0.04em] font-semibold ${h === 'Acciones' ? 'text-right' : 'text-left'}`}>
                   {h}
                 </th>
               ))}
@@ -126,11 +148,11 @@ export default function RegistrosPage() {
           </thead>
           <tbody>
             {isLoading ? (
-              <tr><td colSpan={5} className="text-center py-12 text-text-mute">Cargando…</td></tr>
+              <tr><td colSpan={conAcciones ? 6 : 5} className="text-center py-12 text-text-mute">Cargando…</td></tr>
             ) : isError ? (
-              <tr><td colSpan={5} className="text-center py-12 text-danger">No se pudieron cargar los registros.</td></tr>
+              <tr><td colSpan={conAcciones ? 6 : 5} className="text-center py-12 text-danger">No se pudieron cargar los registros.</td></tr>
             ) : registros.length === 0 ? (
-              <tr><td colSpan={5} className="text-center py-12 text-text-mute">
+              <tr><td colSpan={conAcciones ? 6 : 5} className="text-center py-12 text-text-mute">
                 <div className="flex flex-col items-center gap-2">
                   <Calendar size={26} />
                   No hay registros para los filtros seleccionados.
@@ -168,6 +190,23 @@ export default function RegistrosPage() {
                         <Pill tone="success"><Dot tone="success" size={6} />Puntual</Pill>
                       )}
                     </td>
+                    {conAcciones && (
+                      <td className="px-3.5 py-2 text-right whitespace-nowrap">
+                        {r.esAusente ? (
+                          canJustify && (
+                            <Btn variant="secondary" size="sm" icon={<FileText size={13} />} onClick={() => setJustifyTarget(r)}>
+                              {r.justificacionRazon ? 'Editar just.' : 'Justificar'}
+                            </Btn>
+                          )
+                        ) : (
+                          canEdit && (
+                            <Btn variant="secondary" size="sm" icon={<Edit size={13} />} onClick={() => setCorrectTarget(r)}>
+                              Editar
+                            </Btn>
+                          )
+                        )}
+                      </td>
+                    )}
                   </tr>
                 )
               })
