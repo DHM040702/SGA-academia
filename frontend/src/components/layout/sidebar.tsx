@@ -37,8 +37,9 @@ const GROUPS_ADMIN: NavGroup[] = [
   {
     label: 'Operaciones',
     items: [
-      { href: '/asistencia', icon: Check,      label: 'Asistencia' },
-      { href: '/carnets',    icon: CreditCard, label: 'Carnets' },
+      { href: '/asistencia',    icon: Check,      label: 'Asistencia' },
+      { href: '/inasistencias', icon: FileText,   label: 'Inasistencias' },
+      { href: '/carnets',       icon: CreditCard, label: 'Carnets' },
     ],
   },
   {
@@ -73,8 +74,9 @@ const GROUPS_DIRECTOR: NavGroup[] = [
   {
     label: 'Operaciones',
     items: [
-      { href: '/asistencia', icon: Check,      label: 'Asistencia' },
-      { href: '/carnets',    icon: CreditCard, label: 'Carnets' },
+      { href: '/asistencia',    icon: Check,      label: 'Asistencia' },
+      { href: '/inasistencias', icon: FileText,   label: 'Inasistencias' },
+      { href: '/carnets',       icon: CreditCard, label: 'Carnets' },
     ],
   },
   {
@@ -100,8 +102,9 @@ const GROUPS_VIGILANTE: NavGroup[] = [
   {
     label: 'Operaciones',
     items: [
-      { href: '/vigilante',  icon: ScanLine, label: 'Registro asistencia' },
-      { href: '/asistencia', icon: Check,    label: 'Asistencia' },
+      { href: '/vigilante',     icon: ScanLine, label: 'Registro asistencia' },
+      { href: '/asistencia',    icon: Check,    label: 'Asistencia' },
+      { href: '/inasistencias', icon: FileText, label: 'Inasistencias' },
     ],
   },
   {

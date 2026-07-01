@@ -28,6 +28,7 @@ export interface AsistenciaRecord {
     nombre: string
     apellidos: string
     codigoBarras: string
+    dni?: string | null
     aula?: { id: string; nombre: string; area?: string | null } | null
   } | null
   docente?: {
@@ -112,6 +113,36 @@ export function useCerrarTurno() {
     mutationFn: (dto: { turno: 'manana' | 'tarde' }) =>
       api.post('/asistencia/cerrar-turno', dto).then((r) => r.data),
     onSuccess: () => qc.invalidateQueries({ queryKey: ['asistencia'] }),
+  })
+}
+
+export interface FilterInasistencias {
+  desde?: string
+  hasta?: string
+  aula_id?: string
+  estado?: 'todas' | 'pendientes' | 'justificadas'
+}
+
+export interface InasistenciasResponse {
+  data: AsistenciaRecord[]
+  total: number
+  justificadas: number
+  pendientes: number
+  desde: string
+  hasta: string
+}
+
+export function useInasistencias(filters: FilterInasistencias) {
+  return useQuery({
+    queryKey: ['asistencia', 'inasistencias', filters],
+    queryFn: (): Promise<InasistenciasResponse> => {
+      const params = new URLSearchParams()
+      if (filters.desde)   params.set('desde', filters.desde)
+      if (filters.hasta)   params.set('hasta', filters.hasta)
+      if (filters.aula_id) params.set('aula_id', filters.aula_id)
+      if (filters.estado)  params.set('estado', filters.estado)
+      return api.get(`/asistencia/inasistencias?${params.toString()}`).then((r) => r.data)
+    },
   })
 }
 

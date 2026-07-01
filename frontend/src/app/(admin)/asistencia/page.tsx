@@ -4,9 +4,10 @@ import { useState, useRef, useEffect } from 'react'
 import {
   useAsistencia, useResumenAsistencia,
   useManualAsistencia, useCorrectAsistencia, useDeleteAsistencia,
-  useCerrarTurno, useJustificarAusencia,
+  useCerrarTurno,
 } from '@/hooks/use-asistencia'
 import type { AsistenciaRecord } from '@/hooks/use-asistencia'
+import { JustificarModal } from '@/components/asistencia/justificar-modal'
 import { useAulas } from '@/hooks/use-ciclos'
 import { useAlumnos } from '@/hooks/use-alumnos'
 import { useDocentes } from '@/hooks/use-docentes'
@@ -35,11 +36,14 @@ function todayStr() {
 
 // ─── RowMenu ──────────────────────────────────────────────────────────────────
 
-function RowMenu({ registro, onCorregir, onEliminar, onJustificar }: {
+function RowMenu({ registro, onCorregir, onEliminar, onJustificar, canCorregir, canJustificar, canEliminar }: {
   registro: AsistenciaRecord
   onCorregir: (r: AsistenciaRecord) => void
   onEliminar: (r: AsistenciaRecord) => void
   onJustificar: (r: AsistenciaRecord) => void
+  canCorregir: boolean
+  canJustificar: boolean
+  canEliminar: boolean
 }) {
   const [open, setOpen] = useState(false)
   const ref = useRef<HTMLDivElement>(null)
@@ -52,6 +56,14 @@ function RowMenu({ registro, onCorregir, onEliminar, onJustificar }: {
     return () => document.removeEventListener('mousedown', h)
   }, [])
 
+  // Qué acciones aplican a ESTE registro según rol + estado.
+  const showCorregir   = canCorregir && !registro.esAusente
+  const showJustificar = canJustificar && registro.esAusente
+  const showEliminar   = canEliminar
+  // Sin acciones disponibles → no mostrar el menú (p. ej. vigilante en un
+  // registro presente/tardanza solo puede justificar faltas).
+  if (!showCorregir && !showJustificar && !showEliminar) return null
+
   return (
     <div ref={ref} className="relative flex justify-end">
       <button
@@ -62,7 +74,7 @@ function RowMenu({ registro, onCorregir, onEliminar, onJustificar }: {
       </button>
       {open && (
         <div className="absolute right-0 top-full mt-1 z-30 bg-surface border border-border rounded-2 shadow-2 py-1 w-40">
-          {!registro.esAusente && (
+          {showCorregir && (
             <button
               className="w-full text-left px-3 py-1.5 text-[12px] hover:bg-surface-2 flex items-center gap-2"
               onClick={() => { onCorregir(registro); setOpen(false) }}
@@ -70,7 +82,7 @@ function RowMenu({ registro, onCorregir, onEliminar, onJustificar }: {
               <Edit size={12} /> Corregir registro
             </button>
           )}
-          {registro.esAusente && (
+          {showJustificar && (
             <button
               className="w-full text-left px-3 py-1.5 text-[12px] hover:bg-surface-2 flex items-center gap-2"
               onClick={() => { onJustificar(registro); setOpen(false) }}
@@ -78,12 +90,14 @@ function RowMenu({ registro, onCorregir, onEliminar, onJustificar }: {
               <FileText size={12} /> {registro.justificacionRazon ? 'Editar justificación' : 'Justificar falta'}
             </button>
           )}
-          <button
-            className="w-full text-left px-3 py-1.5 text-[12px] text-danger hover:bg-danger-l flex items-center gap-2"
-            onClick={() => { onEliminar(registro); setOpen(false) }}
-          >
-            <X size={12} /> Eliminar
-          </button>
+          {showEliminar && (
+            <button
+              className="w-full text-left px-3 py-1.5 text-[12px] text-danger hover:bg-danger-l flex items-center gap-2"
+              onClick={() => { onEliminar(registro); setOpen(false) }}
+            >
+              <X size={12} /> Eliminar
+            </button>
+          )}
         </div>
       )}
     </div>
@@ -165,86 +179,6 @@ function CorrectModal({ registro, onClose }: { registro: AsistenciaRecord; onClo
             <Btn type="button" variant="secondary" className="flex-1" onClick={onClose}>Cancelar</Btn>
             <Btn type="submit" className="flex-1" disabled={mut.isPending}>
               {mut.isPending ? 'Guardando…' : 'Guardar cambios'}
-            </Btn>
-          </div>
-        </form>
-      </div>
-    </div>
-  )
-}
-
-// ─── JustificarModal ──────────────────────────────────────────────────────────
-
-function JustificarModal({ registro, onClose }: { registro: AsistenciaRecord; onClose: () => void }) {
-  const mut = useJustificarAusencia()
-  const persona = registro.alumno
-  const nombre  = persona ? `${persona.nombre} ${persona.apellidos}` : '—'
-
-  const [razon,  setRazon]  = useState(registro.justificacionRazon ?? '')
-  const [docNum, setDocNum] = useState(registro.justificacionDoc ?? '')
-  const [error,  setError]  = useState('')
-
-  async function handleSubmit(e: React.FormEvent) {
-    e.preventDefault()
-    if (!razon.trim()) { setError('La razón es obligatoria'); return }
-    if (!docNum.trim()) { setError('El N.° de expediente / documento es obligatorio'); return }
-    try {
-      await mut.mutateAsync({ id: registro.id, razon: razon.trim(), doc_num: docNum.trim() })
-      onClose()
-    } catch (err: any) {
-      const msg = err?.response?.data?.message
-      setError(Array.isArray(msg) ? msg.join(', ') : (msg ?? 'Error al guardar'))
-    }
-  }
-
-  const justificadoNombre = registro.justificadoPor
-    ? `${registro.justificadoPor.nombre ?? ''} ${registro.justificadoPor.apellidos ?? ''}`.trim() || registro.justificadoPor.rol
-    : null
-
-  return (
-    <div className="fixed inset-0 z-50 flex items-center justify-center" style={{ background: 'rgba(0,0,0,0.35)' }}>
-      <div className="bg-surface border border-border rounded-3 shadow-3 w-full max-w-sm p-6 flex flex-col gap-4">
-        <div className="flex items-center justify-between">
-          <h2 className="text-[15px] font-semibold">Justificar falta</h2>
-          <button onClick={onClose} className="text-text-mute hover:text-text"><X size={18} /></button>
-        </div>
-
-        <div className="flex items-center gap-2.5 p-3 bg-surface-2 rounded-2">
-          <Avatar name={nombre} size={32} />
-          <div>
-            <div className="text-[13px] font-medium">{nombre}</div>
-            <div className="text-[11px] text-text-mute">{persona?.aula?.nombre ?? '—'} · Ausente</div>
-          </div>
-        </div>
-
-        <form onSubmit={handleSubmit} className="flex flex-col gap-3">
-          <label className="flex flex-col gap-1">
-            <span className="text-[12px] font-medium text-text-mute">Razón de la justificación *</span>
-            <textarea value={razon} onChange={e => setRazon(e.target.value)} rows={3} required
-              className="px-3 py-2 text-[13px] border border-border rounded-2 bg-surface resize-none"
-              placeholder="Describe el motivo de la falta justificada…" />
-          </label>
-
-          <label className="flex flex-col gap-1">
-            <span className="text-[12px] font-medium text-text-mute">N.° de expediente / documento aprobado *</span>
-            <input type="text" value={docNum} onChange={e => setDocNum(e.target.value)} required
-              className="px-3 py-2 text-[13px] border border-border rounded-2 bg-surface"
-              placeholder="Ej: Exp. 12345 / Certificado médico N.° 678" />
-          </label>
-
-          {justificadoNombre && (
-            <p className="text-[11px] text-text-mute">
-              Última justificación por <span className="font-medium text-text">{justificadoNombre}</span>
-              {registro.justificadoEn ? ` · ${new Date(registro.justificadoEn).toLocaleString('es-PE')}` : ''}
-            </p>
-          )}
-
-          {error && <p className="text-[12px] text-danger">{error}</p>}
-
-          <div className="flex gap-2 pt-1">
-            <Btn type="button" variant="secondary" className="flex-1" onClick={onClose}>Cancelar</Btn>
-            <Btn type="submit" className="flex-1" icon={<FileText size={14} />} disabled={mut.isPending}>
-              {mut.isPending ? 'Guardando…' : 'Guardar justificación'}
             </Btn>
           </div>
         </form>
@@ -710,9 +644,19 @@ async function exportarAsistencia(
 
 export default function AsistenciaPage() {
   const { user } = useAuth()
+  const isAdmin     = user?.rol === 'admin'
+  const isDirector  = user?.rol === 'director'
   const isVigilante = user?.rol === 'vigilante'
   const isDocente   = user?.rol === 'docente'
   const soloLectura = isVigilante || isDocente
+
+  // Capacidades por rol sobre un registro:
+  //  - Justificar inasistencias: admin, director y vigilante.
+  //  - Corregir registro: admin y director.
+  //  - Eliminar registro: solo admin.
+  const canJustificar = isAdmin || isDirector || isVigilante
+  const canCorregir   = isAdmin || isDirector
+  const canEliminar   = isAdmin
 
   // Para docente: fijar filtros a su propio registro
   const myDocenteId = isDocente ? user?.docente?.id : undefined
@@ -919,12 +863,15 @@ export default function AsistenciaPage() {
                           )}
                         </td>
                         <td className="px-3.5 py-2.5">
-                          {!soloLectura && (
+                          {!isDocente && (
                             <RowMenu
                               registro={r}
                               onCorregir={setCorrectTarget}
                               onEliminar={handleEliminar}
                               onJustificar={setJustificarTarget}
+                              canCorregir={canCorregir}
+                              canJustificar={canJustificar}
+                              canEliminar={canEliminar}
                             />
                           )}
                         </td>

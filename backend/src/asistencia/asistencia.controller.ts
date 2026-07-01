@@ -15,6 +15,7 @@ import { FilterAsistenciaDto } from './dto/filter-asistencia.dto';
 import { CreateManualAsistenciaDto } from './dto/create-manual-asistencia.dto';
 import { CerrarTurnoDto } from './dto/cerrar-turno.dto';
 import { JustificarAusenciaDto } from './dto/justificar-ausencia.dto';
+import { FilterInasistenciasDto } from './dto/filter-inasistencias.dto';
 
 @ApiTags('Asistencia')
 @Controller('asistencia')
@@ -73,6 +74,16 @@ export class AsistenciaController {
   @ApiQuery({ name: 'fecha', required: true, type: String, example: '2026-06-03' })
   exportDocentes(@Query('fecha') fecha: string) {
     return this.service.exportDocentes(fecha);
+  }
+
+  /** GET /asistencia/inasistencias — panel de faltas por rango de fechas */
+  @Get('inasistencias')
+  @ApiBearerAuth('access-token')
+  @UseGuards(JwtAuthGuard, RolesGuard)
+  @Roles(Rol.admin, Rol.director, Rol.vigilante)
+  @ApiOperation({ summary: 'Listar inasistencias de alumnos por rango de fechas (para justificar)' })
+  inasistencias(@Query() dto: FilterInasistenciasDto) {
+    return this.service.inasistencias(dto);
   }
 
   /** GET /asistencia — listado paginado con filtros */

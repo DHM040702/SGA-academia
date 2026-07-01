@@ -8,6 +8,7 @@ import type { FilterAsistenciaDto } from './dto/filter-asistencia.dto';
 import type { CreateManualAsistenciaDto } from './dto/create-manual-asistencia.dto';
 import type { CerrarTurnoDto } from './dto/cerrar-turno.dto';
 import type { JustificarAusenciaDto } from './dto/justificar-ausencia.dto';
+import type { FilterInasistenciasDto } from './dto/filter-inasistencias.dto';
 
 @Injectable()
 export class AsistenciaService {
@@ -437,6 +438,59 @@ export class AsistenciaService {
         motivoManual: r.motivoManual ?? '',
       };
     });
+  }
+
+  /**
+   * Panel de inasistencias: lista las faltas (esAusente) de alumnos en un rango
+   * de fechas, con su estado de justificación. Ordenadas por fecha desc y
+   * apellidos. Pensado para justificar en lote desde un panel dedicado.
+   */
+  async inasistencias(dto: FilterInasistenciasDto) {
+    const toUtcDate = (s: string) => {
+      const [y, m, d] = s.split('-').map(Number);
+      return new Date(Date.UTC(y, m - 1, d));
+    };
+
+    // Rango por defecto: últimos 30 días hasta hoy.
+    const now = new Date();
+    const hoy = new Date(Date.UTC(now.getUTCFullYear(), now.getUTCMonth(), now.getUTCDate()));
+    const hasta = dto.hasta ? toUtcDate(dto.hasta) : hoy;
+    const desde = dto.desde
+      ? toUtcDate(dto.desde)
+      : new Date(hasta.getTime() - 30 * 24 * 60 * 60 * 1000);
+
+    const where: any = {
+      tipoPersona: TipoPersona.alumno,
+      esAusente: true,
+      fecha: { gte: desde, lte: hasta },
+    };
+    if (dto.aula_id) where.alumno = { aulaId: dto.aula_id };
+    if (dto.estado === 'pendientes') where.justificacionRazon = null;
+    else if (dto.estado === 'justificadas') where.justificacionRazon = { not: null };
+
+    const items = await this.prisma.asistencia.findMany({
+      where,
+      orderBy: [{ fecha: 'desc' }, { alumno: { apellidos: 'asc' } }],
+      include: {
+        alumno: {
+          select: {
+            id: true, nombre: true, apellidos: true, codigoBarras: true, dni: true,
+            aula: { select: { id: true, nombre: true, area: true } },
+          },
+        },
+        justificadoPor: { select: { id: true, nombre: true, apellidos: true, rol: true } },
+      },
+    });
+
+    const justificadas = items.filter((i) => i.justificacionRazon).length;
+    return {
+      data: items,
+      total: items.length,
+      justificadas,
+      pendientes: items.length - justificadas,
+      desde: desde.toISOString().split('T')[0],
+      hasta: hasta.toISOString().split('T')[0],
+    };
   }
 
   async justificar(id: string, dto: JustificarAusenciaDto, justificadoPorId: string) {
