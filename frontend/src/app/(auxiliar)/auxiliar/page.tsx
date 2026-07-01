@@ -211,7 +211,7 @@ export default function AuxiliarPage() {
                       <Avatar name={lastScan.nombre} size={120} />
                     </div>
 
-                    <h1 className="font-serif text-xl sm:text-3xl lg:text-[40px] font-semibold tracking-tight leading-tight m-0 break-words w-full">
+                    <h1 className="font-serif text-xl sm:text-3xl lg:text-[40px] font-semibold tracking-tight leading-tight m-0 break-words w-full text-white">
                       ✓ {lastScan.nombre}
                     </h1>
 
@@ -245,7 +245,7 @@ export default function AuxiliarPage() {
                     >
                       <span className="text-4xl sm:text-5xl opacity-30">📷</span>
                     </div>
-                    <h1 className="font-serif text-xl sm:text-3xl font-semibold opacity-55 m-0">
+                    <h1 className="font-serif text-xl sm:text-3xl font-semibold opacity-55 m-0 text-white">
                       Sin escaneos aún
                     </h1>
                   </>
@@ -434,7 +434,7 @@ function FeedPanel({ feed, onClose }: { feed: any[]; onClose?: () => void }) {
         style={{ borderBottom: '1px solid rgba(255,255,255,.06)' }}
       >
         <div className="flex items-center justify-between">
-          <h3 className="font-serif text-[15px] font-semibold m-0">En vivo</h3>
+          <h3 className="font-serif text-[15px] font-semibold m-0 text-white">En vivo</h3>
           <div className="flex items-center gap-2">
             <div
               className="flex items-center gap-1.5 px-2 py-0.5 rounded-full text-[11px]"

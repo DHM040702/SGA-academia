@@ -23,18 +23,25 @@ export function Avatar({ name = '', src, size = 32, className }: AvatarProps) {
     .toUpperCase()
 
   const hue = nameHue(name)
-  const bg  = `oklch(0.88 0.04 ${hue})`
-  const fg  = `oklch(0.30 0.08 ${hue})`
+  // HSL en vez de oklch: se renderiza bien en Chrome viejo (el kiosco puede
+  // correr en hardware antiguo). Fondo cálido claro + texto cálido oscuro.
+  const bg  = `hsl(${hue}, 55%, 82%)`
+  const fg  = `hsl(${hue}, 45%, 28%)`
 
   return (
     <div
-      className={cn('shrink-0 rounded-full overflow-hidden flex items-center justify-center border border-border-s', className)}
-      style={{ width: size, height: size, background: src ? 'transparent' : '#000', color: fg, fontSize: size * 0.38, fontWeight: 600 }}
+      className={cn('shrink-0 rounded-full overflow-hidden flex items-center justify-center border border-border-s relative', className)}
+      style={{ width: size, height: size, background: bg, color: fg, fontSize: size * 0.38, fontWeight: 600, lineHeight: 1 }}
     >
-      {src
-        ? <img src={src} alt={name} className="w-full h-full object-cover" onError={e => { (e.currentTarget as HTMLImageElement).style.display = 'none'; (e.currentTarget.parentElement as HTMLElement).style.background = '#000' }} />
-        : null
-      }
+      <span>{initials || '?'}</span>
+      {src && (
+        <img
+          src={src}
+          alt={name}
+          className="absolute inset-0 w-full h-full object-cover"
+          onError={e => { (e.currentTarget as HTMLImageElement).style.display = 'none' }}
+        />
+      )}
     </div>
   )
 }
