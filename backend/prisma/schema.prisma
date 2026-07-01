@@ -22,6 +22,7 @@ model Usuario {
   alumno                 Alumno?
   apoderado              Apoderado?
   asistenciasRegistradas Asistencia[]        @relation("RegistradoPor")
+  asistenciasJustificadas Asistencia[]       @relation("JustificadoPor")
   comunicadosPublicados  Comunicado[]        @relation("PublicadoPor")
   comunicadosEnvios      ComunicadoEnvio[]
   docente                Docente?
@@ -190,11 +191,14 @@ model Asistencia {
   motivoManual       String?     @map("motivo_manual")
   justificacionRazon String?     @map("justificacion_razon")
   justificacionDoc   String?     @map("justificacion_doc")
+  justificadoPorId   String?     @map("justificado_por") @db.Uuid
+  justificadoEn      DateTime?   @map("justificado_en") @db.Timestamptz(6)
   registradoPorId    String      @map("registrado_por") @db.Uuid
   createdAt       DateTime    @default(now()) @map("created_at") @db.Timestamptz(6)
   alumno          Alumno?     @relation(fields: [alumnoId], references: [id])
   docente         Docente?    @relation(fields: [docenteId], references: [id])
   registradoPor   Usuario     @relation("RegistradoPor", fields: [registradoPorId], references: [id])
+  justificadoPor  Usuario?    @relation("JustificadoPor", fields: [justificadoPorId], references: [id])
 
   @@map("asistencias")
 }

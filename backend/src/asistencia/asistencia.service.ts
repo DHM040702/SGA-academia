@@ -224,6 +224,7 @@ export class AsistenciaService {
             },
           },
           docente: { select: { nombre: true, apellidos: true, dni: true } },
+          justificadoPor: { select: { id: true, nombre: true, apellidos: true, rol: true } },
         },
       }),
       this.prisma.asistencia.count({ where }),
@@ -438,16 +439,28 @@ export class AsistenciaService {
     });
   }
 
-  async justificar(id: string, dto: JustificarAusenciaDto) {
+  async justificar(id: string, dto: JustificarAusenciaDto, justificadoPorId: string) {
     const registro = await this.prisma.asistencia.findFirst({ where: { id } });
     if (!registro) throw new NotFoundException('Registro de asistencia no encontrado');
 
+    // Solo se justifican inasistencias: la justificación no aplica a registros
+    // de asistencia presente o tardanza.
+    if (!registro.esAusente) {
+      throw new BadRequestException('Solo se pueden justificar inasistencias');
+    }
+
     return this.prisma.asistencia.update({
       where: { id },
-      data: { justificacionRazon: dto.razon, justificacionDoc: dto.doc_num ?? null },
+      data: {
+        justificacionRazon: dto.razon,
+        justificacionDoc:   dto.doc_num,
+        justificadoPorId,
+        justificadoEn:      new Date(),
+      },
       include: {
         alumno:  { select: { nombre: true, apellidos: true, codigoBarras: true, aula: { select: { id: true, nombre: true } } } },
         docente: { select: { nombre: true, apellidos: true, dni: true } },
+        justificadoPor: { select: { id: true, nombre: true, apellidos: true, rol: true } },
       },
     });
   }

@@ -14,6 +14,13 @@ export interface AsistenciaRecord {
   motivoManual?: string | null
   justificacionRazon?: string | null
   justificacionDoc?: string | null
+  justificadoEn?: string | null
+  justificadoPor?: {
+    id: string
+    nombre?: string | null
+    apellidos?: string | null
+    rol: string
+  } | null
   registradoPorId: string
   createdAt: string
   alumno?: {
@@ -111,7 +118,7 @@ export function useCerrarTurno() {
 export function useJustificarAusencia() {
   const qc = useQueryClient()
   return useMutation({
-    mutationFn: ({ id, ...dto }: { id: string; razon: string; doc_num?: string }) =>
+    mutationFn: ({ id, ...dto }: { id: string; razon: string; doc_num: string }) =>
       api.patch(`/asistencia/${id}/justificar`, dto).then((r) => r.data),
     onSuccess: () => qc.invalidateQueries({ queryKey: ['asistencia'] }),
   })

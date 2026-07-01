@@ -119,13 +119,14 @@ export class AsistenciaController {
   @Patch(':id/justificar')
   @ApiBearerAuth('access-token')
   @UseGuards(JwtAuthGuard, RolesGuard)
-  @Roles(Rol.admin, Rol.director)
+  @Roles(Rol.admin, Rol.director, Rol.vigilante)
   @ApiOperation({ summary: 'Agregar o actualizar justificación de una ausencia' })
   justificar(
     @Param('id', ParseUUIDPipe) id: string,
     @Body() dto: JustificarAusenciaDto,
+    @CurrentUser() user: { id: string },
   ) {
-    return this.service.justificar(id, dto);
+    return this.service.justificar(id, dto, user.id);
   }
 
   /** DELETE /asistencia/:id — eliminar registro (admin only) */

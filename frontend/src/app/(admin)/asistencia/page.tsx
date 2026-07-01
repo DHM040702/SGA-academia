@@ -187,14 +187,19 @@ function JustificarModal({ registro, onClose }: { registro: AsistenciaRecord; on
   async function handleSubmit(e: React.FormEvent) {
     e.preventDefault()
     if (!razon.trim()) { setError('La razón es obligatoria'); return }
+    if (!docNum.trim()) { setError('El N.° de expediente / documento es obligatorio'); return }
     try {
-      await mut.mutateAsync({ id: registro.id, razon: razon.trim(), doc_num: docNum.trim() || undefined })
+      await mut.mutateAsync({ id: registro.id, razon: razon.trim(), doc_num: docNum.trim() })
       onClose()
     } catch (err: any) {
       const msg = err?.response?.data?.message
       setError(Array.isArray(msg) ? msg.join(', ') : (msg ?? 'Error al guardar'))
     }
   }
+
+  const justificadoNombre = registro.justificadoPor
+    ? `${registro.justificadoPor.nombre ?? ''} ${registro.justificadoPor.apellidos ?? ''}`.trim() || registro.justificadoPor.rol
+    : null
 
   return (
     <div className="fixed inset-0 z-50 flex items-center justify-center" style={{ background: 'rgba(0,0,0,0.35)' }}>
@@ -221,11 +226,18 @@ function JustificarModal({ registro, onClose }: { registro: AsistenciaRecord; on
           </label>
 
           <label className="flex flex-col gap-1">
-            <span className="text-[12px] font-medium text-text-mute">N.° de documento aprobatorio</span>
-            <input type="text" value={docNum} onChange={e => setDocNum(e.target.value)}
+            <span className="text-[12px] font-medium text-text-mute">N.° de expediente / documento aprobado *</span>
+            <input type="text" value={docNum} onChange={e => setDocNum(e.target.value)} required
               className="px-3 py-2 text-[13px] border border-border rounded-2 bg-surface"
-              placeholder="Ej: Certificado médico N.° 12345" />
+              placeholder="Ej: Exp. 12345 / Certificado médico N.° 678" />
           </label>
+
+          {justificadoNombre && (
+            <p className="text-[11px] text-text-mute">
+              Última justificación por <span className="font-medium text-text">{justificadoNombre}</span>
+              {registro.justificadoEn ? ` · ${new Date(registro.justificadoEn).toLocaleString('es-PE')}` : ''}
+            </p>
+          )}
 
           {error && <p className="text-[12px] text-danger">{error}</p>}
 
