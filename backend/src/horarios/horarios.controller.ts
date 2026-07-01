@@ -30,7 +30,7 @@ export class HorariosController {
   constructor(private readonly service: HorariosService) {}
 
   @Get()
-  @Roles(Rol.admin, Rol.director, Rol.docente, Rol.alumno, Rol.apoderado, Rol.vigilante)
+  @Roles(Rol.admin, Rol.director, Rol.docente, Rol.alumno, Rol.apoderado, Rol.auxiliar)
   @ApiOperation({ summary: 'Listar horarios paginados con filtros' })
   findAll(@Query() dto: FilterHorariosDto) {
     return this.service.findAll(dto);
@@ -44,7 +44,7 @@ export class HorariosController {
   }
 
   @Get(':id')
-  @Roles(Rol.admin, Rol.director, Rol.docente, Rol.alumno, Rol.apoderado, Rol.vigilante)
+  @Roles(Rol.admin, Rol.director, Rol.docente, Rol.alumno, Rol.apoderado, Rol.auxiliar)
   @ApiOperation({ summary: 'Detalle de un horario' })
   findOne(@Param('id', ParseUUIDPipe) id: string) {
     return this.service.findOne(id);

@@ -6,7 +6,7 @@ import api, { setAccessToken } from '@/lib/api'
 export interface AuthUser {
   id: string
   email: string
-  rol: 'admin' | 'director' | 'vigilante' | 'docente' | 'alumno' | 'apoderado'
+  rol: 'admin' | 'director' | 'auxiliar' | 'docente' | 'alumno' | 'apoderado'
   debeCambiarPassword?: boolean
   nombre?: string | null
   apellidos?: string | null

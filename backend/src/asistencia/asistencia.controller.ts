@@ -22,12 +22,12 @@ import { FilterInasistenciasDto } from './dto/filter-inasistencias.dto';
 export class AsistenciaController {
   constructor(private readonly service: AsistenciaService) {}
 
-  /** POST /asistencia/scan — registro de asistencia del vigilante (Bearer del vigilante) */
+  /** POST /asistencia/scan — registro de asistencia del auxiliar (Bearer del auxiliar) */
   @Post('scan')
   @HttpCode(HttpStatus.OK)
   @ApiBearerAuth('access-token')
   @UseGuards(JwtAuthGuard, RolesGuard)
-  @Roles(Rol.admin, Rol.director, Rol.vigilante)
+  @Roles(Rol.admin, Rol.director, Rol.auxiliar)
   @ApiOperation({ summary: 'Registrar asistencia por código de barras (modo HID)' })
   scan(@Body() dto: RegisterScanDto, @CurrentUser() user: { id: string }) {
     return this.service.scan(dto, user.id);
@@ -38,7 +38,7 @@ export class AsistenciaController {
   @HttpCode(HttpStatus.OK)
   @ApiBearerAuth('access-token')
   @UseGuards(JwtAuthGuard, RolesGuard)
-  @Roles(Rol.admin, Rol.director, Rol.vigilante)
+  @Roles(Rol.admin, Rol.director, Rol.auxiliar)
   @ApiOperation({ summary: 'Cerrar turno: registrar ausencia para alumnos sin asistencia del día' })
   cerrarTurno(@Body() dto: CerrarTurnoDto, @CurrentUser() user: { id: string }) {
     return this.service.cerrarTurno(dto, user.id);
@@ -59,7 +59,7 @@ export class AsistenciaController {
   @Get('stats')
   @ApiBearerAuth('access-token')
   @UseGuards(JwtAuthGuard, RolesGuard)
-  @Roles(Rol.admin, Rol.director, Rol.docente, Rol.vigilante)
+  @Roles(Rol.admin, Rol.director, Rol.docente, Rol.auxiliar)
   @ApiOperation({ summary: 'Estadísticas de asistencia del día actual' })
   stats() {
     return this.service.stats();
@@ -80,7 +80,7 @@ export class AsistenciaController {
   @Get('inasistencias')
   @ApiBearerAuth('access-token')
   @UseGuards(JwtAuthGuard, RolesGuard)
-  @Roles(Rol.admin, Rol.director, Rol.vigilante)
+  @Roles(Rol.admin, Rol.director, Rol.auxiliar)
   @ApiOperation({ summary: 'Listar inasistencias de alumnos por rango de fechas (para justificar)' })
   inasistencias(@Query() dto: FilterInasistenciasDto) {
     return this.service.inasistencias(dto);
@@ -90,7 +90,7 @@ export class AsistenciaController {
   @Get()
   @ApiBearerAuth('access-token')
   @UseGuards(JwtAuthGuard, RolesGuard)
-  @Roles(Rol.admin, Rol.director, Rol.docente, Rol.alumno, Rol.apoderado, Rol.vigilante)
+  @Roles(Rol.admin, Rol.director, Rol.docente, Rol.alumno, Rol.apoderado, Rol.auxiliar)
   @ApiOperation({ summary: 'Listar asistencias paginadas con filtros' })
   findAll(@Query() dto: FilterAsistenciaDto, @CurrentUser() user: { id: string; rol: string }) {
     return this.service.findAll(dto, user);
@@ -130,7 +130,7 @@ export class AsistenciaController {
   @Patch(':id/justificar')
   @ApiBearerAuth('access-token')
   @UseGuards(JwtAuthGuard, RolesGuard)
-  @Roles(Rol.admin, Rol.director, Rol.vigilante)
+  @Roles(Rol.admin, Rol.director, Rol.auxiliar)
   @ApiOperation({ summary: 'Agregar o actualizar justificación de una ausencia' })
   justificar(
     @Param('id', ParseUUIDPipe) id: string,

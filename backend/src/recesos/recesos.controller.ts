@@ -18,7 +18,7 @@ export class RecesosController {
   constructor(private readonly service: RecesosService) {}
 
   @Get()
-  @Roles(Rol.admin, Rol.director, Rol.vigilante, Rol.docente, Rol.alumno)
+  @Roles(Rol.admin, Rol.director, Rol.auxiliar, Rol.docente, Rol.alumno)
   @ApiOperation({ summary: 'Listar recesos por aula o por ciclo (por defecto, el activo)' })
   @ApiQuery({ name: 'aula_id', required: false, type: String })
   @ApiQuery({ name: 'ciclo_id', required: false, type: String })

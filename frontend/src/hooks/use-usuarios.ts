@@ -1,7 +1,7 @@
 import { useQuery, useMutation, useQueryClient } from '@tanstack/react-query'
 import api from '@/lib/api'
 
-export type RolUsuario = 'admin' | 'director' | 'vigilante' | 'alumno' | 'apoderado' | 'docente'
+export type RolUsuario = 'admin' | 'director' | 'auxiliar' | 'alumno' | 'apoderado' | 'docente'
 
 export interface UsuarioRecord {
   id: string
@@ -30,7 +30,7 @@ export interface UsuariosPage {
 export const ROL_LABELS: Record<RolUsuario, string> = {
   admin:      'Administrador',
   director:   'Director',
-  vigilante:  'Vigilante',
+  auxiliar:  'Auxiliar',
   docente:    'Docente',
   alumno:     'Alumno',
   apoderado:  'Apoderado',
@@ -39,7 +39,7 @@ export const ROL_LABELS: Record<RolUsuario, string> = {
 export const ROL_TONES: Record<RolUsuario, string> = {
   admin:     'danger',
   director:  'primary',
-  vigilante: 'warning',
+  auxiliar: 'warning',
   docente:   'info',
   alumno:    'success',
   apoderado: 'neutral',

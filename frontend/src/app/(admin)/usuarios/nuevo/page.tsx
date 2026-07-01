@@ -13,7 +13,7 @@ const SELECT_CLS =
   'w-full px-3 py-2 text-[13px] border border-border rounded-2 bg-surface text-text focus:outline-none focus:ring-1 focus:ring-primary disabled:opacity-50'
 
 // Roles creables desde este formulario
-const ROLES_SISTEMA = ['admin', 'director', 'vigilante', 'apoderado'] as const
+const ROLES_SISTEMA = ['admin', 'director', 'auxiliar', 'apoderado'] as const
 type RolSistema = (typeof ROLES_SISTEMA)[number]
 
 interface FormValues {
@@ -39,7 +39,7 @@ export default function NuevoUsuarioPage() {
     watch,
     formState: { errors, isSubmitting },
   } = useForm<FormValues>({
-    defaultValues: { rol: 'vigilante', activo: 'true' },
+    defaultValues: { rol: 'auxiliar', activo: 'true' },
   })
 
   const rolSeleccionado = watch('rol')
@@ -63,7 +63,7 @@ export default function NuevoUsuarioPage() {
         telefono_whatsapp: values.telefono_whatsapp,
       }
     } else {
-      // Para admin / director / vigilante: datos directamente en el usuario
+      // Para admin / director / auxiliar: datos directamente en el usuario
       if (values.nombre)    dto.nombre    = values.nombre
       if (values.apellidos) dto.apellidos = values.apellidos
       if (values.dni)       dto.dni       = values.dni

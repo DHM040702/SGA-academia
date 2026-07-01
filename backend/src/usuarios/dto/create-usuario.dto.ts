@@ -39,14 +39,14 @@ export class CreateUsuarioDto {
   @IsOptional()
   activo?: boolean;
 
-  /** Nombre del usuario (admin / director / vigilante) */
+  /** Nombre del usuario (admin / director / auxiliar) */
   @ApiPropertyOptional()
   @IsOptional()
   @IsString()
   @MinLength(2)
   nombre?: string;
 
-  /** Apellidos del usuario (admin / director / vigilante) */
+  /** Apellidos del usuario (admin / director / auxiliar) */
   @ApiPropertyOptional()
   @IsOptional()
   @IsString()

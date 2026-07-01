@@ -1,7 +1,7 @@
 'use client'
 
 import { useMemo, useState } from 'react'
-import { useAsistencia, type FilterAsistencia } from '@/hooks/use-asistencia'
+import { useAsistencia, useDeleteAsistencia, type FilterAsistencia } from '@/hooks/use-asistencia'
 import { useAulas } from '@/hooks/use-ciclos'
 import { useAuth } from '@/contexts/auth-context'
 import type { AsistenciaRecord } from '@/hooks/use-asistencia'
@@ -12,7 +12,7 @@ import { Btn } from '@/components/ui/btn'
 import { PageHeader } from '@/components/layout/page-header'
 import { CorrectModal } from '@/components/asistencia/correct-modal'
 import { JustificarModal } from '@/components/asistencia/justificar-modal'
-import { Calendar, Users, Teacher, Edit, FileText } from '@/components/icons'
+import { Calendar, Users, Teacher, Edit, FileText, Trash } from '@/components/icons'
 
 // ─── helpers ──────────────────────────────────────────────────────────────────
 
@@ -39,13 +39,24 @@ function fmtHora(iso?: string | null) {
 export default function RegistrosPage() {
   const { user } = useAuth()
   const isDocente = user?.rol === 'docente'
-  // Solo admin y director pueden editar registros; el vigilante solo justifica faltas.
+  // Solo admin y director pueden editar registros; el auxiliar solo justifica faltas.
   const canEdit    = user?.rol === 'admin' || user?.rol === 'director'
-  const canJustify = canEdit || user?.rol === 'vigilante'
-  const conAcciones = canEdit || canJustify
+  const canDelete  = user?.rol === 'admin'
+  const canJustify = canEdit || user?.rol === 'auxiliar'
+  const conAcciones = canEdit || canJustify || canDelete
 
   const [correctTarget, setCorrectTarget] = useState<AsistenciaRecord | null>(null)
   const [justifyTarget, setJustifyTarget] = useState<AsistenciaRecord | null>(null)
+  const deleteMut = useDeleteAsistencia()
+
+  async function handleEliminar(r: AsistenciaRecord) {
+    const persona = r.tipoPersona === 'alumno' ? r.alumno?.nombre : r.docente?.nombre
+    if (!confirm(
+      `⚠️ ADVERTENCIA\n\nVas a ELIMINAR de forma permanente el registro de asistencia de ${persona}.\n` +
+      `Esta acción no se puede deshacer y afecta las estadísticas oficiales.\n\n¿Deseas continuar?`,
+    )) return
+    await deleteMut.mutateAsync(r.id)
+  }
 
   const hoy = useMemo(() => new Date(), [])
   const hace30 = useMemo(() => new Date(Date.now() - 30 * 24 * 60 * 60 * 1000), [])
@@ -192,19 +203,25 @@ export default function RegistrosPage() {
                     </td>
                     {conAcciones && (
                       <td className="px-3.5 py-2 text-right whitespace-nowrap">
-                        {r.esAusente ? (
-                          canJustify && (
-                            <Btn variant="secondary" size="sm" icon={<FileText size={13} />} onClick={() => setJustifyTarget(r)}>
-                              {r.justificacionRazon ? 'Editar just.' : 'Justificar'}
+                        <div className="inline-flex gap-1.5 justify-end">
+                          {r.esAusente
+                            ? canJustify && (
+                                <Btn variant="secondary" size="sm" icon={<FileText size={13} />} onClick={() => setJustifyTarget(r)}>
+                                  {r.justificacionRazon ? 'Editar just.' : 'Justificar'}
+                                </Btn>
+                              )
+                            : canEdit && (
+                                <Btn variant="secondary" size="sm" icon={<Edit size={13} />} onClick={() => setCorrectTarget(r)}>
+                                  Editar
+                                </Btn>
+                              )}
+                          {canDelete && (
+                            <Btn variant="danger" size="sm" icon={<Trash size={13} />} onClick={() => handleEliminar(r)}
+                              disabled={deleteMut.isPending} title="Eliminar registro">
+                              <span className="sr-only">Eliminar</span>
                             </Btn>
-                          )
-                        ) : (
-                          canEdit && (
-                            <Btn variant="secondary" size="sm" icon={<Edit size={13} />} onClick={() => setCorrectTarget(r)}>
-                              Editar
-                            </Btn>
-                          )
-                        )}
+                          )}
+                        </div>
                       </td>
                     )}
                   </tr>

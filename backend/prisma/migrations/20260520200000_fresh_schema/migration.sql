@@ -5,7 +5,7 @@
 CREATE EXTENSION IF NOT EXISTS "pgcrypto";
 
 -- ─── Enums ───────────────────────────────────────────────────────
-CREATE TYPE "Rol" AS ENUM ('admin', 'director', 'vigilante', 'alumno', 'apoderado', 'docente');
+CREATE TYPE "Rol" AS ENUM ('admin', 'director', 'auxiliar', 'alumno', 'apoderado', 'docente');
 CREATE TYPE "Turno" AS ENUM ('manana', 'tarde', 'noche');
 CREATE TYPE "TipoPersona" AS ENUM ('alumno', 'docente');
 CREATE TYPE "TipoRecurso" AS ENUM ('pdf', 'video', 'enlace', 'iframe');

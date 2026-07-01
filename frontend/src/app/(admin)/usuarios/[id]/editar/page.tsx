@@ -20,14 +20,14 @@ import {
 const SELECT_CLS =
   'w-full px-3 py-2 text-[13px] border border-border rounded-2 bg-surface text-text focus:outline-none focus:ring-1 focus:ring-primary disabled:opacity-50'
 
-const ROLES_EDITABLES = ['admin', 'director', 'vigilante', 'apoderado', 'docente', 'alumno'] as const
+const ROLES_EDITABLES = ['admin', 'director', 'auxiliar', 'apoderado', 'docente', 'alumno'] as const
 
 interface FormValues {
   email: string
   password: string
   rol: string
   activo: string
-  // Datos personales — admin / director / vigilante (en tabla usuarios)
+  // Datos personales — admin / director / auxiliar (en tabla usuarios)
   nombre: string
   apellidos: string
   dni: string          // usuarios.dni — DNI de acceso al sistema
@@ -75,7 +75,7 @@ export default function EditarUsuarioPage() {
   const rolActual = usuario?.rol
 
   // Roles que guardan nombre/apellidos/dni en la tabla usuarios directamente
-  const tieneDatosEnUsuario = rolActual === 'admin' || rolActual === 'director' || rolActual === 'vigilante'
+  const tieneDatosEnUsuario = rolActual === 'admin' || rolActual === 'director' || rolActual === 'auxiliar'
 
   React.useEffect(() => {
     if (!usuario) return
@@ -84,7 +84,7 @@ export default function EditarUsuarioPage() {
       password: '',
       rol:      usuario.rol,
       activo:   String(usuario.activo),
-      // Admin / director / vigilante
+      // Admin / director / auxiliar
       nombre:    usuario.nombre    ?? '',
       apellidos: usuario.apellidos ?? '',
       dni:       usuario.dni       ?? '',
@@ -104,7 +104,7 @@ export default function EditarUsuarioPage() {
     dto.activo = values.activo === 'true'
 
     if (tieneDatosEnUsuario) {
-      // Admin / director / vigilante: nombre, apellidos y DNI van en el usuario directamente
+      // Admin / director / auxiliar: nombre, apellidos y DNI van en el usuario directamente
       if (values.nombre)    dto.nombre    = values.nombre
       if (values.apellidos) dto.apellidos = values.apellidos
       if (values.dni)       dto.dni       = values.dni
@@ -235,7 +235,7 @@ export default function EditarUsuarioPage() {
           </div>
         </Card>
 
-        {/* Datos personales para admin / director / vigilante */}
+        {/* Datos personales para admin / director / auxiliar */}
         {tieneDatosEnUsuario && (
           <Card title="Datos personales" className="mt-4">
             <div className="grid grid-cols-1 sm:grid-cols-2 gap-4 p-1">

@@ -15,7 +15,7 @@ const ROL_OPTIONS: { value: string; label: string }[] = [
   { value: '',          label: 'Todos los roles' },
   { value: 'admin',     label: 'Administrador' },
   { value: 'director',  label: 'Director' },
-  { value: 'vigilante', label: 'Vigilante' },
+  { value: 'auxiliar', label: 'Auxiliar' },
   { value: 'docente',   label: 'Docente' },
   { value: 'alumno',    label: 'Alumno' },
   { value: 'apoderado', label: 'Apoderado' },
@@ -26,7 +26,7 @@ const SELECT_CLS =
 
 function rolTone(rol: RolUsuario): 'danger' | 'warning' | 'success' | 'info' | 'neutral' | 'primary' {
   const map: Record<RolUsuario, any> = {
-    admin: 'danger', director: 'primary', vigilante: 'warning',
+    admin: 'danger', director: 'primary', auxiliar: 'warning',
     docente: 'info', alumno: 'success', apoderado: 'neutral',
   }
   return map[rol]

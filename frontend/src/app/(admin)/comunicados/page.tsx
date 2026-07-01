@@ -422,7 +422,7 @@ function EditarComunicadoModal({
   )
 }
 
-/* ─── Modal simplificado para vigilante ──────────────────────────── */
+/* ─── Modal simplificado para auxiliar ──────────────────────────── */
 function NuevoAvisoModal({ onClose }: { onClose: () => void }) {
   const [titulo, setTitulo] = useState('')
   const [cuerpo, setCuerpo] = useState('')
@@ -495,10 +495,10 @@ function NuevoAvisoModal({ onClose }: { onClose: () => void }) {
 export default function ComunicadosPage() {
   const { user } = useAuth()
   const esAdmin     = user?.rol === 'admin' || user?.rol === 'director'
-  const esVigilante = user?.rol === 'vigilante'
+  const esAuxiliar = user?.rol === 'auxiliar'
   const esDocente   = user?.rol === 'docente'
-  const soloLectura = !esAdmin && !esVigilante  // docente, alumno, apoderado: solo lectura
-  const creadoBasico = esVigilante              // vigilante: crea avisos simples
+  const soloLectura = !esAdmin && !esAuxiliar  // docente, alumno, apoderado: solo lectura
+  const creadoBasico = esAuxiliar              // auxiliar: crea avisos simples
 
   // Admin/director ven tabs de gestión; el resto solo ve su bandeja de recibidos
   const TABS_GESTION: Tab[] = ['Todos', 'Enviados', 'Borradores']

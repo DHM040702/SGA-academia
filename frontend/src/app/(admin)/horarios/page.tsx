@@ -1023,9 +1023,9 @@ function RecesosModal({ aulas, onClose }: {
 
 export default function HorariosPage() {
   const { user } = useAuth()
-  const isVigilante = user?.rol === 'vigilante'
+  const isAuxiliar = user?.rol === 'auxiliar'
   const isDocente   = user?.rol === 'docente'
-  const soloLectura = isVigilante || isDocente   // sin crear/editar/eliminar
+  const soloLectura = isAuxiliar || isDocente   // sin crear/editar/eliminar
   const docenteId   = isDocente ? user?.docente?.id : undefined
 
   const [aulaId, setAulaId]       = useState('')

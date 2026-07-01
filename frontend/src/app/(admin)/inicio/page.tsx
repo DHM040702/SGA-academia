@@ -88,9 +88,9 @@ function WeeklyBar({ data, h = 180 }: { data: { day: string; v: number; today?: 
 }
 
 /* ═══════════════════════════════════════════════════════════════
-   PANTALLA VIGILANTE
+   PANTALLA AUXILIAR
    ═══════════════════════════════════════════════════════════════ */
-function VigilanteInicio() {
+function AuxiliarInicio() {
   const { user } = useAuth()
   const router = useRouter()
 
@@ -100,7 +100,7 @@ function VigilanteInicio() {
   const todayIso = `${now.getFullYear()}-${String(now.getMonth() + 1).padStart(2, '0')}-${String(now.getDate()).padStart(2, '0')}`
   const todayDia = now.getDay() === 0 ? 7 : now.getDay()
 
-  const firstName = user?.nombre?.split(' ')[0] ?? user?.email?.split('@')[0]?.split('.')[0] ?? 'vigilante'
+  const firstName = user?.nombre?.split(' ')[0] ?? user?.email?.split('@')[0]?.split('.')[0] ?? 'auxiliar'
   const capitalized = firstName.charAt(0).toUpperCase() + firstName.slice(1)
 
   // Estado para el modal de cierre de turno
@@ -110,14 +110,14 @@ function VigilanteInicio() {
 
   /* ── Queries con auto-refresh ─────────────────────────────── */
   const { data: stats, refetch: refetchStats } = useQuery({
-    queryKey: ['asistencia', 'stats', 'vigilante-inicio'],
+    queryKey: ['asistencia', 'stats', 'auxiliar-inicio'],
     queryFn: () => api.get('/asistencia/stats').then((r) => r.data),
     staleTime: 20_000,
     refetchInterval: 30_000,
   })
 
   const { data: asistenciaPage, refetch: refetchAsistencia, dataUpdatedAt } = useQuery({
-    queryKey: ['asistencia', 'hoy-vigilante', todayIso],
+    queryKey: ['asistencia', 'hoy-auxiliar', todayIso],
     queryFn: () =>
       api.get('/asistencia', { params: { fecha: todayIso, limit: 15 } }).then((r) => r.data),
     staleTime: 15_000,
@@ -126,7 +126,7 @@ function VigilanteInicio() {
 
   // Sin filtro publicado para mostrar todas las clases del día (publicadas o no)
   const { data: horariosPage } = useQuery({
-    queryKey: ['horarios', 'hoy-vigilante', todayDia],
+    queryKey: ['horarios', 'hoy-auxiliar', todayDia],
     queryFn: () =>
       api.get('/horarios', { params: { dia_semana: todayDia, limit: 50 } }).then((r) => r.data),
     staleTime: 60_000,
@@ -170,13 +170,13 @@ function VigilanteInicio() {
       {/* Header */}
       <PageHeader
         title={`${horaStr}, ${capitalized}`}
-        crumbs={['Vigilancia', 'Inicio']}
+        crumbs={['Auxiliar', 'Inicio']}
         action={
           <>
             <Btn variant="secondary" size="sm" onClick={handleRefresh}>
               <RefreshCw size={14} />Actualizar
             </Btn>
-            <Btn size="sm" onClick={() => window.open('/vigilante', '_blank')}>
+            <Btn size="sm" onClick={() => window.open('/auxiliar', '_blank')}>
               <ScanLine size={14} />Registro de asistencia
             </Btn>
           </>
@@ -349,7 +349,7 @@ function VigilanteInicio() {
             <div className="flex flex-col gap-2.5 pt-1">
               <Btn
                 className="w-full justify-center py-2.5"
-                onClick={() => window.open('/vigilante', '_blank')}
+                onClick={() => window.open('/auxiliar', '_blank')}
               >
                 <ScanLine size={15} />Abrir pantalla de registro
               </Btn>
@@ -952,7 +952,7 @@ function DocenteInicio() {
    ═══════════════════════════════════════════════════════════════ */
 export default function InicioPage() {
   const { user } = useAuth()
-  if (user?.rol === 'vigilante') return <VigilanteInicio />
+  if (user?.rol === 'auxiliar') return <AuxiliarInicio />
   if (user?.rol === 'docente')   return <DocenteInicio />
   return <AdminInicio />
 }

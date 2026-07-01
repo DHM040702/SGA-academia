@@ -14,14 +14,14 @@ export class TurnosController {
   constructor(private readonly service: TurnosService) {}
 
   @Get()
-  @Roles(Rol.admin, Rol.director, Rol.vigilante)
+  @Roles(Rol.admin, Rol.director, Rol.auxiliar)
   @ApiOperation({ summary: 'Listar configuraciones de turno (mañana / tarde)' })
   findAll() {
     return this.service.findAll();
   }
 
   @Get(':turno')
-  @Roles(Rol.admin, Rol.director, Rol.vigilante)
+  @Roles(Rol.admin, Rol.director, Rol.auxiliar)
   @ApiOperation({ summary: 'Detalle de la configuración de un turno' })
   findOne(@Param('turno') turno: string) {
     return this.service.findOne(turno);

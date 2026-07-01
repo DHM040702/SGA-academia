@@ -123,7 +123,7 @@ function RowMenu({ id, name, onClose, readOnly }: { id: string; name: string; on
 export default function AlumnosPage() {
   const router = useRouter()
   const { user } = useAuth()
-  const isVigilante = user?.rol === 'vigilante'
+  const isAuxiliar = user?.rol === 'auxiliar'
   const [filters, setFilters] = React.useState<FilterAlumnos>({ page: 1, limit: 20 })
   const [q, setQ] = React.useState('')
   const [estado, setEstado] = React.useState('')
@@ -193,7 +193,7 @@ export default function AlumnosPage() {
       <PageHeader
         title="Alumnos"
         crumbs={['Administración', 'Alumnos']}
-        action={!isVigilante ? (
+        action={!isAuxiliar ? (
           <>
             <Btn variant="secondary" size="sm" onClick={() => setShowImport(true)}>
               <Upload size={14} />Importar Excel
@@ -353,7 +353,7 @@ export default function AlumnosPage() {
                           <More size={15} />
                         </Btn>
                         {openMenu === a.id && (
-                          <RowMenu id={a.id} name={name} onClose={() => setOpenMenu(null)} readOnly={isVigilante} />
+                          <RowMenu id={a.id} name={name} onClose={() => setOpenMenu(null)} readOnly={isAuxiliar} />
                         )}
                       </div>
                     </td>

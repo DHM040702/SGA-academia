@@ -44,14 +44,14 @@ export class UpdateUsuarioDto {
   @IsBoolean()
   activo?: boolean;
 
-  /** Nombre directo en usuario (admin / director / vigilante) */
+  /** Nombre directo en usuario (admin / director / auxiliar) */
   @ApiPropertyOptional()
   @IsOptional()
   @IsString()
   @MinLength(2)
   nombre?: string;
 
-  /** Apellidos directo en usuario (admin / director / vigilante) */
+  /** Apellidos directo en usuario (admin / director / auxiliar) */
   @ApiPropertyOptional()
   @IsOptional()
   @IsString()

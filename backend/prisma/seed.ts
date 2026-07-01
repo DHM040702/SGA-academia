@@ -72,12 +72,12 @@ async function main() {
   console.log('   ✓ Contraseña temporal = DNI (cambio obligatorio al ingresar)')
 
   // ── 2. Usuarios staff ────────────────────────────────────────────────────
-  const [admin, director, vigilante] = await Promise.all([
+  const [admin, director, auxiliar] = await Promise.all([
     prisma.usuario.create({ data: { email: 'admin@cepreunasam.edu.pe',     passwordHash: await hashDni('00000001'), rol: Rol.admin,     dni: '00000001', nombre: 'Admin',     apellidos: 'Sistema'   } }),
     prisma.usuario.create({ data: { email: 'director@cepreunasam.edu.pe',  passwordHash: await hashDni('00000002'), rol: Rol.director,  dni: '00000002', nombre: 'Director',   apellidos: 'Sistema'   } }),
-    prisma.usuario.create({ data: { email: 'vigilante@cepreunasam.edu.pe', passwordHash: await hashDni('00000003'), rol: Rol.vigilante, dni: '00000003', nombre: 'Vigilante',  apellidos: 'Sistema'   } }),
+    prisma.usuario.create({ data: { email: 'auxiliar@cepreunasam.edu.pe', passwordHash: await hashDni('00000003'), rol: Rol.auxiliar, dni: '00000003', nombre: 'Auxiliar',  apellidos: 'Sistema'   } }),
   ])
-  console.log('   ✓ Staff: admin, director, vigilante')
+  console.log('   ✓ Staff: admin, director, auxiliar')
   void admin
 
   // ── 3. Ciclo ─────────────────────────────────────────────────────────────
@@ -320,7 +320,7 @@ async function main() {
         horaIngreso: new Date(`${schoolDays[di]}T${pad(baseH)}:${pad(min)}:00.000Z`),
         esTardanza:  tardanza,
         esManual:    false,
-        registradoPorId: vigilante.id,
+        registradoPorId: auxiliar.id,
       })
     }
   }
@@ -345,7 +345,7 @@ async function main() {
         horaIngreso: new Date(`${schoolDays[dayIdx]}T07:${pad(min)}:00.000Z`),
         esTardanza:  tardanza,
         esManual:    false,
-        registradoPorId: vigilante.id,
+        registradoPorId: auxiliar.id,
       })
     }
   }
@@ -461,7 +461,7 @@ async function main() {
   console.log('ACCESOS (DNI / contraseña):')
   console.log('  00000001 / admin123      (admin)')
   console.log('  00000002 / admin123      (director)')
-  console.log('  00000003 / admin123      (vigilante)')
+  console.log('  00000003 / admin123      (auxiliar)')
   console.log('  juan.garcia@cepreunasam.edu.pe  → docente123')
   console.log('  alumno001@cepreunasam.edu.pe    → alumno123  (hasta alumno030)')
   console.log('  roberto.torres@gmail.com        → apoderado123')

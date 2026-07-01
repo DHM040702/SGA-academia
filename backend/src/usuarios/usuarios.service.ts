@@ -148,7 +148,7 @@ export class UsuariosService {
         });
       }
 
-      // Admin, director, vigilante: usuario con nombre/apellidos/dni opcionales
+      // Admin, director, auxiliar: usuario con nombre/apellidos/dni opcionales
       if (!dto.password && !dto.dni) {
         throw new BadRequestException('Debe indicar el DNI: se usa como contraseña temporal');
       }

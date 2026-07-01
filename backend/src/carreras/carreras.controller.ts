@@ -19,7 +19,7 @@ export class CarrerasController {
   constructor(private readonly service: CarrerasService) {}
 
   @Get()
-  @Roles(Rol.admin, Rol.director, Rol.docente, Rol.alumno, Rol.apoderado, Rol.vigilante)
+  @Roles(Rol.admin, Rol.director, Rol.docente, Rol.alumno, Rol.apoderado, Rol.auxiliar)
   @ApiOperation({ summary: 'Listar carreras (filtrable por área)' })
   @ApiQuery({ name: 'area', required: false, enum: Area })
   findAll(@Query('area') area?: Area) {
@@ -27,7 +27,7 @@ export class CarrerasController {
   }
 
   @Get(':id')
-  @Roles(Rol.admin, Rol.director, Rol.docente, Rol.alumno, Rol.apoderado, Rol.vigilante)
+  @Roles(Rol.admin, Rol.director, Rol.docente, Rol.alumno, Rol.apoderado, Rol.auxiliar)
   findOne(@Param('id', ParseUUIDPipe) id: string) {
     return this.service.findOne(id);
   }

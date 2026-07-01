@@ -61,7 +61,7 @@ function RowMenu({ registro, onCorregir, onEliminar, onJustificar, canCorregir, 
   const showCorregir   = canCorregir && !registro.esAusente
   const showJustificar = canJustificar && registro.esAusente
   const showEliminar   = canEliminar
-  // Sin acciones disponibles → no mostrar el menú (p. ej. vigilante en un
+  // Sin acciones disponibles → no mostrar el menú (p. ej. auxiliar en un
   // registro presente/tardanza solo puede justificar faltas).
   if (!showCorregir && !showJustificar && !showEliminar) return null
 
@@ -564,15 +564,15 @@ export default function AsistenciaPage() {
   const { user } = useAuth()
   const isAdmin     = user?.rol === 'admin'
   const isDirector  = user?.rol === 'director'
-  const isVigilante = user?.rol === 'vigilante'
+  const isAuxiliar = user?.rol === 'auxiliar'
   const isDocente   = user?.rol === 'docente'
-  const soloLectura = isVigilante || isDocente
+  const soloLectura = isAuxiliar || isDocente
 
   // Capacidades por rol sobre un registro:
-  //  - Justificar inasistencias: admin, director y vigilante.
+  //  - Justificar inasistencias: admin, director y auxiliar.
   //  - Corregir registro: admin y director.
   //  - Eliminar registro: solo admin.
-  const canJustificar = isAdmin || isDirector || isVigilante
+  const canJustificar = isAdmin || isDirector || isAuxiliar
   const canCorregir   = isAdmin || isDirector
   const canEliminar   = isAdmin
 
@@ -658,7 +658,7 @@ export default function AsistenciaPage() {
             )}
             {!isDocente && (
               <Btn icon={<ScanLine size={14} />} size="sm"
-                onClick={() => window.open('/vigilante', '_blank')}>
+                onClick={() => window.open('/auxiliar', '_blank')}>
                 Registro de asistencia
               </Btn>
             )}
@@ -872,7 +872,7 @@ export default function AsistenciaPage() {
                 )}
                 {!isDocente && (
                   <Btn variant="secondary" size="sm" icon={<ScanLine size={13} />}
-                    onClick={() => window.open('/vigilante', '_blank')} className="w-full justify-start">
+                    onClick={() => window.open('/auxiliar', '_blank')} className="w-full justify-start">
                     Abrir registro de asistencia
                   </Btn>
                 )}

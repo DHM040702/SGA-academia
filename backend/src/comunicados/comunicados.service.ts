@@ -20,7 +20,7 @@ export class ComunicadosService {
       docente:   [TipoDestinatario.todos, TipoDestinatario.docentes],
       alumno:    [TipoDestinatario.todos, TipoDestinatario.alumnos],
       apoderado: [TipoDestinatario.todos, TipoDestinatario.apoderados],
-      vigilante: [TipoDestinatario.todos],
+      auxiliar: [TipoDestinatario.todos],
     };
 
     const allowedTypes = rolDestMapping[rolUsuario ?? ''];

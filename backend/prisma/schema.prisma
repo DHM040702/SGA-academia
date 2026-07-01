@@ -290,7 +290,7 @@ model Auditoria {
 enum Rol {
   admin
   director
-  vigilante
+  auxiliar
   alumno
   apoderado
   docente

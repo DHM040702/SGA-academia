@@ -31,14 +31,14 @@ export class ComunicadosController {
   constructor(private readonly service: ComunicadosService) {}
 
   @Get()
-  @Roles(Rol.admin, Rol.director, Rol.docente, Rol.alumno, Rol.apoderado, Rol.vigilante)
+  @Roles(Rol.admin, Rol.director, Rol.docente, Rol.alumno, Rol.apoderado, Rol.auxiliar)
   @ApiOperation({ summary: 'Listar comunicados paginados' })
   findAll(@Query() dto: PaginationDto, @CurrentUser() user: { id: string; rol: string }) {
     return this.service.findAll(dto, user.rol);
   }
 
   @Get(':id')
-  @Roles(Rol.admin, Rol.director, Rol.docente, Rol.alumno, Rol.apoderado, Rol.vigilante)
+  @Roles(Rol.admin, Rol.director, Rol.docente, Rol.alumno, Rol.apoderado, Rol.auxiliar)
   @ApiOperation({ summary: 'Detalle de un comunicado' })
   findOne(@Param('id', ParseUUIDPipe) id: string) {
     return this.service.findOne(id);
@@ -71,7 +71,7 @@ export class ComunicadosController {
 
   @Post(':id/leer')
   @HttpCode(HttpStatus.OK)
-  @Roles(Rol.admin, Rol.director, Rol.docente, Rol.alumno, Rol.apoderado, Rol.vigilante)
+  @Roles(Rol.admin, Rol.director, Rol.docente, Rol.alumno, Rol.apoderado, Rol.auxiliar)
   @ApiOperation({ summary: 'Marcar comunicado como leído por el usuario actual' })
   marcarLeido(
     @Param('id', ParseUUIDPipe) id: string,

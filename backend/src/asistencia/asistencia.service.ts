@@ -243,7 +243,7 @@ export class AsistenciaService {
         }
       }
     } else {
-      // admin, director, vigilante: aplica filtro si viene en el query
+      // admin, director, auxiliar: aplica filtro si viene en el query
       if (alumno_id) where.alumnoId = alumno_id;
     }
 

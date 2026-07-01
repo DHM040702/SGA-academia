@@ -97,14 +97,14 @@ const GROUPS_DIRECTOR: NavGroup[] = [
   },
 ]
 
-const GROUPS_VIGILANTE: NavGroup[] = [
+const GROUPS_AUXILIAR: NavGroup[] = [
   {
     items: [{ href: '/inicio', icon: Home, label: 'Inicio' }],
   },
   {
     label: 'Operaciones',
     items: [
-      { href: '/vigilante',     icon: ScanLine, label: 'Registro asistencia' },
+      { href: '/auxiliar',     icon: ScanLine, label: 'Registro asistencia' },
       { href: '/asistencia',    icon: Check,    label: 'Asistencia' },
       { href: '/inasistencias', icon: FileText, label: 'Inasistencias' },
       { href: '/registros',     icon: Chart,    label: 'Registros' },
@@ -156,7 +156,7 @@ export function Sidebar({ compact = false }: SidebarProps) {
 
   const groups: NavGroup[] =
     user?.rol === 'director'  ? GROUPS_DIRECTOR
-    : user?.rol === 'vigilante' ? GROUPS_VIGILANTE
+    : user?.rol === 'auxiliar' ? GROUPS_AUXILIAR
     : user?.rol === 'docente'   ? GROUPS_DOCENTE
     : GROUPS_ADMIN
 

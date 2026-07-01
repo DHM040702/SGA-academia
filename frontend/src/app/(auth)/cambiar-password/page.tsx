@@ -18,7 +18,7 @@ export default function CambiarPasswordPage() {
 
   function roleHome(rol?: string) {
     if (rol === 'alumno' || rol === 'apoderado') return '/portal/inicio'
-    if (rol === 'vigilante') return '/vigilante'
+    if (rol === 'auxiliar') return '/auxiliar'
     return '/inicio'
   }
 

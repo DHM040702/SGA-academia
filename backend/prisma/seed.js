@@ -83,12 +83,12 @@ async function main() {
         bcrypt.hash('apoderado123', ROUNDS),
     ]);
     console.log('   ✓ Contraseñas hasheadas');
-    const [admin, director, vigilante] = await Promise.all([
+    const [admin, director, auxiliar] = await Promise.all([
         prisma.usuario.create({ data: { email: 'admin@cepreunasam.edu.pe', passwordHash: hashAdmin, rol: client_1.Rol.admin } }),
         prisma.usuario.create({ data: { email: 'director@cepreunasam.edu.pe', passwordHash: hashAdmin, rol: client_1.Rol.director } }),
-        prisma.usuario.create({ data: { email: 'vigilante@cepreunasam.edu.pe', passwordHash: hashAdmin, rol: client_1.Rol.vigilante } }),
+        prisma.usuario.create({ data: { email: 'auxiliar@cepreunasam.edu.pe', passwordHash: hashAdmin, rol: client_1.Rol.auxiliar } }),
     ]);
-    console.log('   ✓ Staff: admin, director, vigilante');
+    console.log('   ✓ Staff: admin, director, auxiliar');
     void admin;
     const ciclo = await prisma.ciclo.create({
         data: { nombre: '2026-I', fechaInicio: new Date('2026-03-02'), fechaFin: new Date('2026-07-31'), activo: true },
@@ -270,7 +270,7 @@ async function main() {
                 horaIngreso: new Date(`${schoolDays[di]}T${pad(baseH)}:${pad(min)}:00.000Z`),
                 esTardanza: tardanza,
                 esManual: false,
-                registradoPorId: vigilante.id,
+                registradoPorId: auxiliar.id,
             });
         }
     }
@@ -290,7 +290,7 @@ async function main() {
                 horaIngreso: new Date(`${schoolDays[dayIdx]}T07:${pad(min)}:00.000Z`),
                 esTardanza: tardanza,
                 esManual: false,
-                registradoPorId: vigilante.id,
+                registradoPorId: auxiliar.id,
             });
         }
     }
@@ -393,7 +393,7 @@ async function main() {
     console.log('ACCESOS:');
     console.log('  admin@cepreunasam.edu.pe        → admin123');
     console.log('  director@cepreunasam.edu.pe     → admin123');
-    console.log('  vigilante@cepreunasam.edu.pe    → admin123');
+    console.log('  auxiliar@cepreunasam.edu.pe    → admin123');
     console.log('  juan.garcia@cepreunasam.edu.pe  → docente123');
     console.log('  alumno001@cepreunasam.edu.pe    → alumno123  (hasta alumno030)');
     console.log('  roberto.torres@gmail.com        → apoderado123');
