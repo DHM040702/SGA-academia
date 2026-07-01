@@ -164,15 +164,24 @@ export class AsistenciaService {
   }
 
   async findAll(dto: FilterAsistenciaDto, caller?: { id: string; rol: string }) {
-    const { page = 1, limit = 20, fecha, aula_id, alumno_id, docente_id, tipo } = dto as any;
+    const { page = 1, limit = 20, fecha, desde, hasta, aula_id, alumno_id, docente_id, tipo } = dto as any;
     const skip = (page - 1) * limit;
 
     const where: any = {};
 
+    // Use Date.UTC to avoid timezone offset shifting the date when server != UTC
+    const toUtc = (s: string) => {
+      const [y, m, d] = s.split('-').map(Number);
+      return new Date(Date.UTC(y, m - 1, d));
+    };
+
     if (fecha) {
-      // Use Date.UTC to avoid timezone offset shifting the date when server != UTC
-      const [y, m, d] = fecha.split('-').map(Number);
-      where.fecha = new Date(Date.UTC(y, m - 1, d));
+      where.fecha = toUtc(fecha);
+    } else if (desde || hasta) {
+      where.fecha = {
+        ...(desde && { gte: toUtc(desde) }),
+        ...(hasta && { lte: toUtc(hasta) }),
+      };
     }
     if (tipo) where.tipoPersona = tipo;
     if (docente_id) where.docenteId = docente_id;
@@ -206,8 +215,35 @@ export class AsistenciaService {
         where.alumnoId = { in: alumnoIds };
       }
       where.tipoPersona = TipoPersona.alumno;
+    } else if (caller?.rol === 'docente') {
+      // El docente ve SOLO: su propia asistencia (tipo=docente) o los alumnos
+      // de las aulas a las que está asignado (vista, sin editar).
+      const docente = await this.prisma.docente.findFirst({
+        where: { usuarioId: caller.id, deletedAt: null },
+        select: { id: true },
+      });
+      if (!docente) throw new NotFoundException('Docente no encontrado');
+
+      if (tipo === TipoPersona.docente) {
+        where.docenteId = docente.id;
+        where.tipoPersona = TipoPersona.docente;
+      } else {
+        const horarios = await this.prisma.horario.findMany({
+          where: { docenteId: docente.id },
+          select: { aulaId: true },
+        });
+        const aulaIds = [...new Set(horarios.map((h) => h.aulaId))];
+        where.tipoPersona = TipoPersona.alumno;
+        if (aula_id) {
+          // Solo puede filtrar por un aula que le pertenece.
+          if (!aulaIds.includes(aula_id)) throw new NotFoundException('Aula no asignada al docente');
+          where.alumno = { aulaId: aula_id };
+        } else {
+          where.alumno = { aulaId: { in: aulaIds } };
+        }
+      }
     } else {
-      // admin, director, vigilante, docente: aplica filtro si viene en el query
+      // admin, director, vigilante: aplica filtro si viene en el query
       if (alumno_id) where.alumnoId = alumno_id;
     }
 

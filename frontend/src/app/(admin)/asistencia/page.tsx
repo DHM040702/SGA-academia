@@ -18,7 +18,7 @@ import { KPI } from '@/components/ui/kpi'
 import { Card } from '@/components/ui/card'
 import { Btn } from '@/components/ui/btn'
 import { PageHeader } from '@/components/layout/page-header'
-import { Download, Edit, ScanLine, MoreHorizontal, X, Plus, Lock, FileText, Clock } from '@/components/icons'
+import { Download, Edit, ScanLine, MoreHorizontal, X, Plus, Lock, FileText, Clock, AlertTriangle } from '@/components/icons'
 import { useTurnos, isoToHHMM } from '@/hooks/use-turnos'
 import { useAuth } from '@/contexts/auth-context'
 
@@ -149,6 +149,15 @@ function CorrectModal({ registro, onClose }: { registro: AsistenciaRecord; onClo
               {registro.tipoPersona === 'alumno' ? 'Alumno' : 'Docente'}
             </Pill>
           </div>
+        </div>
+
+        {/* Advertencia: corregir modifica un registro oficial y queda auditado */}
+        <div className="flex items-start gap-2 p-2.5 rounded-2 bg-warning-light/40 border border-warning-light text-warning">
+          <AlertTriangle size={14} className="mt-0.5 shrink-0" />
+          <p className="text-[11.5px] leading-snug m-0">
+            Estás modificando un registro oficial de asistencia. El cambio queda
+            registrado con tu usuario. Hazlo solo con justificación válida.
+          </p>
         </div>
 
         <form onSubmit={handleSubmit} className="flex flex-col gap-3">
@@ -687,7 +696,11 @@ export default function AsistenciaPage() {
   const ausentes  = Math.max(0, total - presentes - tardanzas)
 
   async function handleEliminar(r: AsistenciaRecord) {
-    if (!confirm(`¿Eliminar el registro de asistencia de ${r.tipoPersona === 'alumno' ? r.alumno?.nombre : r.docente?.nombre}?`)) return
+    const persona = r.tipoPersona === 'alumno' ? r.alumno?.nombre : r.docente?.nombre
+    if (!confirm(
+      `⚠️ ADVERTENCIA\n\nVas a ELIMINAR de forma permanente el registro de asistencia de ${persona}.\n` +
+      `Esta acción no se puede deshacer y afecta las estadísticas oficiales.\n\n¿Deseas continuar?`,
+    )) return
     await deleteMut.mutateAsync(r.id)
   }
 

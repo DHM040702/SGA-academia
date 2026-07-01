@@ -78,6 +78,9 @@ export class ReportesService {
     const asistenciasAlumno = await this.prisma.asistencia.findMany({
       where: {
         tipoPersona: TipoPersona.alumno,
+        // Solo presencias reales: las faltas (esAusente) NO son asistencia y
+        // no deben inflar los % de asistencia del panel/tendencia.
+        esAusente: false,
         fecha: { gte: fechaDesde, lte: fechaHasta },
         ...(alumnoIds.length && { alumnoId: { in: alumnoIds } }),
       },

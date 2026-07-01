@@ -4,10 +4,20 @@ import { TipoPersona } from '@prisma/client';
 import { PaginationDto } from '../../common/dto/pagination.dto';
 
 export class FilterAsistenciaDto extends PaginationDto {
-  @ApiPropertyOptional({ description: 'Fecha en formato YYYY-MM-DD', example: '2026-05-20' })
+  @ApiPropertyOptional({ description: 'Fecha exacta en formato YYYY-MM-DD', example: '2026-05-20' })
   @IsOptional()
   @IsISO8601({ strict: false })
   fecha?: string;
+
+  @ApiPropertyOptional({ description: 'Rango: fecha inicial YYYY-MM-DD (ignorada si se envía `fecha`)', example: '2026-05-01' })
+  @IsOptional()
+  @IsISO8601({ strict: false })
+  desde?: string;
+
+  @ApiPropertyOptional({ description: 'Rango: fecha final YYYY-MM-DD (ignorada si se envía `fecha`)', example: '2026-05-31' })
+  @IsOptional()
+  @IsISO8601({ strict: false })
+  hasta?: string;
 
   @ApiPropertyOptional({ description: 'UUID del aula', format: 'uuid' })
   @IsOptional()

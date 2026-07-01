@@ -41,6 +41,8 @@ export interface AsistenciaRecord {
 
 export interface FilterAsistencia {
   fecha?: string
+  desde?: string
+  hasta?: string
   tipo?: 'alumno' | 'docente'
   aula_id?: string
   alumno_id?: string

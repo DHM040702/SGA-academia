@@ -112,11 +112,11 @@ export class AsistenciaController {
     return this.service.findByAlumno(alumnoId, Math.min(parsedLimit, 200), user);
   }
 
-  /** PATCH /asistencia/:id — corrección manual (vigilante solo toggle puntual/tardanza) */
+  /** PATCH /asistencia/:id — corrección manual (solo admin y director) */
   @Patch(':id')
   @ApiBearerAuth('access-token')
   @UseGuards(JwtAuthGuard, RolesGuard)
-  @Roles(Rol.admin, Rol.director, Rol.vigilante)
+  @Roles(Rol.admin, Rol.director)
   @ApiOperation({ summary: 'Corrección manual de un registro de asistencia' })
   corregir(
     @Param('id', ParseUUIDPipe) id: string,

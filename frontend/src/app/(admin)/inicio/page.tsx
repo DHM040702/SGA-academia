@@ -53,8 +53,14 @@ function timeAgo(dateStr: string): string {
 /* ── Weekly bar chart (solo admin) ───────────────────────────── */
 function WeeklyBar({ data, h = 180 }: { data: { day: string; v: number; today?: boolean }[]; h?: number }) {
   const max = Math.max(...data.map((d) => d.v), 1)
+  const vacio = data.every((d) => d.v <= 0)
   return (
-    <div className="flex items-end gap-2.5 pt-3" style={{ height: h }}>
+    <div className="relative flex items-end gap-2.5 pt-3" style={{ height: h }}>
+      {vacio && (
+        <div className="absolute inset-0 flex items-center justify-center text-[12.5px] text-text-mute pointer-events-none">
+          Aún no hay asistencias registradas esta semana
+        </div>
+      )}
       {data.map((d, i) => (
         <div key={i} className="flex-1 flex flex-col items-center gap-2 h-full">
           <div className="flex-1 w-full flex items-end relative">
