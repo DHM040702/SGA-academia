@@ -4,7 +4,10 @@ import { JwtService } from '@nestjs/jwt';
 import * as bcrypt from 'bcrypt';
 import { PrismaService } from '../prisma/prisma.service';
 
-const REFRESH_EXPIRES_DAYS = 7;
+// Tope absoluto de sesión (lifetime del refresh token en BD y en el JWT).
+// Sesión más corta que los 7 días originales para reducir la ventana de un
+// token robado; combinado con la cookie de sesión y el idle timeout del front.
+const REFRESH_EXPIRES_DAYS = 1;
 
 // Tipo local — no usa el cliente Prisma generado (tabla nueva, CLI roto en este setup)
 interface RefreshTokenRow {

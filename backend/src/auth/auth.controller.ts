@@ -20,7 +20,9 @@ const COOKIE_OPTS = {
   // únicamente cuando se sirva por HTTPS/TLS.
   secure: process.env.COOKIE_SECURE === 'true',
   sameSite: 'lax' as const,
-  maxAge: 7 * 24 * 60 * 60 * 1000,
+  // Sin maxAge → cookie de SESIÓN: el navegador la elimina al cerrarse, de modo
+  // que la sesión no persiste tras cerrar el navegador (refuerzo para equipos
+  // compartidos como el kiosco). El tope absoluto lo pone el refresh token en BD.
   path: '/',
 };
 

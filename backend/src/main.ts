@@ -1,8 +1,11 @@
 import { NestFactory } from '@nestjs/core';
 import { ValidationPipe, Logger } from '@nestjs/common';
 import { DocumentBuilder, SwaggerModule } from '@nestjs/swagger';
+import helmet from 'helmet';
 // eslint-disable-next-line @typescript-eslint/no-require-imports
 const cookieParser = require('cookie-parser');
+// eslint-disable-next-line @typescript-eslint/no-require-imports
+const compression = require('compression');
 import { AppModule } from './app.module';
 
 const logger = new Logger('Bootstrap');
@@ -13,6 +16,13 @@ async function bootstrap() {
   // Confiar en el proxy (Next.js) para que req.ip lea la IP real del cliente
   // desde el header x-forwarded-for en lugar de 127.0.0.1.
   app.getHttpAdapter().getInstance().set('trust proxy', true);
+
+  // ── Seguridad y rendimiento ────────────────────────────────────
+  // helmet: cabeceras de seguridad HTTP. CSP desactivada porque es una API
+  // JSON + Swagger (la CSP por defecto rompería el UI de /api/docs).
+  app.use(helmet({ contentSecurityPolicy: false }));
+  // compression: gzip de las respuestas.
+  app.use(compression());
 
   // ── Global prefix ──────────────────────────────────────────────
   app.setGlobalPrefix('api');

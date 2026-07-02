@@ -109,6 +109,43 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
     setUser(data)
   }, [])
 
+  /* ── Cierre de sesión por inactividad (idle timeout: 120 min) ──────────
+     Cualquier actividad del usuario (incluido el HID del escáner, que emite
+     keydown) reamartilla el temporizador. Tras 120 min sin actividad se cierra
+     la sesión y se redirige al login. Solo aplica con sesión iniciada. */
+  React.useEffect(() => {
+    if (!user) return
+    // Minutos configurables por NEXT_PUBLIC_IDLE_TIMEOUT_MIN (default 120).
+    // Es NEXT_PUBLIC_ porque se evalúa en el navegador; se fija en build.
+    const idleMin = Number(process.env.NEXT_PUBLIC_IDLE_TIMEOUT_MIN)
+    const IDLE_MS = (Number.isFinite(idleMin) && idleMin > 0 ? idleMin : 120) * 60 * 1000
+    let timer: ReturnType<typeof setTimeout>
+    let last = 0
+
+    const expire = async () => {
+      await logout()
+      window.location.href = '/login'
+    }
+    const arm = () => {
+      clearTimeout(timer)
+      timer = setTimeout(() => { void expire() }, IDLE_MS)
+    }
+    const onActivity = () => {
+      const now = Date.now()
+      if (now - last < 30_000) return   // re-armar como máximo cada 30s
+      last = now
+      arm()
+    }
+
+    arm()
+    const events = ['mousemove', 'mousedown', 'keydown', 'scroll', 'touchstart', 'click'] as const
+    events.forEach((e) => window.addEventListener(e, onActivity, { passive: true }))
+    return () => {
+      clearTimeout(timer)
+      events.forEach((e) => window.removeEventListener(e, onActivity))
+    }
+  }, [user, logout])
+
   return (
     <AuthContext.Provider value={{ user, loading, login, logout, refreshUser }}>
       {children}
