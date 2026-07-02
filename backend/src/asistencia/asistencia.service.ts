@@ -354,29 +354,44 @@ export class AsistenciaService {
     });
   }
 
+  /** ID del ciclo activo, o null si no hay ninguno (estado legado). */
+  private async activeCicloId(): Promise<string | null> {
+    const c = await this.prisma.ciclo.findFirst({
+      where: { activo: true },
+      select: { id: true },
+    });
+    return c?.id ?? null;
+  }
+
   async stats() {
     const now = new Date();
     const today = new Date(now.getFullYear(), now.getMonth(), now.getDate());
 
+    // Scoping al ciclo activo: los alumnos de ciclos cerrados NO deben contar en
+    // los KPIs de hoy (ni en el denominador). Si no hay ciclo activo, sin filtro.
+    const cicloId = await this.activeCicloId();
+    const alumnoCiclo = cicloId ? { alumno: { aula: { cicloId } } } : {};
+    const alumnoCicloCount = cicloId ? { aula: { cicloId } } : {};
+
     const [presentes, tardanzas, ausentes, docentesHoy, totalMatriculados] = await Promise.all([
       // Presentes: asistieron a tiempo y NO están marcados como ausentes
       this.prisma.asistencia.count({
-        where: { fecha: today, tipoPersona: TipoPersona.alumno, esTardanza: false, esAusente: false },
+        where: { fecha: today, tipoPersona: TipoPersona.alumno, esTardanza: false, esAusente: false, ...alumnoCiclo },
       }),
       // Tardanzas: llegaron pero fuera de hora
       this.prisma.asistencia.count({
-        where: { fecha: today, tipoPersona: TipoPersona.alumno, esTardanza: true },
+        where: { fecha: today, tipoPersona: TipoPersona.alumno, esTardanza: true, ...alumnoCiclo },
       }),
       // Ausentes: registros de falta (generados por cerrarTurno)
       this.prisma.asistencia.count({
-        where: { fecha: today, tipoPersona: TipoPersona.alumno, esAusente: true },
+        where: { fecha: today, tipoPersona: TipoPersona.alumno, esAusente: true, ...alumnoCiclo },
       }),
       // Docentes con algún registro hoy
       this.prisma.asistencia.count({
         where: { fecha: today, tipoPersona: TipoPersona.docente },
       }),
-      // Total matriculados activos en el sistema
-      this.prisma.alumno.count({ where: { deletedAt: null } }),
+      // Total matriculados activos DEL CICLO ACTIVO
+      this.prisma.alumno.count({ where: { deletedAt: null, ...alumnoCicloCount } }),
     ]);
 
     const total_asistieron = presentes + tardanzas;
@@ -422,8 +437,14 @@ export class AsistenciaService {
       }
     }
 
+    // Solo alumnos del CICLO ACTIVO — de lo contrario se generarían faltas para
+    // alumnos de ciclos cerrados que siguen en su aula vieja.
+    const cicloId = await this.activeCicloId();
     const alumnos = await this.prisma.alumno.findMany({
-      where: { deletedAt: null, aula: { turno: dto.turno } },
+      where: {
+        deletedAt: null,
+        aula: { turno: dto.turno, ...(cicloId ? { cicloId } : {}) },
+      },
       select: { id: true },
     });
 

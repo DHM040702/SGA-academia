@@ -59,13 +59,24 @@ export class ReportesService {
     let aulaIds: string[] | undefined;
     if (aula_id) {
       aulaIds = [aula_id];
-    } else if (ciclo_id) {
-      const res = await this.prisma.aula.findMany({ where: { cicloId: ciclo_id }, select: { id: true } });
-      aulaIds = res.map((a) => a.id);
+    } else {
+      // Sin aula específica: usar el ciclo pedido o, por defecto, el ACTIVO, para
+      // no mezclar métricas de ciclos cerrados. Solo si no hay ciclo activo
+      // (estado legado) se dejan todas las aulas.
+      let cid = ciclo_id;
+      if (!cid) {
+        const activo = await this.prisma.ciclo.findFirst({ where: { activo: true }, select: { id: true } });
+        cid = activo?.id;
+      }
+      if (cid) {
+        const res = await this.prisma.aula.findMany({ where: { cicloId: cid }, select: { id: true } });
+        aulaIds = res.map((a) => a.id);
+      }
     }
 
     const alumnos = await this.prisma.alumno.findMany({
-      where: { deletedAt: null, ...(aulaIds?.length && { aulaId: { in: aulaIds } }) },
+      // aulaIds definido (aunque vacío) = modo scopeado; undefined = legado (todas).
+      where: { deletedAt: null, ...(aulaIds !== undefined && { aulaId: { in: aulaIds } }) },
       select: { id: true, aulaId: true },
     });
     const alumnoIds = alumnos.map((a) => a.id);
@@ -82,7 +93,7 @@ export class ReportesService {
         // no deben inflar los % de asistencia del panel/tendencia.
         esAusente: false,
         fecha: { gte: fechaDesde, lte: fechaHasta },
-        ...(alumnoIds.length && { alumnoId: { in: alumnoIds } }),
+        ...(aulaIds !== undefined && { alumnoId: { in: alumnoIds } }),
       },
       select: { alumnoId: true, esTardanza: true, fecha: true },
     });
@@ -93,7 +104,8 @@ export class ReportesService {
     });
 
     const aulas = await this.prisma.aula.findMany({
-      where: aulaIds?.length ? { id: { in: aulaIds } } : undefined,
+      // Definido (aunque vacío) = scopeado; undefined = legado (todas).
+      where: aulaIds !== undefined ? { id: { in: aulaIds } } : undefined,
       select: { id: true, nombre: true },
     });
 
