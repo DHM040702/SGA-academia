@@ -1,16 +1,19 @@
-import { defineConfig, globalIgnores } from "eslint/config";
-import nextVitals from "eslint-config-next/core-web-vitals";
-import nextTs from "eslint-config-next/typescript";
+import { dirname } from "path";
+import { fileURLToPath } from "url";
+import { FlatCompat } from "@eslint/eslintrc";
 
-const eslintConfig = defineConfig([
-  ...nextVitals,
-  ...nextTs,
-  // Reglas ruidosas preexistentes bajadas a "warn" para poder ACTIVAR el lint
-  // en el build (next.config: ignoreDuringBuilds=false) sin romper el deploy.
-  // El build falla solo con errores; estas quedan como advertencias visibles
-  // que se pueden ir limpiando con el tiempo. Bugs reales nuevos (rules-of-hooks,
-  // exhaustividad de deps peligrosa, etc.) siguen apareciendo.
+// Patrón estándar de create-next-app (Next 15). El import directo de
+// "eslint-config-next/core-web-vitals" NO resolvía en el servidor (build);
+// FlatCompat carga los presets de forma fiable.
+const __filename = fileURLToPath(import.meta.url);
+const __dirname = dirname(__filename);
+const compat = new FlatCompat({ baseDirectory: __dirname });
+
+const eslintConfig = [
+  ...compat.extends("next/core-web-vitals", "next/typescript"),
   {
+    // Reglas ruidosas preexistentes bajadas a "warn" (no bloquean el build).
+    // Bugs reales nuevos (rules-of-hooks, etc.) siguen apareciendo como error.
     rules: {
       "@typescript-eslint/no-explicit-any": "warn",
       "@typescript-eslint/no-unused-vars": "warn",
@@ -20,14 +23,9 @@ const eslintConfig = defineConfig([
       "prefer-const": "warn",
     },
   },
-  // Override default ignores of eslint-config-next.
-  globalIgnores([
-    // Default ignores of eslint-config-next:
-    ".next/**",
-    "out/**",
-    "build/**",
-    "next-env.d.ts",
-  ]),
-]);
+  {
+    ignores: [".next/**", "out/**", "build/**", "next-env.d.ts"],
+  },
+];
 
 export default eslintConfig;
