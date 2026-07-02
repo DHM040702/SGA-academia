@@ -24,7 +24,9 @@ const eslintConfig = [
     },
   },
   {
-    ignores: [".next/**", "out/**", "build/**", "next-env.d.ts"],
+    // server.js es el bootstrap Node (CommonJS) — usa require() legítimamente
+    // y no debe someterse a las reglas TS/React de la app.
+    ignores: [".next/**", "out/**", "build/**", "next-env.d.ts", "server.js"],
   },
 ];
 
