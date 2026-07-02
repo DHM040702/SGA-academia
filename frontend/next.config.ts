@@ -6,8 +6,9 @@ const nextConfig: NextConfig = {
   allowedDevOrigins: ['172.29.172.7', '192.168.137.1', 'sga.intranet'],
 
   eslint: {
-    // TODO: activar (poner en false) una vez se corrijan los errores de lint.
-    ignoreDuringBuilds: true,
+    // ESLint activo en el build: falla solo con ERRORES. Las reglas ruidosas
+    // preexistentes están como "warn" en eslint.config.mjs (no bloquean).
+    ignoreDuringBuilds: false,
   },
 
   typescript: {

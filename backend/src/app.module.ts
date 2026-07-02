@@ -23,6 +23,7 @@ import { CarrerasModule } from './carreras/carreras.module';
 import { TurnosModule } from './turnos/turnos.module';
 import { UsuariosModule } from './usuarios/usuarios.module';
 import { AuditoriaModule } from './auditoria/auditoria.module';
+import { HealthModule } from './health/health.module';
 
 @Module({
   imports: [
@@ -46,6 +47,7 @@ import { AuditoriaModule } from './auditoria/auditoria.module';
     BibliotecaModule,
     ReportesModule,
     AuditoriaModule,
+    HealthModule,
   ],
   controllers: [AppController],
   providers: [
