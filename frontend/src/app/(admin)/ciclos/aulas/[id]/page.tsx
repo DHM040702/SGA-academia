@@ -1,6 +1,6 @@
 'use client'
 
-import { useState, useEffect } from 'react'
+import { useState } from 'react'
 import { useParams, useRouter, useSearchParams } from 'next/navigation'
 import { useAula, useUpdateAula, type HorarioAula, type AulaDetalle } from '@/hooks/use-ciclos'
 import { Card } from '@/components/ui/card'

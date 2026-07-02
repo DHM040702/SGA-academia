@@ -374,7 +374,7 @@ function HorarioCalendario({
     ...all.map((h) => toMin(h.horaFin)),
     ...columns.flatMap((c) => (c.recesos ?? []).map((r) => toMin(r.hora_fin))),
   ]
-  let minM = Math.floor(Math.min(...starts) / 60) * 60
+  const minM = Math.floor(Math.min(...starts) / 60) * 60
   let maxM = Math.ceil(Math.max(...ends) / 60) * 60
   if (maxM <= minM) maxM = minM + 60
 
@@ -695,7 +695,12 @@ function ExportModal({ onClose }: { onClose: () => void }) {
     w.document.close()
     w.focus()
     // Respaldo: si el evento load no disparara la impresión, forzarla a los 2 s.
-    setTimeout(() => { try { (w as any).__doPrint ? (w as any).__doPrint() : w.print() } catch { /* */ } }, 2000)
+    setTimeout(() => {
+      try {
+        const win = w as any
+        if (win.__doPrint) win.__doPrint(); else w.print()
+      } catch { /* */ }
+    }, 2000)
     onClose()
   }
 

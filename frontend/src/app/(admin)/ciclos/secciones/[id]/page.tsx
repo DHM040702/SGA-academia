@@ -1,6 +1,6 @@
 'use client'
 
-import { useState, useEffect } from 'react'
+import { useState } from 'react'
 import { useParams, useRouter, useSearchParams } from 'next/navigation'
 import { useSeccion, type HorarioSeccion } from '@/hooks/use-ciclos'
 import { Card } from '@/components/ui/card'

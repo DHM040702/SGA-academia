@@ -11,7 +11,6 @@ import { Card } from '@/components/ui/card'
 import { Btn } from '@/components/ui/btn'
 import { PageHeader } from '@/components/layout/page-header'
 import { Edit, Mail, Phone, Calendar, Layers } from '@/components/icons'
-import { cn } from '@/lib/utils'
 import type { DocenteHorario } from '@/hooks/use-docentes'
 
 /* ─── Constantes ──────────────────────────────────────────────── */

@@ -481,7 +481,6 @@ export default function ReportesPage() {
 
   /* ── Estado de carga del tab actual ── */
   const currentQ   = tab === 'asistencia' ? asisQ : tab === 'alumnos' ? almQ : tab === 'horarios' ? horQ : curQ
-  const currentData = currentQ.data
   const isLoading  = currentQ.isFetching
   const isError    = currentQ.isError
   const triggered  = tab === 'asistencia' ? asisEnabled : tab === 'alumnos' ? almEnabled : tab === 'horarios' ? horEnabled : curEnabled

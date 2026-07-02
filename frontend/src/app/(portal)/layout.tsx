@@ -11,7 +11,7 @@ import { useAvisosLeidos } from '@/hooks/use-avisos-leidos'
 import { Avatar } from '@/components/ui/avatar'
 import { Pill } from '@/components/ui/pill'
 import { Dot } from '@/components/ui/dot'
-import { Home, Calendar, Check, Book, Megaphone, Users, LogOut, Search, Bell } from '@/components/icons'
+import { Home, Calendar, Check, Book, Megaphone, LogOut, Search, Bell } from '@/components/icons'
 import { cn } from '@/lib/utils'
 
 const NAV_ALUMNO = [

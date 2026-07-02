@@ -1,7 +1,7 @@
 'use client'
 
 import { useRef, useState } from 'react'
-import { useUpdateRecurso, useHistorialRecurso, type RecursoBiblioteca, type TipoRecurso } from '@/hooks/use-biblioteca'
+import { useUpdateRecurso, useHistorialRecurso, type RecursoBiblioteca } from '@/hooks/use-biblioteca'
 import { useCursos } from '@/hooks/use-cursos'
 import { Btn } from '@/components/ui/btn'
 import { X, Upload, FileText, Clock } from '@/components/icons'

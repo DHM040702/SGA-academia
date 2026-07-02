@@ -84,7 +84,6 @@ async function exportarHorarioPDF(horarios: Horario[], aulaLabel: string, cicloA
 }
 
 /* ─── helpers ─────────────────────────────────────────────────── */
-const DIAS_LABEL = ['', 'Lunes', 'Martes', 'Miércoles', 'Jueves', 'Viernes', 'Sábado']
 const DIAS_SHORT = ['', 'Lun', 'Mar', 'Mié', 'Jue', 'Vie', 'Sáb']
 
 const COURSE_COLORS = [

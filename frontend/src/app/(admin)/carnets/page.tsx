@@ -6,7 +6,7 @@ import { useCiclos, useAulas } from '@/hooks/use-ciclos'
 import { PageHeader } from '@/components/layout/page-header'
 import { Card } from '@/components/ui/card'
 import { Btn } from '@/components/ui/btn'
-import { Search, Download, X, CreditCard } from '@/components/icons'
+import { Search, Download, X } from '@/components/icons'
 import api from '@/lib/api'
 
 /* ─── Constantes ──────────────────────────────────────────────── */

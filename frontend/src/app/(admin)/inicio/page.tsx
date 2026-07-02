@@ -508,7 +508,6 @@ function AdminInicio() {
   const totalMatriculadosHoy  = statsHoy?.total_alumno ?? 0
 
   // Promedio histórico 30 días (para el gráfico semanal y comparativas)
-  const asistenciaPct = reporte?.kpis?.asistencia_media ?? 0
 
   const alumnosRiesgo: any[] = React.useMemo(
     () =>
@@ -747,7 +746,6 @@ function DocenteInicio() {
   const horaStr = now.getHours() < 12 ? 'Buenos días' : now.getHours() < 19 ? 'Buenas tardes' : 'Buenas noches'
   const fechaStr = now.toLocaleDateString('es-PE', { weekday: 'long', day: 'numeric', month: 'long', year: 'numeric' })
   const todayDia = now.getDay() === 0 ? 7 : now.getDay()
-  const todayIso = `${now.getFullYear()}-${String(now.getMonth() + 1).padStart(2, '0')}-${String(now.getDate()).padStart(2, '0')}`
 
   const docenteId = user?.docente?.id
   const displayName = user?.docente

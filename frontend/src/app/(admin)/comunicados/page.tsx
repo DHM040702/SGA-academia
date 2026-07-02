@@ -496,7 +496,6 @@ export default function ComunicadosPage() {
   const { user } = useAuth()
   const esAdmin     = user?.rol === 'admin' || user?.rol === 'director'
   const esAuxiliar = user?.rol === 'auxiliar'
-  const esDocente   = user?.rol === 'docente'
   const soloLectura = !esAdmin && !esAuxiliar  // docente, alumno, apoderado: solo lectura
   const creadoBasico = esAuxiliar              // auxiliar: crea avisos simples
 

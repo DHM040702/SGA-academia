@@ -99,7 +99,7 @@ function EditarCursoModal({
 }
 
 /* ─── Horario row ────────────────────────────────────────────────── */
-function HorarioRow({ h, i }: { h: HorarioCurso; i: number }) {
+function HorarioRow({ h }: { h: HorarioCurso; i: number }) {
   const live = (() => {
     const now = new Date()
     const hoy = now.getDay() === 0 ? 7 : now.getDay()
