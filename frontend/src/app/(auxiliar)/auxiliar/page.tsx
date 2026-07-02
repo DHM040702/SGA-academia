@@ -127,12 +127,25 @@ export default function AuxiliarPage() {
     return () => window.removeEventListener('keydown', handleKeyDown)
   }, [handleKeyDown])
 
-  const bg     = scanState === 'success' ? '#0a1a0a' : scanState === 'error' ? '#1a0a0a' : '#1a1612'
-  const accent = scanState === 'success' ? '#7be087' : scanState === 'error' ? '#f87171' : '#8aa8ff'
+  // Duplicado = se re-escaneó a alguien que YA tenía asistencia hoy. Se muestra
+  // en ÁMBAR (advertencia) para que el auxiliar note que NO es un registro nuevo.
+  const duplicado = scanState === 'success' && !!lastScan?.yaRegistrado
+
+  const bg     = scanState === 'error' ? '#1a0a0a' : duplicado ? '#1a1608' : scanState === 'success' ? '#0a1a0a' : '#1a1612'
+  const accent = scanState === 'error' ? '#f87171' : duplicado ? '#fbbf24' : scanState === 'success' ? '#7be087' : '#8aa8ff'
 
   /* ── color helpers ── */
   const successStyle = { background: 'rgba(80,170,90,.15)', color: '#7be087', border: '1px solid rgba(80,170,90,.3)' } as const
   const successStyleStrong = { background: 'rgba(80,170,90,.2)', color: '#7be087', border: '1px solid rgba(80,170,90,.5)' } as const
+
+  // Estilos de la confirmación: verde (nuevo) vs ámbar (ya registrado).
+  const okColor    = duplicado ? '#fbbf24' : '#7be087'
+  const okCircle   = duplicado
+    ? { background: 'rgba(251,191,36,.12)', border: '3px solid rgba(251,191,36,.4)' }
+    : { background: 'rgba(80,170,90,.12)', border: '3px solid rgba(80,170,90,.4)' }
+  const okPill     = duplicado
+    ? { background: 'rgba(251,191,36,.2)', color: '#fbbf24', border: '1px solid rgba(251,191,36,.5)' }
+    : successStyleStrong
 
   return (
     <div
@@ -263,18 +276,18 @@ export default function AuxiliarPage() {
             {/* ── SUCCESS ── */}
             {scanState === 'success' && lastScan && (
               <>
-                <p className="text-[10px] sm:text-[11px] tracking-[0.18em] uppercase m-0" style={{ color: '#7be087' }}>
-                  {lastScan.yaRegistrado ? '✓ Ya registrado hoy' : '✓ Acceso permitido'}
+                <p className="text-[10px] sm:text-[11px] tracking-[0.18em] uppercase m-0" style={{ color: okColor }}>
+                  {duplicado ? '⚠ Ya tenía asistencia hoy' : '✓ Acceso permitido'}
                 </p>
                 <div
                   className="w-20 h-20 sm:w-28 sm:h-28 lg:w-36 lg:h-36 rounded-full flex items-center justify-center"
-                  style={{ background: 'rgba(80,170,90,.12)', border: '3px solid rgba(80,170,90,.4)' }}
+                  style={okCircle}
                 >
                   <Avatar name={lastScan.nombre} size={120} />
                 </div>
                 <h1
                   className="font-serif text-xl sm:text-3xl lg:text-[40px] font-semibold tracking-tight leading-tight m-0 break-words w-full"
-                  style={{ color: '#7be087' }}
+                  style={{ color: okColor }}
                 >
                   {lastScan.nombre}
                 </h1>
@@ -283,10 +296,12 @@ export default function AuxiliarPage() {
                 </p>
                 <div
                   className="inline-flex items-center gap-2 px-4 py-2 rounded-full text-[12px] sm:text-[14px] font-semibold"
-                  style={successStyleStrong}
+                  style={okPill}
                 >
-                  <Dot tone="success" size={8} />
-                  {lastScan.esTardanza ? 'Tardanza' : 'Puntual'} · {lastScan.hora}
+                  <Dot tone={duplicado ? 'warning' : 'success'} size={8} />
+                  {duplicado
+                    ? `Registrado ${lastScan.hora}${lastScan.esTardanza ? ' · Tardanza' : ''}`
+                    : `${lastScan.esTardanza ? 'Tardanza' : 'Puntual'} · ${lastScan.hora}`}
                 </div>
                 <TardanzaToggle
                   esTardanza={lastScan.esTardanza}
