@@ -1,19 +1,15 @@
-import { dirname } from "path";
-import { fileURLToPath } from "url";
-import { FlatCompat } from "@eslint/eslintrc";
+import { defineConfig, globalIgnores } from "eslint/config";
+// Subpaths con extensión .js: el paquete eslint-config-next no expone estos
+// entrypoints vía "exports", así que Node necesita la ruta de archivo explícita.
+// (Evita depender de @eslint/eslintrc, que no está instalado en el frontend.)
+import nextVitals from "eslint-config-next/core-web-vitals.js";
+import nextTs from "eslint-config-next/typescript.js";
 
-// Patrón estándar de create-next-app (Next 15). El import directo de
-// "eslint-config-next/core-web-vitals" NO resolvía en el servidor (build);
-// FlatCompat carga los presets de forma fiable.
-const __filename = fileURLToPath(import.meta.url);
-const __dirname = dirname(__filename);
-const compat = new FlatCompat({ baseDirectory: __dirname });
-
-const eslintConfig = [
-  ...compat.extends("next/core-web-vitals", "next/typescript"),
+const eslintConfig = defineConfig([
+  ...nextVitals,
+  ...nextTs,
   {
-    // Reglas ruidosas preexistentes bajadas a "warn" (no bloquean el build).
-    // Bugs reales nuevos (rules-of-hooks, etc.) siguen apareciendo como error.
+    // Reglas ruidosas preexistentes a "warn" (no bloquean el build).
     rules: {
       "@typescript-eslint/no-explicit-any": "warn",
       "@typescript-eslint/no-unused-vars": "warn",
@@ -23,9 +19,7 @@ const eslintConfig = [
       "prefer-const": "warn",
     },
   },
-  {
-    ignores: [".next/**", "out/**", "build/**", "next-env.d.ts"],
-  },
-];
+  globalIgnores([".next/**", "out/**", "build/**", "next-env.d.ts"]),
+]);
 
 export default eslintConfig;
