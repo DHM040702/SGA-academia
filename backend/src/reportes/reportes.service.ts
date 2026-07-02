@@ -42,6 +42,26 @@ const DIA_NAMES = ['', 'Lunes', 'Martes', 'Miércoles', 'Jueves', 'Viernes', 'S�
 export class ReportesService {
   constructor(private prisma: PrismaService) {}
 
+  /**
+   * IDs de aula sobre las que scopear un reporte:
+   *  - aula_id → esa aula.
+   *  - ciclo_id → aulas de ese ciclo.
+   *  - ninguno → aulas del CICLO ACTIVO (para no mezclar ciclos cerrados).
+   * Devuelve undefined solo si NO hay ciclo activo (estado legado) → sin filtro.
+   * Un array vacío significa "scopeado, pero sin aulas" (filtra a nada).
+   */
+  private async scopedAulaIds(ciclo_id?: string, aula_id?: string): Promise<string[] | undefined> {
+    if (aula_id) return [aula_id];
+    let cid = ciclo_id;
+    if (!cid) {
+      const activo = await this.prisma.ciclo.findFirst({ where: { activo: true }, select: { id: true } });
+      cid = activo?.id;
+    }
+    if (!cid) return undefined;
+    const res = await this.prisma.aula.findMany({ where: { cicloId: cid }, select: { id: true } });
+    return res.map((a) => a.id);
+  }
+
   // ══════════════════════════════════════════════════════════════════
   // ASISTENCIA
   // ══════════════════════════════════════════════════════════════════
@@ -210,18 +230,12 @@ export class ReportesService {
   async reporteAlumnos(params: ReporteAlumnosParams) {
     const { ciclo_id, aula_id, area } = params;
 
-    let aulaIds: string[] | undefined;
-    if (aula_id) {
-      aulaIds = [aula_id];
-    } else if (ciclo_id) {
-      const res = await this.prisma.aula.findMany({ where: { cicloId: ciclo_id }, select: { id: true } });
-      aulaIds = res.map((a) => a.id);
-    }
+    const aulaIds = await this.scopedAulaIds(ciclo_id, aula_id);
 
     const alumnosRaw = await this.prisma.alumno.findMany({
       where: {
         deletedAt: null,
-        ...(aulaIds?.length && { aulaId: { in: aulaIds } }),
+        ...(aulaIds !== undefined && { aulaId: { in: aulaIds } }),
         ...(area && { carrera: { area: area as any } }),
       },
       select: {
@@ -234,7 +248,7 @@ export class ReportesService {
     });
 
     const aulas = await this.prisma.aula.findMany({
-      where: aulaIds?.length ? { id: { in: aulaIds } } : undefined,
+      where: aulaIds !== undefined ? { id: { in: aulaIds } } : undefined,
       select: { id: true, nombre: true, cupoMaximo: true, turno: true, area: true },
     });
 
@@ -251,7 +265,7 @@ export class ReportesService {
       where: {
         tipoPersona: TipoPersona.alumno,
         fecha: { gte: fechaDesde },
-        ...(alumnoIds.length && { alumnoId: { in: alumnoIds } }),
+        ...(aulaIds !== undefined && { alumnoId: { in: alumnoIds } }),
       },
       select: { alumnoId: true, fecha: true },
     });
@@ -357,16 +371,10 @@ export class ReportesService {
   async reporteHorarios(params: ReporteHorariosParams) {
     const { ciclo_id, aula_id, docente_id, solo_publicados } = params;
 
-    let aulaIds: string[] | undefined;
-    if (aula_id) {
-      aulaIds = [aula_id];
-    } else if (ciclo_id) {
-      const res = await this.prisma.aula.findMany({ where: { cicloId: ciclo_id }, select: { id: true } });
-      aulaIds = res.map((a) => a.id);
-    }
+    const aulaIds = await this.scopedAulaIds(ciclo_id, aula_id);
 
     const where: any = {};
-    if (aulaIds?.length)             where.aulaId    = { in: aulaIds };
+    if (aulaIds !== undefined)       where.aulaId    = { in: aulaIds };
     if (docente_id)                  where.docenteId = docente_id;
     if (solo_publicados === 'true')  where.publicado = true;
 
@@ -490,14 +498,10 @@ export class ReportesService {
   async reporteCursos(params: ReporteCursosParams) {
     const { ciclo_id, con_horario } = params;
 
-    let aulaIds: string[] | undefined;
-    if (ciclo_id) {
-      const res = await this.prisma.aula.findMany({ where: { cicloId: ciclo_id }, select: { id: true } });
-      aulaIds = res.map((a) => a.id);
-    }
+    const aulaIds = await this.scopedAulaIds(ciclo_id);
 
     const horarios = await this.prisma.horario.findMany({
-      where: aulaIds?.length ? { aulaId: { in: aulaIds } } : undefined,
+      where: aulaIds !== undefined ? { aulaId: { in: aulaIds } } : undefined,
       select: {
         id: true, publicado: true, horaInicio: true, horaFin: true,
         aulaId: true, docenteId: true, cursoId: true,

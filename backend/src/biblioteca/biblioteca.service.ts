@@ -33,11 +33,45 @@ export class BibliotecaService {
     private minio: MinioService,
   ) {}
 
+  /**
+   * Áreas que el usuario tiene permitido ver (control de acceso REAL, no confía
+   * en el frontend):
+   *  - admin/director/docente/auxiliar → null (sin restricción).
+   *  - alumno → el área de su aula.
+   *  - apoderado → las áreas de sus pupilos.
+   * Los recursos "generales" (area null) son visibles para todos.
+   */
+  private async allowedAreas(user?: { id: string; rol: string }): Promise<Area[] | null> {
+    if (!user) return null;
+    if (user.rol === 'alumno') {
+      const al = await this.prisma.alumno.findFirst({
+        where: { usuarioId: user.id, deletedAt: null },
+        select: { aula: { select: { area: true } } },
+      });
+      return al?.aula?.area ? [al.aula.area] : [];
+    }
+    if (user.rol === 'apoderado') {
+      const ap = await this.prisma.apoderado.findFirst({
+        where: { usuarioId: user.id, deletedAt: null },
+        select: { alumnos: { select: { alumno: { select: { aula: { select: { area: true } } } } } } },
+      });
+      const areas = new Set<Area>();
+      for (const link of ap?.alumnos ?? []) {
+        const a = link.alumno?.aula?.area;
+        if (a) areas.add(a);
+      }
+      return [...areas];
+    }
+    return null; // admin, director, docente, auxiliar
+  }
+
   /* ── Listar ───────────────────────────────────────────────────── */
 
-  async findAll(dto: FilterBibliotecaDto) {
+  async findAll(dto: FilterBibliotecaDto, user?: { id: string; rol: string }) {
     const { page = 1, limit = 20, q, tipo, curso_id, area, solo_generales } = dto;
     const skip = (page - 1) * limit;
+
+    const allowed = await this.allowedAreas(user);
 
     const where: any = { activo: true };
     if (tipo)     where.tipo    = tipo;
@@ -47,7 +81,11 @@ export class BibliotecaService {
     const and: any[] = [];
     // Filtro por área: recursos del área pedida + los de "todas" (area null).
     // solo_generales → únicamente los sin área (para alumnos sin área asignada).
-    if (solo_generales) and.push({ area: null });
+    if (allowed !== null) {
+      // Restringido por rol: SOLO su(s) área(s) + generales, ignorando los
+      // params del cliente (no se confía en el frontend).
+      and.push({ OR: [{ area: { in: allowed } }, { area: null }] });
+    } else if (solo_generales) and.push({ area: null });
     else if (area) and.push({ OR: [{ area }, { area: null }] });
     if (q) {
       and.push({
@@ -78,9 +116,15 @@ export class BibliotecaService {
 
   /* ── Detalle ──────────────────────────────────────────────────── */
 
-  async findOne(id: string) {
+  async findOne(id: string, user?: { id: string; rol: string }) {
+    const allowed = await this.allowedAreas(user);
     const recurso = await this.prisma.recursoBiblioteca.findFirst({
-      where: { id, activo: true },
+      // Mismo control de acceso que findAll: un alumno/apoderado no puede abrir
+      // por id un recurso de un área que no le corresponde.
+      where: {
+        id, activo: true,
+        ...(allowed !== null ? { OR: [{ area: { in: allowed } }, { area: null }] } : {}),
+      },
       include: INCLUDE,
     });
     if (!recurso) throw new NotFoundException('Recurso de biblioteca no encontrado');

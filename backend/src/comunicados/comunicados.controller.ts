@@ -55,8 +55,8 @@ export class ComunicadosController {
   @Get(':id')
   @Roles(Rol.admin, Rol.director, Rol.docente, Rol.alumno, Rol.apoderado, Rol.auxiliar)
   @ApiOperation({ summary: 'Detalle de un comunicado' })
-  findOne(@Param('id', ParseUUIDPipe) id: string) {
-    return this.service.findOne(id);
+  findOne(@Param('id', ParseUUIDPipe) id: string, @CurrentUser() user: { rol: string }) {
+    return this.service.findOne(id, user.rol);
   }
 
   @Post()

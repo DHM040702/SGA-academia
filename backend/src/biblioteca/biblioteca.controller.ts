@@ -36,8 +36,8 @@ export class BibliotecaController {
   @Get()
   @Roles(Rol.admin, Rol.director, Rol.docente, Rol.alumno, Rol.apoderado, Rol.auxiliar)
   @ApiOperation({ summary: 'Listar recursos de biblioteca con filtros' })
-  findAll(@Query() dto: FilterBibliotecaDto) {
-    return this.service.findAll(dto);
+  findAll(@Query() dto: FilterBibliotecaDto, @CurrentUser() user: { id: string; rol: string }) {
+    return this.service.findAll(dto, user);
   }
 
   @Get('stats')
@@ -57,8 +57,8 @@ export class BibliotecaController {
   @Get(':id')
   @Roles(Rol.admin, Rol.director, Rol.docente, Rol.alumno, Rol.apoderado, Rol.auxiliar)
   @ApiOperation({ summary: 'Detalle de un recurso de biblioteca' })
-  findOne(@Param('id', ParseUUIDPipe) id: string) {
-    return this.service.findOne(id);
+  findOne(@Param('id', ParseUUIDPipe) id: string, @CurrentUser() user: { id: string; rol: string }) {
+    return this.service.findOne(id, user);
   }
 
   @Post()

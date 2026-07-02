@@ -9,27 +9,32 @@ import { UpdateComunicadoDto } from './dto/update-comunicado.dto';
 export class ComunicadosService {
   constructor(private prisma: PrismaService) {}
 
-  async findAll(dto: PaginationDto, rolUsuario?: string) {
-    const { page = 1, limit = 20 } = dto;
-    const skip = (page - 1) * limit;
-
+  /**
+   * Alcance de visibilidad de comunicados según rol:
+   *  - Gestión (admin/director): ve todo (borradores incluidos).
+   *  - Resto: solo publicados y dirigidos a su rol (o a "todos").
+   */
+  private scopeFor(rolUsuario?: string) {
     const esGestion = !rolUsuario || rolUsuario === 'admin' || rolUsuario === 'director';
-
-    // Qué tipos de destinatario puede ver cada rol
     const rolDestMapping: Partial<Record<string, TipoDestinatario[]>> = {
       docente:   [TipoDestinatario.todos, TipoDestinatario.docentes],
       alumno:    [TipoDestinatario.todos, TipoDestinatario.alumnos],
       apoderado: [TipoDestinatario.todos, TipoDestinatario.apoderados],
-      auxiliar: [TipoDestinatario.todos],
+      auxiliar:  [TipoDestinatario.todos],
     };
-
     const allowedTypes = rolDestMapping[rolUsuario ?? ''];
     const where = {
-      // Solo publicados para usuarios no gestores (no ven borradores)
       ...(!esGestion ? { publicadoAt: { not: null } } : {}),
-      // Filtrar por destinatario según el rol
       ...(allowedTypes ? { destinatarioTipo: { in: allowedTypes } } : {}),
     };
+    return { esGestion, where };
+  }
+
+  async findAll(dto: PaginationDto, rolUsuario?: string) {
+    const { page = 1, limit = 20 } = dto;
+    const skip = (page - 1) * limit;
+
+    const { where } = this.scopeFor(rolUsuario);
 
     const [items, total] = await Promise.all([
       this.prisma.comunicado.findMany({
@@ -60,24 +65,34 @@ export class ComunicadosService {
     return paginate(enriched, total, page, limit);
   }
 
-  async findOne(id: string) {
+  async findOne(id: string, rolUsuario?: string) {
+    const { esGestion, where: scope } = this.scopeFor(rolUsuario);
+
     const comunicado = await this.prisma.comunicado.findFirst({
-      where: { id },
+      // Aplica el mismo alcance que findAll: un no-gestor no puede abrir por id
+      // un borrador ni un comunicado dirigido a otro rol.
+      where: { id, ...scope },
       include: {
         publicadoPor: { select: { id: true, email: true } },
         aula:         { select: { id: true, nombre: true } },
-        _count:       { select: { envios: true } },
-        envios: {
-          select: {
-            id: true, usuarioId: true, canal: true,
-            estado: true, enviadoAt: true, errorDetalle: true,
+        // Métricas y detalle de envíos: SOLO para gestión.
+        ...(esGestion ? {
+          _count: { select: { envios: true } },
+          envios: {
+            select: {
+              id: true, usuarioId: true, canal: true,
+              estado: true, enviadoAt: true, errorDetalle: true,
+            },
+            orderBy: { enviadoAt: 'desc' },
+            take: 10,
           },
-          orderBy: { enviadoAt: 'desc' },
-          take: 10,
-        },
+        } : {}),
       },
     });
     if (!comunicado) throw new NotFoundException('Comunicado no encontrado');
+
+    // Los no-gestores no reciben métricas de envío.
+    if (!esGestion) return comunicado;
 
     const [enviados, total_envios] = await Promise.all([
       this.prisma.comunicadoEnvio.count({ where: { comunicadoId: id, estado: EstadoEnvio.enviado } }),
