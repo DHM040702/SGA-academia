@@ -61,21 +61,30 @@ async function bootstrap() {
   );
 
   // ── Swagger ────────────────────────────────────────────────────
-  const config = new DocumentBuilder()
-    .setTitle('SGA – Sistema de Gestión Académica')
-    .setDescription('API REST del SGA CEPREUNASAM')
-    .setVersion('1.0')
-    .addBearerAuth({ type: 'http', scheme: 'bearer', bearerFormat: 'JWT' }, 'access-token')
-    .addCookieAuth('refresh_token')
-    .build();
+  // En producción se OCULTA (expone todo el mapa de la API). Se puede forzar
+  // con SWAGGER_ENABLED=true si se necesita puntualmente.
+  const swaggerEnabled = process.env.SWAGGER_ENABLED === 'true' || !isProd;
+  if (swaggerEnabled) {
+    const config = new DocumentBuilder()
+      .setTitle('SGA – Sistema de Gestión Académica')
+      .setDescription('API REST del SGA CEPREUNASAM')
+      .setVersion('1.0')
+      .addBearerAuth({ type: 'http', scheme: 'bearer', bearerFormat: 'JWT' }, 'access-token')
+      .addCookieAuth('refresh_token')
+      .build();
 
-  const document = SwaggerModule.createDocument(app, config);
-  SwaggerModule.setup('api/docs', app, document, {
-    swaggerOptions: { persistAuthorization: true },
-  });
+    const document = SwaggerModule.createDocument(app, config);
+    SwaggerModule.setup('api/docs', app, document, {
+      swaggerOptions: { persistAuthorization: true },
+    });
+  }
 
-  await app.listen(process.env.PORT ?? 3001, '0.0.0.0');
-  logger.log(`Backend corriendo en http://localhost:${process.env.PORT ?? 3000}/api`);
-  logger.log(`Swagger en http://localhost:${process.env.PORT ?? 3000}/api/docs`);
+  // Host de escucha: en producción conviene 127.0.0.1 para que SOLO el proxy
+  // (nginx/Next en el mismo host) alcance la API y no quede expuesta en la LAN.
+  const port = process.env.PORT ?? 3001;
+  const host = process.env.API_HOST ?? '0.0.0.0';
+  await app.listen(port, host);
+  logger.log(`Backend en http://${host}:${port}/api`);
+  if (swaggerEnabled) logger.log(`Swagger en http://${host}:${port}/api/docs`);
 }
 bootstrap();
