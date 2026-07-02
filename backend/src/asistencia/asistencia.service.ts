@@ -327,6 +327,26 @@ export class AsistenciaService {
     });
   }
 
+  /**
+   * Cambia SOLO el flag puntual/tardanza de un registro. Función legítima del
+   * auxiliar en el kiosco al momento de registrar (no es "editar" el registro
+   * completo, que sigue restringido a admin/director).
+   */
+  async setTardanza(id: string, esTardanza: boolean, registradoPorId: string) {
+    const registro = await this.prisma.asistencia.findFirst({ where: { id } });
+    if (!registro) throw new NotFoundException('Registro de asistencia no encontrado');
+    if (registro.esAusente) throw new BadRequestException('No aplica tardanza a una inasistencia');
+
+    return this.prisma.asistencia.update({
+      where: { id },
+      data: { esTardanza, esManual: true, registradoPorId },
+      include: {
+        alumno:  { select: { nombre: true, apellidos: true, codigoBarras: true, aula: { select: { id: true, nombre: true } } } },
+        docente: { select: { nombre: true, apellidos: true, dni: true } },
+      },
+    });
+  }
+
   async stats() {
     const now = new Date();
     const today = new Date(now.getFullYear(), now.getMonth(), now.getDate());

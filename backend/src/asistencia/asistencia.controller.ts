@@ -112,6 +112,20 @@ export class AsistenciaController {
     return this.service.findByAlumno(alumnoId, Math.min(parsedLimit, 200), user);
   }
 
+  /** PATCH /asistencia/:id/tardanza — marcar puntual/tardanza (auxiliar en el kiosco) */
+  @Patch(':id/tardanza')
+  @ApiBearerAuth('access-token')
+  @UseGuards(JwtAuthGuard, RolesGuard)
+  @Roles(Rol.admin, Rol.director, Rol.auxiliar)
+  @ApiOperation({ summary: 'Cambiar solo el flag puntual/tardanza de un registro' })
+  setTardanza(
+    @Param('id', ParseUUIDPipe) id: string,
+    @Body() dto: { es_tardanza: boolean },
+    @CurrentUser() user: { id: string },
+  ) {
+    return this.service.setTardanza(id, !!dto.es_tardanza, user.id);
+  }
+
   /** PATCH /asistencia/:id — corrección manual (solo admin y director) */
   @Patch(':id')
   @ApiBearerAuth('access-token')

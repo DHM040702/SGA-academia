@@ -101,6 +101,16 @@ export function useCorrectAsistencia() {
   })
 }
 
+/** Cambia solo puntual/tardanza — permitido al auxiliar en el kiosco. */
+export function useSetTardanza() {
+  const qc = useQueryClient()
+  return useMutation({
+    mutationFn: ({ id, es_tardanza }: { id: string; es_tardanza: boolean }) =>
+      api.patch(`/asistencia/${id}/tardanza`, { es_tardanza }).then((r) => r.data),
+    onSuccess: () => qc.invalidateQueries({ queryKey: ['asistencia'] }),
+  })
+}
+
 export function useDeleteAsistencia() {
   const qc = useQueryClient()
   return useMutation({
