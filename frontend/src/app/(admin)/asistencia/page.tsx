@@ -405,8 +405,19 @@ const AREA_LABEL: Record<string, string> = {
   medicas:  'Médicas',
 }
 
-function exportarAsistenciaExcel(registros: AsistenciaRecord[], fecha: string) {
-  const soloAlumnos = registros.filter(r => r.tipoPersona === 'alumno' && r.alumno)
+async function exportarAsistenciaExcel(
+  fecha: string,
+  opts: { aula_id?: string; turno?: 'manana' | 'tarde' } = {},
+) {
+  // Fetch propio y COMPLETO (limit alto) para no quedar truncado por la
+  // paginación de la tabla; respeta los filtros de aula y turno.
+  const { default: api } = await import('@/lib/api')
+  const { data: page } = await api.get('/asistencia', {
+    params: { fecha, tipo: 'alumno', aula_id: opts.aula_id, turno: opts.turno, limit: 5000 },
+  })
+  const soloAlumnos: AsistenciaRecord[] = (page?.data ?? []).filter(
+    (r: AsistenciaRecord) => r.tipoPersona === 'alumno' && r.alumno,
+  )
 
   const fechaLabel = new Date(fecha + 'T12:00:00').toLocaleDateString('es-PE', {
     day: '2-digit', month: '2-digit', year: 'numeric',
@@ -581,6 +592,7 @@ export default function AsistenciaPage() {
 
   const [fecha,        setFecha]        = useState(todayStr())
   const [aulaFilter,   setAulaFilter]   = useState('')
+  const [turnoFilter,  setTurnoFilter]  = useState<'manana' | 'tarde' | ''>('')
   const [tipoFilter,   setTipoFilter]   = useState<'alumno' | 'docente' | ''>(isDocente ? 'docente' : '')
   const [showManual,     setShowManual]     = useState(false)
   const [showCerrar,     setShowCerrar]     = useState(false)
@@ -594,6 +606,7 @@ export default function AsistenciaPage() {
     fecha,
     tipo:       isDocente ? 'docente' : (tipoFilter || undefined),
     aula_id:    isDocente ? undefined : (aulaFilter || undefined),
+    turno:      isDocente ? undefined : (turnoFilter || undefined),
     docente_id: isDocente ? myDocenteId : undefined,
     limit:      100,
   })
@@ -630,7 +643,7 @@ export default function AsistenciaPage() {
         action={
           <>
             <Btn variant="secondary" icon={<Download size={14} />} size="sm"
-              onClick={() => exportarAsistenciaExcel(registros, fecha)}>
+              onClick={() => exportarAsistenciaExcel(fecha, { aula_id: aulaFilter || undefined, turno: turnoFilter || undefined })}>
               Excel alumnos
             </Btn>
             {!soloLectura && (
@@ -696,6 +709,15 @@ export default function AsistenciaPage() {
                     className="text-[12px] px-2 py-1 border border-border rounded-2 bg-surface">
                     <option value="">Todas las aulas</option>
                     {aulas.map(a => <option key={a.id} value={a.id}>{a.nombre}</option>)}
+                  </select>
+                )}
+                {/* Filtro por turno — oculto para docente */}
+                {!isDocente && (
+                  <select value={turnoFilter} onChange={e => setTurnoFilter(e.target.value as any)}
+                    className="text-[12px] px-2 py-1 border border-border rounded-2 bg-surface">
+                    <option value="">Todos los turnos</option>
+                    <option value="manana">Mañana</option>
+                    <option value="tarde">Tarde</option>
                   </select>
                 )}
                 {/* Filtro por tipo — oculto para docente (siempre ven solo 'docente') */}
@@ -851,7 +873,7 @@ export default function AsistenciaPage() {
                   </Btn>
                 )}
                 <Btn variant="secondary" size="sm" icon={<Download size={13} />}
-                  onClick={() => exportarAsistenciaExcel(registros, fecha)} className="w-full justify-start">
+                  onClick={() => exportarAsistenciaExcel(fecha, { aula_id: aulaFilter || undefined, turno: turnoFilter || undefined })} className="w-full justify-start">
                   Excel alumnos
                 </Btn>
                 {!soloLectura && (

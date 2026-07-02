@@ -29,7 +29,7 @@ export interface AsistenciaRecord {
     apellidos: string
     codigoBarras: string
     dni?: string | null
-    aula?: { id: string; nombre: string; area?: string | null } | null
+    aula?: { id: string; nombre: string; area?: string | null; turno?: string | null } | null
   } | null
   docente?: {
     id: string
@@ -44,6 +44,7 @@ export interface FilterAsistencia {
   desde?: string
   hasta?: string
   tipo?: 'alumno' | 'docente'
+  turno?: 'manana' | 'tarde'
   aula_id?: string
   alumno_id?: string
   docente_id?: string

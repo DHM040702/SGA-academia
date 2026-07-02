@@ -24,6 +24,7 @@ type ScanState = 'idle' | 'success' | 'error'
 interface LastScan {
   id: string; nombre: string; codigo: string
   aula: string; hora: string; esTardanza: boolean
+  yaRegistrado?: boolean
 }
 
 export default function AuxiliarPage() {
@@ -66,13 +67,19 @@ export default function AuxiliarPage() {
         const alumno  = result?.alumno
         const docente = result?.docente
         const persona = alumno ?? docente
+        // Usar la hora REAL del registro (para un re-escaneo muestra la hora
+        // original, no la actual).
+        const horaReg = result?.horaIngreso
+          ? new Date(result.horaIngreso).toLocaleTimeString('es-PE', { hour: '2-digit', minute: '2-digit' })
+          : new Date().toLocaleTimeString('es-PE', { hour: '2-digit', minute: '2-digit' })
         setLastScan({
-          id:         result?.id ?? '',
-          nombre:     persona ? `${persona.nombre ?? (persona as any).nombres} ${persona.apellidos}` : code,
-          codigo:     code,
-          aula:       alumno?.aula?.nombre ?? '—',
-          hora:       new Date().toLocaleTimeString('es-PE', { hour: '2-digit', minute: '2-digit' }),
-          esTardanza: result?.esTardanza ?? false,
+          id:           result?.id ?? '',
+          nombre:       persona ? `${persona.nombre ?? (persona as any).nombres} ${persona.apellidos}` : code,
+          codigo:       code,
+          aula:         alumno?.aula?.nombre ?? '—',
+          hora:         horaReg,
+          esTardanza:   result?.esTardanza ?? false,
+          yaRegistrado: result?.yaRegistrado ?? false,
         })
         setScanState('success')
         setTimeout(() => setScanState('idle'), 4000)
@@ -257,7 +264,7 @@ export default function AuxiliarPage() {
             {scanState === 'success' && lastScan && (
               <>
                 <p className="text-[10px] sm:text-[11px] tracking-[0.18em] uppercase m-0" style={{ color: '#7be087' }}>
-                  ✓ Acceso permitido
+                  {lastScan.yaRegistrado ? '✓ Ya registrado hoy' : '✓ Acceso permitido'}
                 </p>
                 <div
                   className="w-20 h-20 sm:w-28 sm:h-28 lg:w-36 lg:h-36 rounded-full flex items-center justify-center"

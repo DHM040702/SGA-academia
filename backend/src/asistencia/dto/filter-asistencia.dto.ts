@@ -1,6 +1,6 @@
 import { ApiPropertyOptional } from '@nestjs/swagger';
 import { IsEnum, IsISO8601, IsOptional, IsUUID } from 'class-validator';
-import { TipoPersona } from '@prisma/client';
+import { TipoPersona, Turno } from '@prisma/client';
 import { PaginationDto } from '../../common/dto/pagination.dto';
 
 export class FilterAsistenciaDto extends PaginationDto {
@@ -38,4 +38,9 @@ export class FilterAsistenciaDto extends PaginationDto {
   @IsOptional()
   @IsEnum(TipoPersona)
   tipo?: TipoPersona;
+
+  @ApiPropertyOptional({ enum: Turno, description: 'Filtrar por turno del aula (manana/tarde)' })
+  @IsOptional()
+  @IsEnum(Turno)
+  turno?: Turno;
 }

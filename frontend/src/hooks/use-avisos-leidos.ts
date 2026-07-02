@@ -1,75 +1,61 @@
 'use client'
 
 import { useState, useCallback, useEffect } from 'react'
+import api from '@/lib/api'
 
 /**
- * Estado "leído" de los avisos/comunicados, persistido en localStorage por
- * usuario. Así un aviso abierto sigue marcado como leído tras recargar o navegar
- * (antes el estado vivía solo en memoria y se perdía).
+ * Estado "leído" de los avisos/comunicados, ahora persistido SERVER-SIDE
+ * (columna comunicados_envios.leido_en). Se sincroniza entre dispositivos.
  *
- * Todas las instancias del hook se mantienen sincronizadas (campana, KPI, lista)
- * mediante un evento de ventana que se dispara al escribir.
- *
- * Es por dispositivo (no sincroniza entre equipos). Para sincronización real
- * haría falta una tabla server-side de lecturas.
+ * Mantiene la misma interfaz que la versión anterior (localStorage) para no
+ * tocar los consumidores: campana, KPI y lista. Un cache a nivel de módulo +
+ * un evento de ventana mantienen sincronizadas todas las instancias del hook
+ * dentro de la misma pestaña.
  */
 const EVENTO = 'avisos-leidos-changed'
-
-function keyFor(userId?: string | null) {
-  return `avisos-leidos:${userId ?? 'anon'}`
-}
+let cache = new Set<string>()
 
 export function useAvisosLeidos(userId?: string | null) {
-  const [readIds, setReadIds] = useState<Set<string>>(new Set())
+  const [readIds, setReadIds] = useState<Set<string>>(cache)
 
-  const load = useCallback(() => {
+  const load = useCallback(async () => {
+    if (!userId) { cache = new Set(); setReadIds(cache); window.dispatchEvent(new Event(EVENTO)); return }
     try {
-      const raw = localStorage.getItem(keyFor(userId))
-      setReadIds(new Set<string>(raw ? JSON.parse(raw) : []))
-    } catch {
-      setReadIds(new Set())
-    }
+      const { data } = await api.get<string[]>('/comunicados/leidos')
+      cache = new Set(data)
+      setReadIds(cache)
+      window.dispatchEvent(new Event(EVENTO))
+    } catch { /* mantener lo que haya en cache */ }
   }, [userId])
 
-  // Cargar al montar (y al cambiar de usuario), y re-sincronizar cuando otra
-  // instancia escribe (mismo tab) o cuando cambia en otra pestaña.
+  // Cargar al montar (y al cambiar de usuario); re-sincronizar cuando otra
+  // instancia del hook actualiza el cache.
   useEffect(() => {
-    load()
-    function onChange() { load() }
+    void load()
+    const onChange = () => setReadIds(new Set(cache))
     window.addEventListener(EVENTO, onChange)
-    window.addEventListener('storage', onChange)
-    return () => {
-      window.removeEventListener(EVENTO, onChange)
-      window.removeEventListener('storage', onChange)
-    }
+    return () => window.removeEventListener(EVENTO, onChange)
   }, [load])
 
-  const persist = useCallback((s: Set<string>) => {
-    try {
-      localStorage.setItem(keyFor(userId), JSON.stringify([...s]))
-      window.dispatchEvent(new Event(EVENTO))
-    } catch { /* */ }
-  }, [userId])
-
   const markRead = useCallback((id: string) => {
-    setReadIds((prev) => {
-      if (prev.has(id)) return prev
-      const next = new Set(prev)
-      next.add(id)
-      queueMicrotask(() => persist(next))   // escribir fuera del render
-      return next
-    })
-  }, [persist])
+    if (cache.has(id)) return
+    cache = new Set(cache)
+    cache.add(id)
+    setReadIds(cache)
+    window.dispatchEvent(new Event(EVENTO))
+    api.post(`/comunicados/${id}/leer`).catch(() => { /* optimista */ })
+  }, [])
 
   const markAllRead = useCallback((ids: string[]) => {
-    setReadIds((prev) => {
-      const next = new Set(prev)
-      let changed = false
-      for (const id of ids) if (!next.has(id)) { next.add(id); changed = true }
-      if (changed) queueMicrotask(() => persist(next))
-      return next
-    })
-  }, [persist])
+    const next = new Set(cache)
+    let changed = false
+    for (const id of ids) if (!next.has(id)) { next.add(id); changed = true }
+    if (!changed) return
+    cache = next
+    setReadIds(cache)
+    window.dispatchEvent(new Event(EVENTO))
+    api.post('/comunicados/leidos/todos').catch(() => { /* optimista */ })
+  }, [])
 
   const isRead = useCallback((id: string) => readIds.has(id), [readIds])
   const countUnread = useCallback(

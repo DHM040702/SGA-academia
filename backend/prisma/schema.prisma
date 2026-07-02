@@ -242,6 +242,7 @@ model ComunicadoEnvio {
   canal        CanalEnvio
   estado       EstadoEnvio @default(pendiente)
   enviadoAt    DateTime?   @map("enviado_at") @db.Timestamptz(6)
+  leidoEn      DateTime?   @map("leido_en") @db.Timestamptz(6)
   errorDetalle String?     @map("error_detalle")
   comunicado   Comunicado  @relation(fields: [comunicadoId], references: [id])
   usuario      Usuario     @relation(fields: [usuarioId], references: [id])

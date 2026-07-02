@@ -37,6 +37,21 @@ export class ComunicadosController {
     return this.service.findAll(dto, user.rol);
   }
 
+  @Get('leidos')
+  @Roles(Rol.admin, Rol.director, Rol.docente, Rol.alumno, Rol.apoderado, Rol.auxiliar)
+  @ApiOperation({ summary: 'IDs de comunicados ya leídos por el usuario actual' })
+  leidos(@CurrentUser() user: { id: string }) {
+    return this.service.leidosDelUsuario(user.id);
+  }
+
+  @Post('leidos/todos')
+  @HttpCode(HttpStatus.OK)
+  @Roles(Rol.admin, Rol.director, Rol.docente, Rol.alumno, Rol.apoderado, Rol.auxiliar)
+  @ApiOperation({ summary: 'Marcar todos los comunicados del usuario como leídos' })
+  marcarTodosLeidos(@CurrentUser() user: { id: string }) {
+    return this.service.marcarTodosLeidos(user.id);
+  }
+
   @Get(':id')
   @Roles(Rol.admin, Rol.director, Rol.docente, Rol.alumno, Rol.apoderado, Rol.auxiliar)
   @ApiOperation({ summary: 'Detalle de un comunicado' })

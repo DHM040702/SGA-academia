@@ -179,10 +179,30 @@ export class ComunicadosService {
     });
     if (!envio) return { success: false, message: 'Envío no encontrado para este usuario' };
 
-    await this.prisma.comunicadoEnvio.update({
-      where: { id: envio.id },
-      data: { estado: EstadoEnvio.enviado, enviadoAt: new Date() },
+    if (!envio.leidoEn) {
+      await this.prisma.comunicadoEnvio.update({
+        where: { id: envio.id },
+        data: { leidoEn: new Date() },
+      });
+    }
+    return { success: true };
+  }
+
+  /** Marca como leídos TODOS los comunicados del usuario aún sin leer. */
+  async marcarTodosLeidos(usuarioId: string) {
+    await this.prisma.comunicadoEnvio.updateMany({
+      where: { usuarioId, canal: CanalEnvio.sistema, leidoEn: null },
+      data: { leidoEn: new Date() },
     });
     return { success: true };
+  }
+
+  /** IDs de comunicados ya leídos por el usuario (para hidratar el frontend). */
+  async leidosDelUsuario(usuarioId: string): Promise<string[]> {
+    const rows = await this.prisma.comunicadoEnvio.findMany({
+      where: { usuarioId, canal: CanalEnvio.sistema, leidoEn: { not: null } },
+      select: { comunicadoId: true },
+    });
+    return rows.map((r) => r.comunicadoId);
   }
 }

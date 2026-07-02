@@ -57,7 +57,9 @@ export class AsistenciaService {
         docente: { select: { nombre: true, apellidos: true, dni: true } },
       },
     });
-    if (existente) return existente;
+    // Ya tenía asistencia hoy: devolver el mismo registro marcado como
+    // yaRegistrado para que el kiosco muestre la confirmación con su hora real.
+    if (existente) return { ...existente, yaRegistrado: true };
 
     // ── Determinación de tardanza ─────────────────────────────────────────────
     // Alumnos: siempre "presente" al escanear (sin chequeo de horario por TurnoConfig).
@@ -95,7 +97,7 @@ export class AsistenciaService {
       }
     }
 
-    return this.prisma.asistencia.create({
+    const creado = await this.prisma.asistencia.create({
       data: {
         tipoPersona,
         alumnoId:        alumnoId  ?? null,
@@ -116,6 +118,7 @@ export class AsistenciaService {
         docente: { select: { nombre: true, apellidos: true, dni: true } },
       },
     });
+    return { ...creado, yaRegistrado: false };
   }
 
   async createManual(dto: CreateManualAsistenciaDto, registradoPorId: string) {
@@ -164,7 +167,7 @@ export class AsistenciaService {
   }
 
   async findAll(dto: FilterAsistenciaDto, caller?: { id: string; rol: string }) {
-    const { page = 1, limit = 20, fecha, desde, hasta, aula_id, alumno_id, docente_id, tipo } = dto as any;
+    const { page = 1, limit = 20, fecha, desde, hasta, aula_id, alumno_id, docente_id, tipo, turno } = dto as any;
     const skip = (page - 1) * limit;
 
     const where: any = {};
@@ -185,8 +188,12 @@ export class AsistenciaService {
     }
     if (tipo) where.tipoPersona = tipo;
     if (docente_id) where.docenteId = docente_id;
-    if (aula_id) {
-      where.alumno = { aulaId: aula_id };
+    // Filtro por aula (id) y/o por turno (propiedad del aula).
+    if (aula_id || turno) {
+      where.alumno = {
+        ...(aula_id ? { aulaId: aula_id } : {}),
+        ...(turno ? { aula: { turno } } : {}),
+      };
     }
 
     // ── Control de acceso por rol ────────────────────────────────────────────
@@ -257,7 +264,7 @@ export class AsistenciaService {
           alumno:  {
             select: {
               nombre: true, apellidos: true, codigoBarras: true,
-              aula: { select: { id: true, nombre: true, area: true } },
+              aula: { select: { id: true, nombre: true, area: true, turno: true } },
             },
           },
           docente: { select: { nombre: true, apellidos: true, dni: true } },
