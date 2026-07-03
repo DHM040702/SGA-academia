@@ -46,6 +46,14 @@ function fmt(s?: string) {
     .toLocaleDateString('es-PE', { day: '2-digit', month: 'short', year: 'numeric' })
 }
 
+/** Día + mes en mayúsculas, tolerante a ISO con o sin 'T' (evita INVALID DATE). */
+function fmtDia(s?: string) {
+  if (!s) return '—'
+  return new Date(s + (s.includes('T') ? '' : 'T12:00:00'))
+    .toLocaleDateString('es-PE', { day: '2-digit', month: 'short' })
+    .toUpperCase()
+}
+
 function toDateInput(iso?: string) {
   if (!iso) return ''
   return iso.slice(0, 10)
@@ -559,19 +567,11 @@ export default function CiclosPage() {
                     />
                   </div>
                   <div className="flex justify-between mt-1.5 text-[11px] text-text-mute font-mono">
-                    <span>
-                      {new Date(cicloSelected.fechaInicio + 'T12:00:00')
-                        .toLocaleDateString('es-PE', { day: '2-digit', month: 'short' })
-                        .toUpperCase()}
-                    </span>
+                    <span>{fmtDia(cicloSelected.fechaInicio)}</span>
                     <span className="text-primary font-semibold">
                       {cicloSelected.activo ? `HOY · ${progress.pct}% completado` : `${progress.pct}% completado`}
                     </span>
-                    <span>
-                      {new Date(cicloSelected.fechaFin + 'T12:00:00')
-                        .toLocaleDateString('es-PE', { day: '2-digit', month: 'short' })
-                        .toUpperCase()}
-                    </span>
+                    <span>{fmtDia(cicloSelected.fechaFin)}</span>
                   </div>
                 </>
               )}

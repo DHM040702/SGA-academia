@@ -18,8 +18,10 @@ export function cicloWeekInfo(
   fechaFin: string,
   hoy = new Date(),
 ): { week: number; total: number } {
-  const start = new Date(fechaInicio + 'T12:00:00')
-  const end   = new Date(fechaFin   + 'T12:00:00')
+  // Tolerante a ISO con o sin 'T' (la API devuelve @db.Date como ISO completo;
+  // concatenar 'T12:00:00' a ciegas daría Invalid Date → semana NaN).
+  const start = new Date(fechaInicio + (fechaInicio.includes('T') ? '' : 'T12:00:00'))
+  const end   = new Date(fechaFin   + (fechaFin.includes('T')   ? '' : 'T12:00:00'))
   const totalMs = end.getTime() - start.getTime()
   const total   = Math.max(1, Math.ceil(totalMs / (7 * 86_400_000)))
   const elapsed = hoy.getTime() - start.getTime()

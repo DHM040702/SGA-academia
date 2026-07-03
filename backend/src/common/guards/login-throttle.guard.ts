@@ -24,12 +24,27 @@ export class LoginThrottleGuard implements CanActivate {
   private readonly log = new Logger(LoginThrottleGuard.name);
   private readonly redis: Redis;
 
+  private redisAvisado = false;
+
   constructor(config: ConfigService) {
     this.redis = new Redis(config.get<string>('REDIS_URL') ?? 'redis://localhost:6379', {
       maxRetriesPerRequest: 1,
       enableOfflineQueue: false,
+      // Backoff creciente para no reintentar agresivamente.
+      retryStrategy: (times) => Math.min(times * 500, 10_000),
     });
-    this.redis.on('error', (e) => this.log.warn(`Redis throttle no disponible: ${e.message}`));
+    // Avisar SOLO una vez cuando cae (no spamear el log en cada reintento) y
+    // avisar de nuevo al reconectar.
+    this.redis.on('error', (e) => {
+      if (!this.redisAvisado) {
+        this.log.warn(`Redis throttle no disponible (rate-limit en fail-open): ${e.message}`);
+        this.redisAvisado = true;
+      }
+    });
+    this.redis.on('ready', () => {
+      if (this.redisAvisado) this.log.log('Redis throttle reconectado');
+      this.redisAvisado = false;
+    });
   }
 
   async canActivate(ctx: ExecutionContext): Promise<boolean> {
