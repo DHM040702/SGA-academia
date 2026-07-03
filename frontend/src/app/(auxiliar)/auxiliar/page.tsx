@@ -3,7 +3,7 @@
 import { useState, useEffect, useRef, useCallback } from 'react'
 import Link from 'next/link'
 import { useRouter } from 'next/navigation'
-import { useAsistencia, useScan, useSetTardanza } from '@/hooks/use-asistencia'
+import { useAsistencia, useScan, useSetTardanza, useResumenAsistencia } from '@/hooks/use-asistencia'
 import { Avatar } from '@/components/ui/avatar'
 import { Dot } from '@/components/ui/dot'
 import { useAuth } from '@/contexts/auth-context'
@@ -52,8 +52,14 @@ export default function AuxiliarPage() {
 
   const { data: pageData } = useAsistencia({ fecha: TODAY, limit: 20 })
   const feed      = pageData?.data ?? []
-  const presentes = feed.filter((r) => !r.esTardanza).length
-  const tardanzas = feed.filter((r) => r.esTardanza).length
+  // Totales REALES del día (no solo el feed de 20 «En vivo»). Se refrescan
+  // automáticamente y tras cada escaneo (invalida la key ['asistencia']).
+  const { data: stats } = useResumenAsistencia()
+  const presentes     = stats?.presentes ?? feed.filter((r) => !r.esTardanza).length
+  const tardanzas     = stats?.tardanzas ?? feed.filter((r) => r.esTardanza).length
+  const totalEsperado = stats?.total_alumno ?? feed.length
+  const asistieron    = presentes + tardanzas
+  const pctAsistencia = stats?.pct_asistencia ?? (feed.length > 0 ? Math.round((asistieron / feed.length) * 100) : 0)
 
   useEffect(() => {
     const id = setInterval(() => setCurrentTime(clock()), 10_000)
@@ -393,11 +399,11 @@ export default function AuxiliarPage() {
 
           <div className="w-px h-7 flex-shrink-0" style={{ background: 'rgba(255,255,255,.12)' }} />
 
-          <RegistroStat n={presentes + tardanzas} l="Presentes" />
+          <RegistroStat n={asistieron} l="Presentes" />
           <RegistroStat n={tardanzas} l="Tardanzas" />
-          <RegistroStat n={feed.length} l="Total" />
+          <RegistroStat n={totalEsperado} l="Total" />
           <RegistroStat
-            n={feed.length > 0 ? `${Math.round(((presentes + tardanzas) / feed.length) * 100)}%` : '—'}
+            n={totalEsperado > 0 ? `${pctAsistencia}%` : '—'}
             l="Asistencia"
             highlight
           />

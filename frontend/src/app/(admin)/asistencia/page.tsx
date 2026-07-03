@@ -594,6 +594,7 @@ export default function AsistenciaPage() {
   const [aulaFilter,   setAulaFilter]   = useState('')
   const [turnoFilter,  setTurnoFilter]  = useState<'manana' | 'tarde' | ''>('')
   const [tipoFilter,   setTipoFilter]   = useState<'alumno' | 'docente' | ''>(isDocente ? 'docente' : '')
+  const [qNombre,      setQNombre]      = useState('')
   const [showManual,     setShowManual]     = useState(false)
   const [showCerrar,     setShowCerrar]     = useState(false)
   const [correctTarget,  setCorrectTarget]  = useState<AsistenciaRecord | null>(null)
@@ -601,7 +602,7 @@ export default function AsistenciaPage() {
   const deleteMut = useDeleteAsistencia()
 
   const { data: aulas = [] }    = useAulas()
-  const { data: stats }         = useResumenAsistencia()
+  const { data: stats }         = useResumenAsistencia(fecha)
   const { data: page, isLoading } = useAsistencia({
     fecha,
     tipo:       isDocente ? 'docente' : (tipoFilter || undefined),
@@ -612,6 +613,21 @@ export default function AsistenciaPage() {
   })
 
   const registros = page?.data ?? []
+
+  // Filtro por nombre/código (cliente) + tope de filas para no renderizar una
+  // lista interminable. El resto se acota refinando la búsqueda o los filtros.
+  const MAX_FILAS = 60
+  const registrosFiltrados = qNombre.trim()
+    ? registros.filter(r => {
+        const p = r.tipoPersona === 'alumno' ? r.alumno : r.docente
+        const nombre = p ? `${p.nombre ?? ''} ${p.apellidos ?? ''}`.toLowerCase() : ''
+        const codigo = (r.tipoPersona === 'alumno' ? r.alumno?.codigoBarras : r.docente?.dni) ?? ''
+        const q = qNombre.trim().toLowerCase()
+        return nombre.includes(q) || String(codigo).toLowerCase().includes(q)
+      })
+    : registros
+  const registrosVisibles = registrosFiltrados.slice(0, MAX_FILAS)
+
   const presentes = stats?.presentes ?? registros.filter(r => !r.esTardanza).length
   const tardanzas = stats?.tardanzas ?? registros.filter(r =>  r.esTardanza).length
   const total     = stats?.total_alumno ?? registros.length
@@ -682,10 +698,10 @@ export default function AsistenciaPage() {
       <div className="p-7 flex flex-col gap-3.5">
         {/* KPIs */}
         <div className="grid grid-cols-2 md:grid-cols-4 gap-3.5">
-          <KPI label="Presentes hoy"    value={presentes}  sub={`de ${total} registros`}  trend={4} accent="var(--color-success)" />
-          <KPI label="Tardanzas hoy"    value={tardanzas}  sub="del total"                         accent="var(--color-warning)" />
-          <KPI label="Ausentes"         value={ausentes}   sub="sin registro"                       accent="var(--color-danger)" />
-          <KPI label="Docentes hoy"     value={stats?.docentes_hoy ?? 0} sub="marcaron asistencia"  accent="var(--color-primary)" />
+          <KPI label="Presentes"    value={presentes}  sub={`de ${total} matriculados`}  accent="var(--color-success)" />
+          <KPI label="Tardanzas"    value={tardanzas}  sub="del total"                         accent="var(--color-warning)" />
+          <KPI label="Ausentes"     value={ausentes}   sub="sin registro"                       accent="var(--color-danger)" />
+          <KPI label="Docentes"     value={stats?.docentes_hoy ?? 0} sub="marcaron asistencia"  accent="var(--color-primary)" />
         </div>
 
         {/* Content */}
@@ -693,9 +709,17 @@ export default function AsistenciaPage() {
           {/* Tabla principal */}
           <Card
             title="Registros del día"
-            subtitle={fechaLabel}
+            subtitle={`${fechaLabel} · ${registrosFiltrados.length} ${registrosFiltrados.length === 1 ? 'registro' : 'registros'}${registrosFiltrados.length > MAX_FILAS ? ` (mostrando ${MAX_FILAS})` : ''}`}
             action={
               <div className="flex gap-1.5 items-center flex-wrap">
+                {/* Búsqueda por nombre o código */}
+                <input
+                  type="text"
+                  value={qNombre}
+                  onChange={e => setQNombre(e.target.value)}
+                  placeholder="Buscar por nombre o código…"
+                  className="text-[12px] px-2 py-1 border border-border rounded-2 bg-surface min-w-[180px]"
+                />
                 {/* Selector de fecha */}
                 <input
                   type="date"
@@ -757,8 +781,14 @@ export default function AsistenciaPage() {
                       )}
                     </td>
                   </tr>
+                ) : registrosFiltrados.length === 0 ? (
+                  <tr>
+                    <td colSpan={6} className="text-center py-10 text-text-mute">
+                      Ningún registro coincide con «{qNombre}».
+                    </td>
+                  </tr>
                 ) : (
-                  registros.map(r => {
+                  registrosVisibles.map(r => {
                     const persona = r.tipoPersona === 'alumno' ? r.alumno : r.docente
                     const nombre  = persona
                       ? `${(persona as any).nombre ?? (persona as any).nombres} ${persona.apellidos}`

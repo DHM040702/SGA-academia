@@ -55,14 +55,15 @@ export class AsistenciaController {
     return this.service.createManual(dto, user.id);
   }
 
-  /** GET /asistencia/stats — estadísticas del día */
+  /** GET /asistencia/stats?fecha=YYYY-MM-DD — estadísticas del día (por defecto hoy) */
   @Get('stats')
   @ApiBearerAuth('access-token')
   @UseGuards(JwtAuthGuard, RolesGuard)
   @Roles(Rol.admin, Rol.director, Rol.docente, Rol.auxiliar)
-  @ApiOperation({ summary: 'Estadísticas de asistencia del día actual' })
-  stats() {
-    return this.service.stats();
+  @ApiOperation({ summary: 'Estadísticas de asistencia de una fecha (por defecto hoy)' })
+  @ApiQuery({ name: 'fecha', required: false, type: String, example: '2026-06-03' })
+  stats(@Query('fecha') fecha?: string) {
+    return this.service.stats(fecha);
   }
 
   /** GET /asistencia/export-docentes?fecha=YYYY-MM-DD — datos para Excel de docentes */

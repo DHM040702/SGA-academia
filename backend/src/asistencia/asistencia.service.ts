@@ -409,12 +409,20 @@ export class AsistenciaService {
     return c?.id ?? null;
   }
 
-  async stats() {
-    const now = new Date();
-    const today = new Date(now.getFullYear(), now.getMonth(), now.getDate());
+  async stats(fecha?: string) {
+    // Fecha objetivo: la pedida (YYYY-MM-DD, en UTC como el resto de queries de
+    // @db.Date) o, por defecto, hoy. Así los KPIs siguen a la fecha seleccionada.
+    let dia: Date;
+    if (fecha) {
+      const [y, m, d] = fecha.split('-').map(Number);
+      dia = new Date(Date.UTC(y, m - 1, d));
+    } else {
+      const now = new Date();
+      dia = new Date(now.getFullYear(), now.getMonth(), now.getDate());
+    }
 
     // Scoping al ciclo activo: los alumnos de ciclos cerrados NO deben contar en
-    // los KPIs de hoy (ni en el denominador). Si no hay ciclo activo, sin filtro.
+    // los KPIs (ni en el denominador). Si no hay ciclo activo, sin filtro.
     const cicloId = await this.activeCicloId();
     const alumnoCiclo = cicloId ? { alumno: { aula: { cicloId } } } : {};
     const alumnoCicloCount = cicloId ? { aula: { cicloId } } : {};
@@ -422,19 +430,19 @@ export class AsistenciaService {
     const [presentes, tardanzas, ausentes, docentesHoy, totalMatriculados] = await Promise.all([
       // Presentes: asistieron a tiempo y NO están marcados como ausentes
       this.prisma.asistencia.count({
-        where: { fecha: today, tipoPersona: TipoPersona.alumno, esTardanza: false, esAusente: false, ...alumnoCiclo },
+        where: { fecha: dia, tipoPersona: TipoPersona.alumno, esTardanza: false, esAusente: false, ...alumnoCiclo },
       }),
       // Tardanzas: llegaron pero fuera de hora
       this.prisma.asistencia.count({
-        where: { fecha: today, tipoPersona: TipoPersona.alumno, esTardanza: true, ...alumnoCiclo },
+        where: { fecha: dia, tipoPersona: TipoPersona.alumno, esTardanza: true, ...alumnoCiclo },
       }),
       // Ausentes: registros de falta (generados por cerrarTurno)
       this.prisma.asistencia.count({
-        where: { fecha: today, tipoPersona: TipoPersona.alumno, esAusente: true, ...alumnoCiclo },
+        where: { fecha: dia, tipoPersona: TipoPersona.alumno, esAusente: true, ...alumnoCiclo },
       }),
-      // Docentes con algún registro hoy
+      // Docentes con algún registro en la fecha
       this.prisma.asistencia.count({
-        where: { fecha: today, tipoPersona: TipoPersona.docente },
+        where: { fecha: dia, tipoPersona: TipoPersona.docente },
       }),
       // Total matriculados activos DEL CICLO ACTIVO
       this.prisma.alumno.count({ where: { deletedAt: null, ...alumnoCicloCount } }),

@@ -188,11 +188,11 @@ export interface StatsAsistencia {
   docentes_hoy: number
 }
 
-export function useResumenAsistencia() {
+export function useResumenAsistencia(fecha?: string) {
   return useQuery<StatsAsistencia>({
-    queryKey: ['asistencia', 'stats'],
+    queryKey: ['asistencia', 'stats', fecha ?? 'hoy'],
     queryFn: async () => {
-      const { data } = await api.get('/asistencia/stats')
+      const { data } = await api.get('/asistencia/stats', { params: fecha ? { fecha } : {} })
       return data
     },
     refetchInterval: 30_000,
