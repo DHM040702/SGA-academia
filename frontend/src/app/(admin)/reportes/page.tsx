@@ -52,7 +52,43 @@ interface ReporteCursosData {
   por_curso: { cursoId: string; nombre: string; codigo: string; total_clases: number; publicadas: number; borradores: number; aulas_distintas: number; docentes_distintos: number; horas_semana: number }[]
 }
 
-type ReportTab = 'asistencia' | 'alumnos' | 'horarios' | 'cursos' | 'individual'
+// Justificaciones
+interface JustificacionRow {
+  fecha: string; alumno: string; codigo: string; dni: string; aula: string
+  estado: 'justificada' | 'pendiente'; razon: string; expediente: string
+  justificado_por: string; justificado_en: string | null
+}
+interface ReporteJustificacionesData {
+  total: number; justificadas: number; pendientes: number; desde: string; hasta: string
+  detalle: JustificacionRow[]
+}
+
+// Ranking de aulas
+interface RankingAulaRow {
+  aulaId: string; nombre: string; turno: string; area: string
+  alumnos: number; sesiones: number; pct_asistencia: number
+}
+interface ReporteRankingData { desde: string; hasta: string; ranking: RankingAulaRow[] }
+
+// Resumen diario
+interface ResumenDiaRow {
+  fecha: string; presentes: number; tardanzas: number; faltas: number; justificadas: number; pct: number
+}
+interface ReporteResumenData { desde: string; hasta: string; total_alumnos: number; dias: ResumenDiaRow[] }
+
+// Asistencia por alumno (detalle individual)
+interface AlumnoDetalleRow {
+  fecha: string; hora: string | null
+  estado: 'justificada' | 'falta' | 'tardanza' | 'puntual'; razon: string; expediente: string
+}
+interface ReporteAlumnoDetalleData {
+  alumno: { id: string; nombre: string; codigo: string; dni: string; aula: string | null }
+  desde: string; hasta: string
+  kpis: { presentes: number; tardanzas: number; faltas: number; justificadas: number; dias_con_registro: number; pct: number }
+  detalle: AlumnoDetalleRow[]
+}
+
+type ReportTab = 'asistencia' | 'justificaciones' | 'ranking' | 'resumen' | 'alumnos' | 'horarios' | 'cursos' | 'individual'
 type SortDir   = 'asc' | 'desc'
 
 /* ══════════════════════════════════════════════════════════════════
@@ -112,6 +148,34 @@ function useReporteCursos(params: Record<string, string>, enabled: boolean) {
   return useQuery<ReporteCursosData>({
     queryKey: ['reportes', 'cursos', params],
     queryFn: async () => { const { data } = await api.get('/reportes/cursos', { params }); return data },
+    enabled, staleTime: 0,
+  })
+}
+function useReporteJustificaciones(params: Record<string, string>, enabled: boolean) {
+  return useQuery<ReporteJustificacionesData>({
+    queryKey: ['reportes', 'justificaciones', params],
+    queryFn: async () => { const { data } = await api.get('/reportes/justificaciones', { params }); return data },
+    enabled, staleTime: 0,
+  })
+}
+function useReporteRanking(params: Record<string, string>, enabled: boolean) {
+  return useQuery<ReporteRankingData>({
+    queryKey: ['reportes', 'ranking-aulas', params],
+    queryFn: async () => { const { data } = await api.get('/reportes/ranking-aulas', { params }); return data },
+    enabled, staleTime: 0,
+  })
+}
+function useReporteResumen(params: Record<string, string>, enabled: boolean) {
+  return useQuery<ReporteResumenData>({
+    queryKey: ['reportes', 'resumen-diario', params],
+    queryFn: async () => { const { data } = await api.get('/reportes/resumen-diario', { params }); return data },
+    enabled, staleTime: 0,
+  })
+}
+function useReporteAlumnoDetalle(params: Record<string, string>, enabled: boolean) {
+  return useQuery<ReporteAlumnoDetalleData>({
+    queryKey: ['reportes', 'asistencia-alumno', params],
+    queryFn: async () => { const { data } = await api.get('/reportes/asistencia-alumno', { params }); return data },
     enabled, staleTime: 0,
   })
 }
@@ -287,6 +351,82 @@ function exportExcelCursos(r: ReporteCursosData) {
   XLSX.writeFile(wb, 'reporte-cursos.xlsx')
 }
 
+/** Formatea un instante ISO (Timestamptz) a fecha+hora local, o '' si null. */
+function fmtInstante(iso: string | null): string {
+  if (!iso) return ''
+  const d = new Date(iso)
+  return isNaN(d.getTime()) ? '' : d.toLocaleString('es-PE', { dateStyle: 'short', timeStyle: 'short' })
+}
+/** Hora de un instante ISO (horaIngreso Timestamptz), o '—'. */
+function fmtHora(iso: string | null): string {
+  if (!iso) return '—'
+  const d = new Date(iso)
+  return isNaN(d.getTime()) ? '—' : d.toLocaleTimeString('es-PE', { hour: '2-digit', minute: '2-digit' })
+}
+
+function exportExcelJustificaciones(r: ReporteJustificacionesData) {
+  const wb = XLSX.utils.book_new()
+  XLSX.utils.book_append_sheet(wb, XLSX.utils.aoa_to_sheet([
+    ['Métrica', 'Valor'],
+    ['Período', `${r.desde} → ${r.hasta}`],
+    ['Total faltas', r.total],
+    ['Justificadas', r.justificadas],
+    ['Pendientes', r.pendientes],
+  ]), 'Resumen')
+  XLSX.utils.book_append_sheet(wb, XLSX.utils.aoa_to_sheet([
+    ['Fecha', 'Alumno', 'Código', 'DNI', 'Aula', 'Estado', 'Razón', 'Expediente', 'Justificado por', 'Justificado en'],
+    ...r.detalle.map((d) => [
+      d.fecha, d.alumno, d.codigo, d.dni, d.aula,
+      d.estado === 'justificada' ? 'Justificada' : 'Pendiente',
+      d.razon, d.expediente, d.justificado_por, fmtInstante(d.justificado_en),
+    ]),
+  ]), 'Detalle')
+  XLSX.writeFile(wb, 'reporte-justificaciones.xlsx')
+}
+
+function exportExcelRanking(r: ReporteRankingData) {
+  const wb = XLSX.utils.book_new()
+  XLSX.utils.book_append_sheet(wb, XLSX.utils.aoa_to_sheet([
+    ['#', 'Aula', 'Área', 'Turno', 'Alumnos', 'Sesiones', '% Asistencia'],
+    ...r.ranking.map((a, i) => [i + 1, a.nombre, AREA_LABEL[a.area] ?? a.area, a.turno, a.alumnos, a.sesiones, a.pct_asistencia]),
+  ]), 'Ranking')
+  XLSX.writeFile(wb, `reporte-ranking-aulas.xlsx`)
+}
+
+function exportExcelResumen(r: ReporteResumenData) {
+  const wb = XLSX.utils.book_new()
+  XLSX.utils.book_append_sheet(wb, XLSX.utils.aoa_to_sheet([
+    ['Fecha', 'Presentes', 'Tardanzas', 'Faltas', 'Justificadas', '% Asistencia'],
+    ...r.dias.map((d) => [d.fecha, d.presentes, d.tardanzas, d.faltas, d.justificadas, d.pct]),
+  ]), 'Resumen diario')
+  XLSX.writeFile(wb, 'reporte-resumen-diario.xlsx')
+}
+
+function exportExcelAlumnoDetalle(r: ReporteAlumnoDetalleData) {
+  const ESTADO_LABEL: Record<string, string> = { puntual: 'Puntual', tardanza: 'Tardanza', falta: 'Falta', justificada: 'Justificada' }
+  const wb = XLSX.utils.book_new()
+  XLSX.utils.book_append_sheet(wb, XLSX.utils.aoa_to_sheet([
+    ['Alumno', r.alumno.nombre],
+    ['Código', r.alumno.codigo],
+    ['DNI', r.alumno.dni],
+    ['Aula', r.alumno.aula ?? '—'],
+    ['Período', `${r.desde} → ${r.hasta}`],
+    [],
+    ['Métrica', 'Valor'],
+    ['Presentes', r.kpis.presentes],
+    ['Tardanzas', r.kpis.tardanzas],
+    ['Faltas', r.kpis.faltas],
+    ['Justificadas', r.kpis.justificadas],
+    ['Días con registro', r.kpis.dias_con_registro],
+    ['% Asistencia', r.kpis.pct],
+  ]), 'Resumen')
+  XLSX.utils.book_append_sheet(wb, XLSX.utils.aoa_to_sheet([
+    ['Fecha', 'Hora', 'Estado', 'Razón', 'Expediente'],
+    ...r.detalle.map((d) => [d.fecha, fmtHora(d.hora), ESTADO_LABEL[d.estado] ?? d.estado, d.razon, d.expediente]),
+  ]), 'Detalle')
+  XLSX.writeFile(wb, `reporte-alumno-${r.alumno.codigo || r.alumno.dni || 'detalle'}.xlsx`)
+}
+
 /* ══════════════════════════════════════════════════════════════════
    PÁGINA PRINCIPAL
 ══════════════════════════════════════════════════════════════════ */
@@ -338,6 +478,9 @@ export default function ReportesPage() {
   /* ── Filtros — Cursos ── */
   const [cursoConHorario, setCursoConHorario] = useState('')  // '' | 'true' | 'false'
 
+  /* ── Filtros — Justificaciones ── */
+  const [justEstado, setJustEstado] = useState<'todas' | 'pendientes' | 'justificadas'>('todas')
+
   /* ── Filtros de tabla (cliente) ── */
   const [aulaSearch,  setAulaSearch]  = useState('')
   const [docSearch,   setDocSearch]   = useState('')
@@ -349,6 +492,10 @@ export default function ReportesPage() {
   const [horAulaSort, setHorAulaSort] = useState('total_clases');   const [horAulaDir,  setHorAulaDir]  = useState<SortDir>('desc')
   const [almAulaSort, setAlmAulaSort] = useState('total_alumnos');  const [almAulaDir,  setAlmAulaDir]  = useState<SortDir>('desc')
   const [curSort,     setCurSort]     = useState('total_clases');   const [curDir,      setCurDir]      = useState<SortDir>('desc')
+  const [justSearch,  setJustSearch]  = useState('')
+  const [justSort,    setJustSort]    = useState('fecha');          const [justDir,     setJustDir]     = useState<SortDir>('desc')
+  const [rkSearch,    setRkSearch]    = useState('')
+  const [rkSort,      setRkSort]      = useState('pct_asistencia');  const [rkDir,       setRkDir]       = useState<SortDir>('desc')
 
   /* ── Estados de query por tab ── */
   const [asisParams,  setAsisParams]   = useState<Record<string, string>>({})
@@ -359,11 +506,30 @@ export default function ReportesPage() {
   const [horEnabled,  setHorEnabled]   = useState(false)
   const [curParams,   setCurParams]    = useState<Record<string, string>>({})
   const [curEnabled,  setCurEnabled]   = useState(false)
+  const [justParams,  setJustParams]   = useState<Record<string, string>>({})
+  const [justEnabled, setJustEnabled]  = useState(false)
+  const [rkParams,    setRkParams]     = useState<Record<string, string>>({})
+  const [rkEnabled,   setRkEnabled]    = useState(false)
+  const [resParams,   setResParams]    = useState<Record<string, string>>({})
+  const [resEnabled,  setResEnabled]   = useState(false)
 
   const asisQ = useReporteAsistencia(asisParams, asisEnabled)
   const almQ  = useReporteAlumnos(almParams, almEnabled)
   const horQ  = useReporteHorarios(horParams, horEnabled)
   const curQ  = useReporteCursos(curParams, curEnabled)
+  const justQ = useReporteJustificaciones(justParams, justEnabled)
+  const rkQ   = useReporteRanking(rkParams, rkEnabled)
+  const resQ  = useReporteResumen(resParams, resEnabled)
+
+  /* ── Detalle on-screen del alumno seleccionado (tab Por alumno) ── */
+  const indivDetalleParams = useMemo(() => {
+    if (!indivAlumno) return {}
+    const p: Record<string, string> = { alumno_id: indivAlumno.id }
+    if (desdeEfec) p.desde = desdeEfec
+    if (hastaEfec) p.hasta = hastaEfec
+    return p
+  }, [indivAlumno, desdeEfec, hastaEfec])
+  const indivDetalleQ = useReporteAlumnoDetalle(indivDetalleParams, !!indivAlumno)
 
   /* ── Generar reporte del tab activo ── */
   function handleGenerar() {
@@ -391,6 +557,29 @@ export default function ReportesPage() {
       if (cursoConHorario) base.con_horario = cursoConHorario
       setCurParams(base); setCurEnabled(true)
       setCursoSearch('')
+    }
+    if (tab === 'justificaciones') {
+      if (desdeEfec) base.desde = desdeEfec
+      if (hastaEfec) base.hasta = hastaEfec
+      base.estado = justEstado
+      setJustParams(base); setJustEnabled(true)
+      setJustSearch('')
+    }
+    if (tab === 'ranking') {
+      // ranking-aulas solo acepta ciclo_id + rango (no aula_id)
+      const p: Record<string, string> = {}
+      if (cicloId)   p.ciclo_id = cicloId
+      if (desdeEfec) p.desde    = desdeEfec
+      if (hastaEfec) p.hasta    = hastaEfec
+      setRkParams(p); setRkEnabled(true)
+      setRkSearch('')
+    }
+    if (tab === 'resumen') {
+      const p: Record<string, string> = {}
+      if (cicloId)   p.ciclo_id = cicloId
+      if (desdeEfec) p.desde    = desdeEfec
+      if (hastaEfec) p.hasta    = hastaEfec
+      setResParams(p); setResEnabled(true)
     }
   }
 
@@ -479,15 +668,48 @@ export default function ReportesPage() {
     [asisQ.data],
   )
 
+  const filteredJust = useMemo(() => {
+    let rows = justQ.data?.detalle ?? []
+    if (justSearch) {
+      const q = justSearch.toLowerCase()
+      rows = rows.filter((r) => r.alumno.toLowerCase().includes(q) || r.dni.includes(justSearch) || r.codigo.toLowerCase().includes(q) || r.aula.toLowerCase().includes(q))
+    }
+    return sortRows(rows, justSort, justDir)
+  }, [justQ.data, justSearch, justSort, justDir])
+
+  const filteredRanking = useMemo(() => {
+    let rows = rkQ.data?.ranking ?? []
+    if (rkSearch) rows = rows.filter((r) => r.nombre.toLowerCase().includes(rkSearch.toLowerCase()))
+    return sortRows(rows, rkSort, rkDir)
+  }, [rkQ.data, rkSearch, rkSort, rkDir])
+
+  const resumenChart = useMemo(
+    () => resQ.data?.dias.map((d) => ({ ...d, fecha: d.fecha.slice(5) })) ?? [],
+    [resQ.data],
+  )
+
   /* ── Estado de carga del tab actual ── */
-  const currentQ   = tab === 'asistencia' ? asisQ : tab === 'alumnos' ? almQ : tab === 'horarios' ? horQ : curQ
+  const currentQ   = tab === 'asistencia' ? asisQ
+    : tab === 'justificaciones' ? justQ
+    : tab === 'ranking' ? rkQ
+    : tab === 'resumen' ? resQ
+    : tab === 'alumnos' ? almQ
+    : tab === 'horarios' ? horQ
+    : curQ
   const isLoading  = currentQ.isFetching
   const isError    = currentQ.isError
-  const triggered  = tab === 'asistencia' ? asisEnabled : tab === 'alumnos' ? almEnabled : tab === 'horarios' ? horEnabled : curEnabled
+  const triggered  = tab === 'asistencia' ? asisEnabled
+    : tab === 'justificaciones' ? justEnabled
+    : tab === 'ranking' ? rkEnabled
+    : tab === 'resumen' ? resEnabled
+    : tab === 'alumnos' ? almEnabled
+    : tab === 'horarios' ? horEnabled
+    : curEnabled
 
   /* ── Filtros comunes que aplican al tab actual ── */
-  const showAula   = tab !== 'cursos'
+  const showAula    = tab === 'asistencia' || tab === 'alumnos' || tab === 'horarios' || tab === 'justificaciones'
   const showDocente = tab === 'asistencia' || tab === 'horarios'
+  const showPeriodo = tab === 'asistencia' || tab === 'justificaciones' || tab === 'ranking' || tab === 'resumen'
 
   return (
     <>
@@ -511,6 +733,9 @@ export default function ReportesPage() {
             {tab === 'alumnos'  && almQ.data  && <Btn variant="secondary" icon={<Download size={14} />} size="sm" onClick={() => exportExcelAlumnos(almQ.data!)}>Excel</Btn>}
             {tab === 'horarios' && horQ.data  && <Btn variant="secondary" icon={<Download size={14} />} size="sm" onClick={() => exportExcelHorarios(horQ.data!)}>Excel</Btn>}
             {tab === 'cursos'   && curQ.data  && <Btn variant="secondary" icon={<Download size={14} />} size="sm" onClick={() => exportExcelCursos(curQ.data!)}>Excel</Btn>}
+            {tab === 'justificaciones' && justQ.data && <Btn variant="secondary" icon={<Download size={14} />} size="sm" onClick={() => exportExcelJustificaciones(justQ.data!)}>Excel</Btn>}
+            {tab === 'ranking'  && rkQ.data   && <Btn variant="secondary" icon={<Download size={14} />} size="sm" onClick={() => exportExcelRanking(rkQ.data!)}>Excel</Btn>}
+            {tab === 'resumen'  && resQ.data  && <Btn variant="secondary" icon={<Download size={14} />} size="sm" onClick={() => exportExcelResumen(resQ.data!)}>Excel</Btn>}
           </>
         }
       />
@@ -518,13 +743,16 @@ export default function ReportesPage() {
       <div className="p-4 md:p-7 flex flex-col gap-4">
 
         {/* ── Tabs ── */}
-        <div className="flex gap-1 border-b border-border">
+        <div className="flex flex-wrap gap-1 border-b border-border">
           {([
-            { key: 'asistencia', label: 'Asistencia',  sub: asisEnabled && asisQ.data ? `${asisQ.data.kpis.sesiones_registradas} sesiones` : '' },
-            { key: 'alumnos',    label: 'Alumnos',      sub: almEnabled  && almQ.data  ? `${almQ.data.kpis.total} alumnos`  : '' },
-            { key: 'horarios',   label: 'Horarios',     sub: horEnabled  && horQ.data  ? `${horQ.data.kpis.total_clases} clases` : '' },
-            { key: 'cursos',     label: 'Cursos',       sub: curEnabled  && curQ.data  ? `${curQ.data.kpis.total_cursos} cursos` : '' },
-            { key: 'individual', label: 'Por alumno',   sub: '' },
+            { key: 'asistencia',     label: 'Asistencia',   sub: asisEnabled && asisQ.data ? `${asisQ.data.kpis.sesiones_registradas} sesiones` : '' },
+            { key: 'justificaciones', label: 'Justificaciones', sub: justEnabled && justQ.data ? `${justQ.data.pendientes} pend.` : '' },
+            { key: 'ranking',        label: 'Ranking aulas', sub: rkEnabled && rkQ.data ? `${rkQ.data.ranking.length} aulas` : '' },
+            { key: 'resumen',        label: 'Resumen diario', sub: resEnabled && resQ.data ? `${resQ.data.dias.length} días` : '' },
+            { key: 'alumnos',        label: 'Alumnos',      sub: almEnabled  && almQ.data  ? `${almQ.data.kpis.total} alumnos`  : '' },
+            { key: 'horarios',       label: 'Horarios',     sub: horEnabled  && horQ.data  ? `${horQ.data.kpis.total_clases} clases` : '' },
+            { key: 'cursos',         label: 'Cursos',       sub: curEnabled  && curQ.data  ? `${curQ.data.kpis.total_cursos} cursos` : '' },
+            { key: 'individual',     label: 'Por alumno',   sub: '' },
           ] as { key: ReportTab; label: string; sub: string }[]).map((t) => (
             <button key={t.key} onClick={() => setTab(t.key)}
               className={`px-4 py-2 text-[13px] border-b-2 transition-colors ${
@@ -579,7 +807,7 @@ export default function ReportesPage() {
             )}
 
             {/* Filtros específicos por tab */}
-            {tab === 'asistencia' && (
+            {showPeriodo && (
               <>
                 <div className="flex flex-col gap-1">
                   <label className="text-[10.5px] text-text-mute uppercase tracking-[0.05em] font-medium">Período</label>
@@ -603,6 +831,18 @@ export default function ReportesPage() {
                   </>
                 )}
               </>
+            )}
+
+            {tab === 'justificaciones' && (
+              <div className="flex flex-col gap-1">
+                <label className="text-[10.5px] text-text-mute uppercase tracking-[0.05em] font-medium">Estado</label>
+                <select value={justEstado} onChange={(e) => setJustEstado(e.target.value as typeof justEstado)}
+                  className="text-[13px] px-2.5 py-1.5 border border-border rounded-2 bg-surface">
+                  <option value="todas">Todas</option>
+                  <option value="pendientes">Solo pendientes</option>
+                  <option value="justificadas">Solo justificadas</option>
+                </select>
+              </div>
             )}
 
             {tab === 'alumnos' && (
@@ -776,6 +1016,201 @@ export default function ReportesPage() {
                     </tbody>
                   </table>
                 ) : <EmptyState msg="Sin registros de docentes en el período." />}
+              </Card>
+            </>
+          )
+        })()}
+
+        {/* ════════════════════════════════════════════════════════════
+            TAB: JUSTIFICACIONES
+        ════════════════════════════════════════════════════════════ */}
+        {tab === 'justificaciones' && justQ.data && !isLoading && (() => {
+          const r = justQ.data
+          const pctJust = r.total > 0 ? Math.round((r.justificadas / r.total) * 100) : 0
+          return (
+            <>
+              <div className="grid grid-cols-2 sm:grid-cols-4 gap-3.5">
+                <KPI label="Total faltas"   value={r.total}        sub={`${r.desde} → ${r.hasta}`} accent="var(--color-primary)" />
+                <KPI label="Justificadas"   value={r.justificadas} sub="con expediente"           accent="var(--color-success)" />
+                <KPI label="Pendientes"     value={r.pendientes}   sub="sin justificar"           accent="var(--color-danger)" />
+                <KPI label="% Justificadas" value={`${pctJust}%`}  sub="del total de faltas"      accent="var(--color-info)" />
+              </div>
+
+              <Card title="Detalle de faltas" subtitle={`${filteredJust.length} de ${r.detalle.length} registros`}>
+                <div className="px-3.5 pb-3 flex flex-wrap gap-2 items-center border-b border-border-s">
+                  <SearchInput value={justSearch} onChange={setJustSearch} placeholder="Buscar alumno, DNI o aula…" />
+                  {justSearch && <button onClick={() => setJustSearch('')} className="text-[11px] text-text-mute hover:text-text flex items-center gap-1"><X size={11}/>Limpiar</button>}
+                </div>
+                {filteredJust.length > 0 ? (
+                  <div className="overflow-x-auto">
+                    <table className="w-full border-collapse text-[13px]">
+                      <thead>
+                        <tr className="border-b border-border bg-surface-2/50">
+                          {[['fecha','Fecha'],['alumno','Alumno'],['aula','Aula'],['estado','Estado']].map(([k,l]) => (
+                            <SortTh key={k} label={l} sortKey={k} current={justSort} dir={justDir} onSort={mkToggle(justSort,setJustSort,justDir,setJustDir)} />
+                          ))}
+                          <th className="px-3.5 py-2.5 text-[11px] text-text-mute uppercase tracking-[0.04em] font-semibold text-left">Razón</th>
+                          <th className="px-3.5 py-2.5 text-[11px] text-text-mute uppercase tracking-[0.04em] font-semibold text-left">Expediente</th>
+                          <th className="px-3.5 py-2.5 text-[11px] text-text-mute uppercase tracking-[0.04em] font-semibold text-left">Justificado por</th>
+                        </tr>
+                      </thead>
+                      <tbody>
+                        {filteredJust.map((d, i) => (
+                          <tr key={`${d.codigo}-${d.fecha}-${i}`} className="border-t border-border-s hover:bg-surface-2/40 align-top">
+                            <td className="px-3.5 py-2.5 font-mono text-[12px] whitespace-nowrap">{d.fecha}</td>
+                            <td className="px-3.5 py-2.5">
+                              <div className="font-semibold">{d.alumno || '—'}</div>
+                              <div className="text-[11px] text-text-mute font-mono">{d.codigo}{d.dni ? ` · DNI ${d.dni}` : ''}</div>
+                            </td>
+                            <td className="px-3.5 py-2.5">{d.aula || '—'}</td>
+                            <td className="px-3.5 py-2.5">
+                              <Pill tone={d.estado === 'justificada' ? 'success' : 'danger'}>
+                                {d.estado === 'justificada' ? 'Justificada' : 'Pendiente'}
+                              </Pill>
+                            </td>
+                            <td className="px-3.5 py-2.5 max-w-[240px]">
+                              <span className="text-[12px] text-text-mute line-clamp-2" title={d.razon}>{d.razon || '—'}</span>
+                            </td>
+                            <td className="px-3.5 py-2.5 text-[12px] text-text-mute max-w-[160px] truncate" title={d.expediente}>{d.expediente || '—'}</td>
+                            <td className="px-3.5 py-2.5">
+                              {d.justificado_por
+                                ? <><div className="text-[12px]">{d.justificado_por}</div><div className="text-[11px] text-text-mute">{fmtInstante(d.justificado_en)}</div></>
+                                : <span className="text-[12px] text-text-mute">—</span>}
+                            </td>
+                          </tr>
+                        ))}
+                      </tbody>
+                    </table>
+                  </div>
+                ) : <EmptyState msg={r.detalle.length === 0 ? 'Sin faltas registradas en el período.' : 'Ningún registro coincide con la búsqueda.'} />}
+              </Card>
+            </>
+          )
+        })()}
+
+        {/* ════════════════════════════════════════════════════════════
+            TAB: RANKING DE AULAS
+        ════════════════════════════════════════════════════════════ */}
+        {tab === 'ranking' && rkQ.data && !isLoading && (() => {
+          const r = rkQ.data
+          const rankMap = new Map(r.ranking.map((a, i) => [a.aulaId, i + 1]))
+          const prom = r.ranking.length ? Math.round(r.ranking.reduce((s, a) => s + a.pct_asistencia, 0) / r.ranking.length) : 0
+          const mejor = r.ranking[0]
+          return (
+            <>
+              <div className="grid grid-cols-2 sm:grid-cols-4 gap-3.5">
+                <KPI label="Aulas evaluadas" value={r.ranking.length}                sub={`${r.desde} → ${r.hasta}`}       accent="var(--color-primary)" />
+                <KPI label="Mejor aula"      value={mejor ? `${mejor.pct_asistencia}%` : '—'} sub={mejor?.nombre ?? 'sin datos'} accent="var(--color-success)" />
+                <KPI label="Promedio"        value={`${prom}%`}                       sub="asistencia media"                accent="var(--color-info)" />
+                <KPI label="En riesgo"       value={r.ranking.filter((a) => a.pct_asistencia < 70).length} sub="< 70% asistencia" accent="var(--color-danger)" />
+              </div>
+
+              <Card title="Ranking de asistencia por aula" subtitle={`${filteredRanking.length} de ${r.ranking.length} aulas`}>
+                <div className="px-3.5 pb-3 flex flex-wrap gap-2 items-center border-b border-border-s">
+                  <SearchInput value={rkSearch} onChange={setRkSearch} placeholder="Buscar aula…" />
+                  {rkSearch && <button onClick={() => setRkSearch('')} className="text-[11px] text-text-mute hover:text-text flex items-center gap-1"><X size={11}/>Limpiar</button>}
+                </div>
+                {filteredRanking.length > 0 ? (
+                  <table className="w-full border-collapse text-[13px]">
+                    <thead>
+                      <tr className="border-b border-border bg-surface-2/50">
+                        <th className="px-3.5 py-2.5 text-[11px] text-text-mute uppercase tracking-[0.04em] font-semibold text-left w-10">#</th>
+                        {[['nombre','Aula'],['alumnos','Alumnos'],['sesiones','Sesiones'],['pct_asistencia','Asistencia']].map(([k,l]) => (
+                          <SortTh key={k} label={l} sortKey={k} current={rkSort} dir={rkDir} onSort={mkToggle(rkSort,setRkSort,rkDir,setRkDir)} />
+                        ))}
+                        <th className="px-3.5 py-2.5 text-[11px] text-text-mute uppercase tracking-[0.04em] font-semibold text-left">Estado</th>
+                      </tr>
+                    </thead>
+                    <tbody>
+                      {filteredRanking.map((a) => {
+                        const pos = rankMap.get(a.aulaId) ?? 0
+                        return (
+                          <tr key={a.aulaId} className="border-t border-border-s hover:bg-surface-2/40">
+                            <td className="px-3.5 py-2.5 font-mono text-[12px] font-semibold text-text-mute">{pos <= 3 ? ['🥇','🥈','🥉'][pos-1] : pos}</td>
+                            <td className="px-3.5 py-2.5">
+                              <div className="font-semibold">{a.nombre}</div>
+                              <div className="text-[11px] text-text-mute">{AREA_LABEL[a.area] ?? a.area} · {a.turno === 'manana' ? 'Mañana' : 'Tarde'}</div>
+                            </td>
+                            <td className="px-3.5 py-2.5 font-mono text-[12px]">{a.alumnos}</td>
+                            <td className="px-3.5 py-2.5 font-mono text-[12px]">{a.sesiones}</td>
+                            <td className="px-3.5 py-2.5"><PctBar pct={a.pct_asistencia} /></td>
+                            <td className="px-3.5 py-2.5">
+                              <Pill tone={a.pct_asistencia >= 85 ? 'success' : a.pct_asistencia >= 70 ? 'warning' : 'danger'}>
+                                {a.pct_asistencia >= 85 ? 'Óptimo' : a.pct_asistencia >= 70 ? 'Regular' : 'En riesgo'}
+                              </Pill>
+                            </td>
+                          </tr>
+                        )
+                      })}
+                    </tbody>
+                  </table>
+                ) : <EmptyState msg={r.ranking.length === 0 ? 'Sin aulas con datos en el período.' : 'Ninguna aula coincide con la búsqueda.'} />}
+              </Card>
+            </>
+          )
+        })()}
+
+        {/* ════════════════════════════════════════════════════════════
+            TAB: RESUMEN DIARIO
+        ════════════════════════════════════════════════════════════ */}
+        {tab === 'resumen' && resQ.data && !isLoading && (() => {
+          const r = resQ.data
+          const totFaltas = r.dias.reduce((s, d) => s + d.faltas, 0)
+          const promPct   = r.dias.length ? Math.round(r.dias.reduce((s, d) => s + d.pct, 0) / r.dias.length) : 0
+          return (
+            <>
+              <div className="grid grid-cols-2 sm:grid-cols-4 gap-3.5">
+                <KPI label="Alumnos en scope" value={r.total_alumnos} sub={cicloActivo?.nombre ?? '—'}   accent="var(--color-primary)" />
+                <KPI label="Días con datos"   value={r.dias.length}   sub={`${r.desde} → ${r.hasta}`}    accent="var(--color-info)" />
+                <KPI label="Prom. asistencia" value={`${promPct}%`}   sub="media del período"           accent="var(--color-success)" />
+                <KPI label="Total faltas"     value={totFaltas}       sub="en el período"               accent="var(--color-danger)" />
+              </div>
+
+              {resumenChart.length > 0 && (
+                <Card title="Asistencia diaria" subtitle="% de asistencia por día · línea 85% = umbral óptimo">
+                  <div className="px-4 pb-4">
+                    <ResponsiveContainer width="100%" height={200}>
+                      <BarChart data={resumenChart} margin={{ top: 8, right: 8, bottom: 0, left: -16 }}>
+                        <CartesianGrid strokeDasharray="3 3" stroke="var(--color-border)" />
+                        <XAxis dataKey="fecha" tick={{ fontSize: 10, fill: 'var(--color-text-mute)' }} interval="preserveStartEnd" />
+                        <YAxis domain={[0, 100]} tick={{ fontSize: 10, fill: 'var(--color-text-mute)' }} tickFormatter={(v) => `${v}%`} />
+                        <Tooltip content={<ChartTooltip />} />
+                        <ReferenceLine y={85} stroke="var(--color-success)" strokeDasharray="4 3" strokeOpacity={0.6} />
+                        <Bar dataKey="pct" name="Asistencia" radius={[3, 3, 0, 0]}>
+                          {resumenChart.map((d, i) => (
+                            <Cell key={i} fill={d.pct >= 85 ? 'var(--color-success)' : d.pct >= 70 ? 'var(--color-warning)' : 'var(--color-danger)'} />
+                          ))}
+                        </Bar>
+                      </BarChart>
+                    </ResponsiveContainer>
+                  </div>
+                </Card>
+              )}
+
+              <Card title="Consolidado por día" subtitle={`${r.dias.length} días`}>
+                <div className="overflow-x-auto">
+                  <table className="w-full border-collapse text-[13px]">
+                    <thead>
+                      <tr className="border-b border-border bg-surface-2/50">
+                        {['Fecha','Presentes','Tardanzas','Faltas','Justificadas','Asistencia'].map((l) => (
+                          <th key={l} className="px-3.5 py-2.5 text-[11px] text-text-mute uppercase tracking-[0.04em] font-semibold text-left">{l}</th>
+                        ))}
+                      </tr>
+                    </thead>
+                    <tbody>
+                      {r.dias.map((d) => (
+                        <tr key={d.fecha} className="border-t border-border-s hover:bg-surface-2/40">
+                          <td className="px-3.5 py-2.5 font-mono text-[12px] whitespace-nowrap">{d.fecha}</td>
+                          <td className="px-3.5 py-2.5 font-mono text-[12px] text-success">{d.presentes}</td>
+                          <td className="px-3.5 py-2.5 font-mono text-[12px] text-warning">{d.tardanzas}</td>
+                          <td className="px-3.5 py-2.5 font-mono text-[12px] text-danger">{d.faltas}</td>
+                          <td className="px-3.5 py-2.5 font-mono text-[12px]">{d.justificadas}</td>
+                          <td className="px-3.5 py-2.5"><PctBar pct={d.pct} /></td>
+                        </tr>
+                      ))}
+                    </tbody>
+                  </table>
+                </div>
               </Card>
             </>
           )
@@ -1103,6 +1538,100 @@ export default function ReportesPage() {
                 )}
               </div>
             </Card>
+
+            {/* ── Detalle on-screen del alumno seleccionado ── */}
+            {indivAlumno && (
+              <>
+                {/* Selector de período */}
+                <div className="bg-surface border border-border rounded-3 p-4 shadow-1 flex flex-wrap gap-3 items-end">
+                  <div className="flex flex-col gap-1">
+                    <label className="text-[10.5px] text-text-mute uppercase tracking-[0.05em] font-medium">Período</label>
+                    <select value={periodo} onChange={(e) => setPeriodo(e.target.value as PeriodoLabel)}
+                      className="text-[13px] px-2.5 py-1.5 border border-border rounded-2 bg-surface">
+                      {PERIODOS.map((p) => <option key={p.label} value={p.label}>{p.label}</option>)}
+                    </select>
+                  </div>
+                  {periodo === 'Personalizado' && (
+                    <>
+                      <div className="flex flex-col gap-1">
+                        <label className="text-[10.5px] text-text-mute uppercase tracking-[0.05em] font-medium">Desde</label>
+                        <input type="date" value={desdeInput} onChange={(e) => setDesdeInput(e.target.value)}
+                          className="text-[13px] px-2.5 py-1.5 border border-border rounded-2 bg-surface" />
+                      </div>
+                      <div className="flex flex-col gap-1">
+                        <label className="text-[10.5px] text-text-mute uppercase tracking-[0.05em] font-medium">Hasta</label>
+                        <input type="date" value={hastaInput} onChange={(e) => setHastaInput(e.target.value)}
+                          className="text-[13px] px-2.5 py-1.5 border border-border rounded-2 bg-surface" />
+                      </div>
+                    </>
+                  )}
+                  <div className="flex-1" />
+                  {indivDetalleQ.data && (
+                    <Btn variant="secondary" size="sm" icon={<Download size={14} />}
+                      onClick={() => exportExcelAlumnoDetalle(indivDetalleQ.data!)}>Excel</Btn>
+                  )}
+                </div>
+
+                {indivDetalleQ.isFetching && (
+                  <Card><div className="py-12 text-center text-text-mute text-[13px]"><div className="text-[28px] mb-2 animate-pulse">⏳</div>Cargando detalle…</div></Card>
+                )}
+                {indivDetalleQ.isError && !indivDetalleQ.isFetching && (
+                  <Card><div className="py-10 text-center text-danger text-[13px]">No se pudo cargar el detalle del alumno.</div></Card>
+                )}
+                {indivDetalleQ.data && !indivDetalleQ.isFetching && (() => {
+                  const r = indivDetalleQ.data
+                  const k = r.kpis
+                  const ESTADO: Record<string, { label: string; tone: 'success' | 'warning' | 'danger' | 'info' }> = {
+                    puntual:     { label: 'Puntual',     tone: 'success' },
+                    tardanza:    { label: 'Tardanza',    tone: 'warning' },
+                    falta:       { label: 'Falta',       tone: 'danger' },
+                    justificada: { label: 'Justificada', tone: 'info' },
+                  }
+                  return (
+                    <>
+                      <div className="grid grid-cols-2 sm:grid-cols-3 lg:grid-cols-6 gap-3.5">
+                        <KPI label="% Asistencia"  value={`${k.pct}%`}          sub={`${r.desde} → ${r.hasta}`} accent="var(--color-primary)" />
+                        <KPI label="Presentes"     value={k.presentes}          sub="a tiempo"                 accent="var(--color-success)" />
+                        <KPI label="Tardanzas"     value={k.tardanzas}          sub="con retraso"              accent="var(--color-warning)" />
+                        <KPI label="Faltas"        value={k.faltas}             sub="ausencias"                accent="var(--color-danger)" />
+                        <KPI label="Justificadas"  value={k.justificadas}       sub="de las faltas"            accent="var(--color-info)" />
+                        <KPI label="Días registro" value={k.dias_con_registro}  sub="con marca"                accent="oklch(0.55 0.13 280)" />
+                      </div>
+
+                      <Card title="Detalle de asistencia" subtitle={`${r.detalle.length} registros`}>
+                        {r.detalle.length > 0 ? (
+                          <div className="overflow-x-auto">
+                            <table className="w-full border-collapse text-[13px]">
+                              <thead>
+                                <tr className="border-b border-border bg-surface-2/50">
+                                  {['Fecha','Hora','Estado','Razón','Expediente'].map((l) => (
+                                    <th key={l} className="px-3.5 py-2.5 text-[11px] text-text-mute uppercase tracking-[0.04em] font-semibold text-left">{l}</th>
+                                  ))}
+                                </tr>
+                              </thead>
+                              <tbody>
+                                {r.detalle.map((d, i) => {
+                                  const e = ESTADO[d.estado] ?? { label: d.estado, tone: 'neutral' as const }
+                                  return (
+                                    <tr key={`${d.fecha}-${i}`} className="border-t border-border-s hover:bg-surface-2/40 align-top">
+                                      <td className="px-3.5 py-2.5 font-mono text-[12px] whitespace-nowrap">{d.fecha}</td>
+                                      <td className="px-3.5 py-2.5 font-mono text-[12px]">{fmtHora(d.hora)}</td>
+                                      <td className="px-3.5 py-2.5"><Pill tone={e.tone}>{e.label}</Pill></td>
+                                      <td className="px-3.5 py-2.5 max-w-[260px]"><span className="text-[12px] text-text-mute line-clamp-2" title={d.razon}>{d.razon || '—'}</span></td>
+                                      <td className="px-3.5 py-2.5 text-[12px] text-text-mute max-w-[160px] truncate" title={d.expediente}>{d.expediente || '—'}</td>
+                                    </tr>
+                                  )
+                                })}
+                              </tbody>
+                            </table>
+                          </div>
+                        ) : <EmptyState msg="Sin registros de asistencia en el período." />}
+                      </Card>
+                    </>
+                  )
+                })()}
+              </>
+            )}
 
           </>
         )}
