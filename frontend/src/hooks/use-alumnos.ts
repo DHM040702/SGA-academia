@@ -107,6 +107,14 @@ export function useDeleteAlumno() {
   })
 }
 
+export function useRestoreAlumno() {
+  const qc = useQueryClient()
+  return useMutation({
+    mutationFn: (id: string) => api.patch(`/alumnos/${id}/restore`).then((r) => r.data),
+    onSuccess: () => qc.invalidateQueries({ queryKey: ['alumnos'] }),
+  })
+}
+
 export interface ImportResult {
   ok: number
   /** Altas nuevas (alumnos que no existían) */

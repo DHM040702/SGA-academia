@@ -19,7 +19,7 @@ import { KPI } from '@/components/ui/kpi'
 import { Card } from '@/components/ui/card'
 import { Btn } from '@/components/ui/btn'
 import { PageHeader } from '@/components/layout/page-header'
-import { Download, Edit, ScanLine, MoreHorizontal, X, Plus, Lock, FileText, Clock } from '@/components/icons'
+import { Download, Edit, ScanLine, MoreHorizontal, X, Plus, Lock, FileText, Clock, Search } from '@/components/icons'
 import { useTurnos, isoToHHMM } from '@/hooks/use-turnos'
 import { useAuth } from '@/contexts/auth-context'
 
@@ -595,38 +595,35 @@ export default function AsistenciaPage() {
   const [turnoFilter,  setTurnoFilter]  = useState<'manana' | 'tarde' | ''>('')
   const [tipoFilter,   setTipoFilter]   = useState<'alumno' | 'docente' | ''>(isDocente ? 'docente' : '')
   const [qNombre,      setQNombre]      = useState('')
+  const [qBusqueda,    setQBusqueda]    = useState('')   // búsqueda con debounce (→ backend)
+  const [limitFilas,   setLimitFilas]   = useState(50)   // máximo de filas listadas
   const [showManual,     setShowManual]     = useState(false)
   const [showCerrar,     setShowCerrar]     = useState(false)
   const [correctTarget,  setCorrectTarget]  = useState<AsistenciaRecord | null>(null)
   const [justificarTarget, setJustificarTarget] = useState<AsistenciaRecord | null>(null)
   const deleteMut = useDeleteAsistencia()
 
+  // Debounce de la búsqueda por nombre → se envía al backend (busca en TODO el
+  // día, no solo en la página cargada).
+  useEffect(() => {
+    const t = setTimeout(() => setQBusqueda(qNombre.trim()), 300)
+    return () => clearTimeout(t)
+  }, [qNombre])
+
   const { data: aulas = [] }    = useAulas()
   const { data: stats }         = useResumenAsistencia(fecha)
   const { data: page, isLoading } = useAsistencia({
     fecha,
+    q:          qBusqueda || undefined,
     tipo:       isDocente ? 'docente' : (tipoFilter || undefined),
     aula_id:    isDocente ? undefined : (aulaFilter || undefined),
     turno:      isDocente ? undefined : (turnoFilter || undefined),
     docente_id: isDocente ? myDocenteId : undefined,
-    limit:      100,
+    limit:      limitFilas,
   })
 
-  const registros = page?.data ?? []
-
-  // Filtro por nombre/código (cliente) + tope de filas para no renderizar una
-  // lista interminable. El resto se acota refinando la búsqueda o los filtros.
-  const MAX_FILAS = 60
-  const registrosFiltrados = qNombre.trim()
-    ? registros.filter(r => {
-        const p = r.tipoPersona === 'alumno' ? r.alumno : r.docente
-        const nombre = p ? `${p.nombre ?? ''} ${p.apellidos ?? ''}`.toLowerCase() : ''
-        const codigo = (r.tipoPersona === 'alumno' ? r.alumno?.codigoBarras : r.docente?.dni) ?? ''
-        const q = qNombre.trim().toLowerCase()
-        return nombre.includes(q) || String(codigo).toLowerCase().includes(q)
-      })
-    : registros
-  const registrosVisibles = registrosFiltrados.slice(0, MAX_FILAS)
+  const registros      = page?.data ?? []
+  const totalRegistros = page?.total ?? registros.length
 
   const presentes = stats?.presentes ?? registros.filter(r => !r.esTardanza).length
   const tardanzas = stats?.tardanzas ?? registros.filter(r =>  r.esTardanza).length
@@ -704,57 +701,70 @@ export default function AsistenciaPage() {
           <KPI label="Docentes"     value={stats?.docentes_hoy ?? 0} sub="marcaron asistencia"  accent="var(--color-primary)" />
         </div>
 
+        {/* Barra de filtros — full width, para no apretar la cabecera de la tabla */}
+        <div className="flex flex-wrap gap-2 items-center bg-surface border border-border rounded-3 px-3 py-2.5 shadow-1">
+          {/* Búsqueda por nombre, código o DNI (alumno o docente) */}
+          <div className="relative flex-1 min-w-[200px] max-w-[320px]">
+            <Search size={13} className="absolute left-2.5 top-1/2 -translate-y-1/2 text-text-mute pointer-events-none" />
+            <input
+              type="text"
+              value={qNombre}
+              onChange={e => setQNombre(e.target.value)}
+              placeholder="Buscar por nombre, código o DNI…"
+              className="w-full text-[12.5px] pl-8 pr-2.5 py-1.5 border border-border rounded-2 bg-surface"
+            />
+          </div>
+          {/* Selector de fecha */}
+          <input type="date" value={fecha} onChange={e => setFecha(e.target.value)}
+            className="text-[12.5px] px-2.5 py-1.5 border border-border rounded-2 bg-surface" />
+          {/* Aula / Turno / Tipo — ocultos para docente */}
+          {!isDocente && (
+            <select value={aulaFilter} onChange={e => setAulaFilter(e.target.value)}
+              className="text-[12.5px] px-2.5 py-1.5 border border-border rounded-2 bg-surface max-w-[170px]">
+              <option value="">Todas las aulas</option>
+              {aulas.map(a => <option key={a.id} value={a.id}>{a.nombre}</option>)}
+            </select>
+          )}
+          {!isDocente && (
+            <select value={turnoFilter} onChange={e => setTurnoFilter(e.target.value as any)}
+              className="text-[12.5px] px-2.5 py-1.5 border border-border rounded-2 bg-surface">
+              <option value="">Todos los turnos</option>
+              <option value="manana">Mañana</option>
+              <option value="tarde">Tarde</option>
+            </select>
+          )}
+          {!isDocente && (
+            <select value={tipoFilter} onChange={e => setTipoFilter(e.target.value as any)}
+              className="text-[12.5px] px-2.5 py-1.5 border border-border rounded-2 bg-surface">
+              <option value="">Alumnos y docentes</option>
+              <option value="alumno">Solo alumnos</option>
+              <option value="docente">Solo docentes</option>
+            </select>
+          )}
+          {/* Límite de filas listadas */}
+          <select value={limitFilas} onChange={e => setLimitFilas(Number(e.target.value))}
+            title="Máximo de filas a mostrar"
+            className="text-[12.5px] px-2.5 py-1.5 border border-border rounded-2 bg-surface">
+            <option value={25}>Mostrar 25</option>
+            <option value={50}>Mostrar 50</option>
+            <option value={100}>Mostrar 100</option>
+            <option value={200}>Mostrar 200</option>
+          </select>
+          {(qNombre || aulaFilter || turnoFilter || (!isDocente && tipoFilter)) && (
+            <button
+              onClick={() => { setQNombre(''); setAulaFilter(''); setTurnoFilter(''); if (!isDocente) setTipoFilter('') }}
+              className="text-[12px] text-text-mute hover:text-text flex items-center gap-1">
+              <X size={12} />Limpiar
+            </button>
+          )}
+        </div>
+
         {/* Content */}
         <div className="grid gap-3.5 grid-cols-1 lg:grid-cols-[1.5fr_1fr]">
           {/* Tabla principal */}
           <Card
             title="Registros del día"
-            subtitle={`${fechaLabel} · ${registrosFiltrados.length} ${registrosFiltrados.length === 1 ? 'registro' : 'registros'}${registrosFiltrados.length > MAX_FILAS ? ` (mostrando ${MAX_FILAS})` : ''}`}
-            action={
-              <div className="flex gap-1.5 items-center flex-wrap">
-                {/* Búsqueda por nombre o código */}
-                <input
-                  type="text"
-                  value={qNombre}
-                  onChange={e => setQNombre(e.target.value)}
-                  placeholder="Buscar por nombre o código…"
-                  className="text-[12px] px-2 py-1 border border-border rounded-2 bg-surface min-w-[180px]"
-                />
-                {/* Selector de fecha */}
-                <input
-                  type="date"
-                  value={fecha}
-                  onChange={e => setFecha(e.target.value)}
-                  className="text-[12px] px-2 py-1 border border-border rounded-2 bg-surface"
-                />
-                {/* Filtro por aula — oculto para docente */}
-                {!isDocente && (
-                  <select value={aulaFilter} onChange={e => setAulaFilter(e.target.value)}
-                    className="text-[12px] px-2 py-1 border border-border rounded-2 bg-surface">
-                    <option value="">Todas las aulas</option>
-                    {aulas.map(a => <option key={a.id} value={a.id}>{a.nombre}</option>)}
-                  </select>
-                )}
-                {/* Filtro por turno — oculto para docente */}
-                {!isDocente && (
-                  <select value={turnoFilter} onChange={e => setTurnoFilter(e.target.value as any)}
-                    className="text-[12px] px-2 py-1 border border-border rounded-2 bg-surface">
-                    <option value="">Todos los turnos</option>
-                    <option value="manana">Mañana</option>
-                    <option value="tarde">Tarde</option>
-                  </select>
-                )}
-                {/* Filtro por tipo — oculto para docente (siempre ven solo 'docente') */}
-                {!isDocente && (
-                  <select value={tipoFilter} onChange={e => setTipoFilter(e.target.value as any)}
-                    className="text-[12px] px-2 py-1 border border-border rounded-2 bg-surface">
-                    <option value="">Todos</option>
-                    <option value="alumno">Alumnos</option>
-                    <option value="docente">Docentes</option>
-                  </select>
-                )}
-              </div>
-            }
+            subtitle={`${fechaLabel} · ${totalRegistros} ${totalRegistros === 1 ? 'registro' : 'registros'}${totalRegistros > registros.length ? ` · mostrando ${registros.length}` : ''}`}
           >
             <table className="w-full border-collapse text-[13px]">
               <thead>
@@ -772,23 +782,20 @@ export default function AsistenciaPage() {
                 ) : registros.length === 0 ? (
                   <tr>
                     <td colSpan={6} className="text-center py-10 text-text-mute">
-                      No hay registros para este día.
-                      {!soloLectura && (
-                        <><br />
-                        <button onClick={() => setShowManual(true)} className="mt-2 text-primary text-[12px] hover:underline">
-                          + Agregar registro manual
-                        </button></>
-                      )}
-                    </td>
-                  </tr>
-                ) : registrosFiltrados.length === 0 ? (
-                  <tr>
-                    <td colSpan={6} className="text-center py-10 text-text-mute">
-                      Ningún registro coincide con «{qNombre}».
+                      {qBusqueda || aulaFilter || turnoFilter || tipoFilter
+                        ? 'Ningún registro coincide con los filtros.'
+                        : <>No hay registros para este día.
+                            {!soloLectura && (
+                              <><br />
+                              <button onClick={() => setShowManual(true)} className="mt-2 text-primary text-[12px] hover:underline">
+                                + Agregar registro manual
+                              </button></>
+                            )}
+                          </>}
                     </td>
                   </tr>
                 ) : (
-                  registrosVisibles.map(r => {
+                  registros.map(r => {
                     const persona = r.tipoPersona === 'alumno' ? r.alumno : r.docente
                     const nombre  = persona
                       ? `${(persona as any).nombre ?? (persona as any).nombres} ${persona.apellidos}`

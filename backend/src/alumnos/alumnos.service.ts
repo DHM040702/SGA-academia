@@ -56,10 +56,16 @@ export class AlumnosService {
     // ciclo ni aula, se limita al SEMESTRE ACTIVO (los alumnos de semestres
     // cerrados no deben aparecer en el activo). Solo si no hay ciclo activo se
     // muestran todos (estado legado / sin semestre en curso).
+    // estado=inactivo → listar alumnos dados de baja (soft-delete) para poder
+    // reactivarlos. Se muestran solo a admin (control en el controller/frontend).
+    const wantInactive = (dto as any).estado === 'inactivo';
+
     let cicloWhere: any = {};
     if (ciclo_id) {
       cicloWhere = { aula: { cicloId: ciclo_id } };
-    } else if (!aula_id) {
+    } else if (!aula_id && !wantInactive) {
+      // Para inactivos NO se limita al ciclo activo: un alumno dado de baja por
+      // error puede pertenecer a cualquier semestre y debe poder encontrarse.
       const activo = await this.prisma.ciclo.findFirst({
         where: { activo: true },
         select: { id: true },
@@ -68,7 +74,7 @@ export class AlumnosService {
     }
 
     const where = {
-      deletedAt: null,
+      deletedAt: wantInactive ? { not: null } : null,
       ...searchWhere,
       ...aulaWhere,
       ...cicloWhere,
@@ -130,11 +136,11 @@ export class AlumnosService {
         codigo_barra:   a.codigoBarras,
         fotoUrl:        (await this.minio.presign(a.fotoUrl)) ?? a.fotoUrl,
         asistencia_pct: pct,
-        estado:         estadoFromPct(pct),
+        estado:         wantInactive ? 'inactivo' : estadoFromPct(pct),
       };
     }));
 
-    const filtered = (dto as any).estado
+    const filtered = ((dto as any).estado && !wantInactive)
       ? enriched.filter((a) => a.estado === (dto as any).estado)
       : enriched;
 
@@ -354,6 +360,21 @@ export class AlumnosService {
       await tx.usuario.update({
         where: { id: alumno.usuarioId },
         data: { activo: false, deletedAt: now },
+      });
+      return { success: true };
+    });
+  }
+
+  /** Reactiva un alumno dado de baja (limpia soft-delete y reactiva su cuenta). */
+  async restore(id: string) {
+    const alumno = await this.prisma.alumno.findFirst({ where: { id } });
+    if (!alumno) throw new NotFoundException('Alumno no encontrado');
+    if (!alumno.deletedAt) return { success: true }; // ya estaba activo
+    return this.prisma.$transaction(async (tx) => {
+      await tx.alumno.update({ where: { id }, data: { deletedAt: null } });
+      await tx.usuario.update({
+        where: { id: alumno.usuarioId },
+        data: { activo: true, deletedAt: null },
       });
       return { success: true };
     });

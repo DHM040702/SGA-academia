@@ -8,11 +8,11 @@ import { Dot } from '@/components/ui/dot'
 import { Avatar } from '@/components/ui/avatar'
 import { Input } from '@/components/ui/input'
 import { ImportExcelModal } from '@/components/alumnos/import-excel-modal'
-import { useAlumnos, useDeleteAlumno, type EstadoAlumno, type FilterAlumnos } from '@/hooks/use-alumnos'
+import { useAlumnos, useDeleteAlumno, useRestoreAlumno, type EstadoAlumno, type FilterAlumnos } from '@/hooks/use-alumnos'
 import { useCiclos, useAulas } from '@/hooks/use-ciclos'
 import { useAuth } from '@/contexts/auth-context'
 import { cn } from '@/lib/utils'
-import { Search, Plus, Upload, Scan, Filter, ChevR, ChevL, More, Eye, Edit, Trash } from '@/components/icons'
+import { Search, Plus, Upload, Scan, Filter, ChevR, ChevL, More, Eye, Edit, Trash, RefreshCw } from '@/components/icons'
 
 /* ── Constantes ────────────────────────────────────────────────── */
 const ESTADO_TONE: Record<EstadoAlumno, 'success' | 'warning' | 'danger' | 'neutral'> = {
@@ -79,15 +79,42 @@ function Pagination({ page, totalPages, onPage }: { page: number; totalPages: nu
 }
 
 /* ── RowMenu ────────────────────────────────────────────────────── */
-function RowMenu({ id, name, onClose, readOnly }: { id: string; name: string; onClose: () => void; readOnly?: boolean }) {
+function RowMenu({ id, name, onClose, readOnly, inactive, canRestore }: {
+  id: string; name: string; onClose: () => void
+  readOnly?: boolean; inactive?: boolean; canRestore?: boolean
+}) {
   const router = useRouter()
   const deleteAlumno = useDeleteAlumno()
+  const restoreAlumno = useRestoreAlumno()
 
   function go(path: string) { router.push(path); onClose() }
 
   function handleDelete() {
     if (!confirm(`¿Eliminar a ${name}? Esta acción aplica soft-delete.`)) return
     deleteAlumno.mutate(id, { onSuccess: onClose })
+  }
+
+  function handleRestore() {
+    if (!confirm(`¿Reactivar a ${name}? Se restaurará el alumno y su cuenta de acceso.`)) return
+    restoreAlumno.mutate(id, { onSuccess: onClose })
+  }
+
+  // Fila de un alumno dado de baja: solo el admin puede reactivarlo.
+  if (inactive) {
+    return (
+      <div className="absolute right-0 top-8 z-50 bg-surface border border-border rounded-2 shadow-2 py-1 min-w-[150px]">
+        {canRestore ? (
+          <button
+            onClick={handleRestore}
+            className="w-full text-left flex items-center gap-2 px-3 py-2 text-[12.5px] text-success hover:bg-success-light transition-colors border-none bg-transparent cursor-pointer font-sans"
+          >
+            <RefreshCw size={13} />Reactivar alumno
+          </button>
+        ) : (
+          <div className="px-3 py-2 text-[12px] text-text-mute">Sin acciones disponibles</div>
+        )}
+      </div>
+    )
   }
 
   return (
@@ -125,6 +152,8 @@ export default function AlumnosPage() {
   const { user } = useAuth()
   // Auxiliar y director tienen acceso de solo lectura (sin crear/editar/eliminar)
   const readOnly = user?.rol === 'auxiliar' || user?.rol === 'director'
+  // Solo el admin ve/gestiona alumnos inactivos (dados de baja) para reactivarlos.
+  const isAdmin = user?.rol === 'admin'
   const [filters, setFilters] = React.useState<FilterAlumnos>({ page: 1, limit: 20 })
   const [q, setQ] = React.useState('')
   const [estado, setEstado] = React.useState('')
@@ -258,6 +287,8 @@ export default function AlumnosPage() {
             { label: 'Activos', value: 'activo' },
             { label: 'Observados', value: 'observado' },
             { label: 'En riesgo', value: 'riesgo' },
+            // Solo el admin puede ver/reactivar alumnos dados de baja
+            ...(isAdmin ? [{ label: 'Inactivos (baja)', value: 'inactivo' }] : []),
           ]}
         />
 
@@ -295,11 +326,16 @@ export default function AlumnosPage() {
               items.map((a, i) => {
                 const name = `${a.nombres} ${a.apellidos}`
                 const pct = a.asistencia_pct
+                const inactive = a.estado === 'inactivo'
                 return (
                   <tr
                     key={a.id}
-                    className={cn('hover:bg-surface2/50 cursor-pointer transition-colors', i > 0 && 'border-t border-border-s')}
-                    onClick={() => router.push(`/alumnos/${a.id}`)}
+                    className={cn(
+                      'hover:bg-surface2/50 transition-colors',
+                      i > 0 && 'border-t border-border-s',
+                      inactive ? 'opacity-60' : 'cursor-pointer',
+                    )}
+                    onClick={() => { if (!inactive) router.push(`/alumnos/${a.id}`) }}
                   >
                     <td className="px-3.5 py-3">
                       <div className="flex items-center gap-2.5">
@@ -354,7 +390,7 @@ export default function AlumnosPage() {
                           <More size={15} />
                         </Btn>
                         {openMenu === a.id && (
-                          <RowMenu id={a.id} name={name} onClose={() => setOpenMenu(null)} readOnly={readOnly} />
+                          <RowMenu id={a.id} name={name} onClose={() => setOpenMenu(null)} readOnly={readOnly} inactive={inactive} canRestore={isAdmin} />
                         )}
                       </div>
                     </td>

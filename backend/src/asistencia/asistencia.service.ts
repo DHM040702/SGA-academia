@@ -216,6 +216,17 @@ export class AsistenciaService {
       };
     }
 
+    // Búsqueda por nombre/código/DNI sobre alumno o docente. Busca en TODOS los
+    // registros del día (no solo la página), para no depender del límite.
+    if (q) {
+      const like = { contains: q, mode: 'insensitive' as const };
+      const likeNum = { contains: q };
+      where.OR = [
+        { alumno:  { OR: [{ nombre: like }, { apellidos: like }, { codigoBarras: likeNum }, { dni: likeNum }] } },
+        { docente: { OR: [{ nombre: like }, { apellidos: like }, { dni: likeNum }] } },
+      ];
+    }
+
     // ── Control de acceso por rol ────────────────────────────────────────────
     if (caller?.rol === 'alumno') {
       // El alumno solo puede ver su propia asistencia

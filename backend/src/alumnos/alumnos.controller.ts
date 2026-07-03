@@ -61,6 +61,13 @@ export class AlumnosController {
     return this.service.remove(id);
   }
 
+  @Patch(':id/restore')
+  @Roles(Rol.admin)
+  @ApiOperation({ summary: 'Reactivar alumno dado de baja (revierte soft delete)' })
+  restore(@Param('id', ParseUUIDPipe) id: string) {
+    return this.service.restore(id);
+  }
+
   // ── Apoderados de un alumno ───────────────────────────────────────
 
   @Get(':id/apoderados')
