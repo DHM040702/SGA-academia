@@ -59,6 +59,13 @@ export class SeccionesService {
     const ciclo = await this.prisma.ciclo.findFirst({ where: { id: dto.ciclo_id } });
     if (!ciclo) throw new BadRequestException('El ciclo especificado no existe');
 
+    // Unicidad: no puede haber dos aulas con el mismo nombre+turno en el mismo
+    // ciclo (rompería el mapeo del import de alumnos, que indexa por nombre|turno).
+    const dup = await this.prisma.aula.findFirst({
+      where: { cicloId: dto.ciclo_id, nombre: dto.nombre, turno: dto.turno },
+    });
+    if (dup) throw new BadRequestException('Ya existe un aula con ese nombre y turno en el ciclo');
+
     return this.prisma.aula.create({
       data: {
         nombre:     dto.nombre,
@@ -72,12 +79,21 @@ export class SeccionesService {
   }
 
   async update(id: string, dto: UpdateAulaDto) {
-    await this.findOne(id);
+    const aula = await this.findOne(id);
 
     if (dto.ciclo_id) {
       const ciclo = await this.prisma.ciclo.findFirst({ where: { id: dto.ciclo_id } });
       if (!ciclo) throw new BadRequestException('El ciclo especificado no existe');
     }
+
+    // Verificar unicidad con los valores EFECTIVOS tras el cambio.
+    const cicloId = dto.ciclo_id ?? aula.cicloId;
+    const nombre  = dto.nombre   ?? aula.nombre;
+    const turno   = dto.turno    ?? aula.turno;
+    const dup = await this.prisma.aula.findFirst({
+      where: { cicloId, nombre, turno, NOT: { id } },
+    });
+    if (dup) throw new BadRequestException('Ya existe un aula con ese nombre y turno en el ciclo');
 
     return this.prisma.aula.update({
       where: { id },

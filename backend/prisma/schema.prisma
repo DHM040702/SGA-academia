@@ -136,6 +136,9 @@ model Aula {
   horarios   Horario[]
   ciclo      Ciclo        @relation(fields: [cicloId], references: [id])
 
+  // Un aula queda unívocamente identificada por ciclo + nombre + turno
+  // (el import de alumnos indexa por nombre|turno dentro del ciclo activo).
+  @@unique([cicloId, nombre, turno])
   @@map("aulas")
 }
 
