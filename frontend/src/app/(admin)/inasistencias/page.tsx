@@ -1,6 +1,6 @@
 'use client'
 
-import { useMemo, useState } from 'react'
+import { useEffect, useMemo, useState } from 'react'
 import { useInasistencias, type FilterInasistencias, type AsistenciaRecord } from '@/hooks/use-asistencia'
 import { useAulas } from '@/hooks/use-ciclos'
 import { JustificarModal } from '@/components/asistencia/justificar-modal'
@@ -36,10 +36,16 @@ export default function InasistenciasPage() {
   const [hasta,  setHasta]  = useState(ymd(hoy))
   const [aulaId, setAulaId] = useState('')
   const [estado, setEstado] = useState<'todas' | 'pendientes' | 'justificadas'>('pendientes')
+  const [page,   setPage]   = useState(1)
 
-  const filters: FilterInasistencias = { desde, hasta, aula_id: aulaId || undefined, estado }
+  // Volver a la página 1 cuando cambia cualquier filtro.
+  useEffect(() => { setPage(1) }, [desde, hasta, aulaId, estado])
+
+  const filters: FilterInasistencias = { desde, hasta, aula_id: aulaId || undefined, estado, page, limit: 50 }
   const { data, isLoading, isError } = useInasistencias(filters)
   const { data: aulas = [] } = useAulas()
+
+  const totalPages = data?.totalPages ?? 1
 
   const [target, setTarget] = useState<AsistenciaRecord | null>(null)
 
@@ -160,6 +166,14 @@ export default function InasistenciasPage() {
               </div>
             </div>
           ))}
+        </div>
+      )}
+
+      {totalPages > 1 && (
+        <div className="flex items-center justify-center gap-3">
+          <Btn variant="secondary" disabled={page <= 1} onClick={() => setPage(p => Math.max(1, p - 1))}>Anterior</Btn>
+          <span className="text-[12.5px] text-text-mute">Página {page} de {totalPages}</span>
+          <Btn variant="secondary" disabled={page >= totalPages} onClick={() => setPage(p => Math.min(totalPages, p + 1))}>Siguiente</Btn>
         </div>
       )}
     </div>

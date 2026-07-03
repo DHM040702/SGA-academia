@@ -203,6 +203,10 @@ model Asistencia {
   registradoPor   Usuario     @relation("RegistradoPor", fields: [registradoPorId], references: [id])
   justificadoPor  Usuario?    @relation("JustificadoPor", fields: [justificadoPorId], references: [id])
 
+  // Un registro por persona por día (Postgres trata los NULL como distintos,
+  // así que cada índice solo aplica a su tipo). Cierra la race del escaneo doble.
+  @@unique([alumnoId, fecha])
+  @@unique([docenteId, fecha])
   @@map("asistencias")
 }
 

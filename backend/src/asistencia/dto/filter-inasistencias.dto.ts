@@ -1,5 +1,6 @@
 import { ApiPropertyOptional } from '@nestjs/swagger';
 import { IsEnum, IsISO8601, IsOptional, IsUUID } from 'class-validator';
+import { PaginationDto } from '../../common/dto/pagination.dto';
 
 export enum EstadoInasistencia {
   todas = 'todas',
@@ -7,7 +8,7 @@ export enum EstadoInasistencia {
   justificadas = 'justificadas',
 }
 
-export class FilterInasistenciasDto {
+export class FilterInasistenciasDto extends PaginationDto {
   @ApiPropertyOptional({ description: 'Fecha inicial (YYYY-MM-DD). Por defecto: 30 días atrás.', example: '2026-06-01' })
   @IsOptional()
   @IsISO8601({ strict: false })

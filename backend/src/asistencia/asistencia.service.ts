@@ -1,5 +1,5 @@
 import { BadRequestException, Injectable, NotFoundException } from '@nestjs/common';
-import { TipoPersona } from '@prisma/client';
+import { Prisma, TipoPersona } from '@prisma/client';
 import { PrismaService } from '../prisma/prisma.service';
 import { paginate } from '../common/dto/pagination.dto';
 import type { RegisterScanDto } from './dto/register-scan.dto';
@@ -97,28 +97,48 @@ export class AsistenciaService {
       }
     }
 
-    const creado = await this.prisma.asistencia.create({
-      data: {
-        tipoPersona,
-        alumnoId:        alumnoId  ?? null,
-        docenteId:       docenteId ?? null,
-        fecha:           today,
-        horaIngreso:     now,
-        esTardanza,
-        esManual:        false,
-        registradoPorId,
-      },
-      include: {
-        alumno:  {
-          select: {
-            nombre: true, apellidos: true, codigoBarras: true,
-            aula: { select: { id: true, nombre: true } },
-          },
+    const includeScan = {
+      alumno:  {
+        select: {
+          nombre: true, apellidos: true, codigoBarras: true,
+          aula: { select: { id: true, nombre: true } },
         },
-        docente: { select: { nombre: true, apellidos: true, dni: true } },
       },
-    });
-    return { ...creado, yaRegistrado: false };
+      docente: { select: { nombre: true, apellidos: true, dni: true } },
+    } as const;
+
+    try {
+      const creado = await this.prisma.asistencia.create({
+        data: {
+          tipoPersona,
+          alumnoId:        alumnoId  ?? null,
+          docenteId:       docenteId ?? null,
+          fecha:           today,
+          horaIngreso:     now,
+          esTardanza,
+          esManual:        false,
+          registradoPorId,
+        },
+        include: includeScan,
+      });
+      return { ...creado, yaRegistrado: false };
+    } catch (e) {
+      // Race: otro request insertó el registro entre el chequeo `existente` y este
+      // create; el índice único lo rechaza (P2002). Devolver el que sí quedó.
+      if (e instanceof Prisma.PrismaClientKnownRequestError && e.code === 'P2002') {
+        const yaExiste = await this.prisma.asistencia.findFirst({
+          where: {
+            tipoPersona,
+            ...(alumnoId  ? { alumnoId }  : {}),
+            ...(docenteId ? { docenteId } : {}),
+            fecha: today,
+          },
+          include: includeScan,
+        });
+        if (yaExiste) return { ...yaExiste, yaRegistrado: true };
+      }
+      throw e;
+    }
   }
 
   async createManual(dto: CreateManualAsistenciaDto, registradoPorId: string) {
@@ -543,37 +563,53 @@ export class AsistenciaService {
       ? toUtcDate(dto.desde)
       : new Date(hasta.getTime() - 30 * 24 * 60 * 60 * 1000);
 
-    const where: any = {
+    const { page = 1, limit = 50 } = dto as any;
+    const skip = (page - 1) * limit;
+
+    // Base: todas las faltas del rango (para los KPIs, sin filtro de estado).
+    const baseWhere: any = {
       tipoPersona: TipoPersona.alumno,
       esAusente: true,
       fecha: { gte: desde, lte: hasta },
     };
-    if (dto.aula_id) where.alumno = { aulaId: dto.aula_id };
-    if (dto.estado === 'pendientes') where.justificacionRazon = null;
-    else if (dto.estado === 'justificadas') where.justificacionRazon = { not: null };
+    if (dto.aula_id) baseWhere.alumno = { aulaId: dto.aula_id };
 
-    const items = await this.prisma.asistencia.findMany({
-      where,
-      orderBy: [{ fecha: 'desc' }, { alumno: { apellidos: 'asc' } }],
-      include: {
-        alumno: {
-          select: {
-            id: true, nombre: true, apellidos: true, codigoBarras: true, dni: true,
-            aula: { select: { id: true, nombre: true, area: true } },
+    // Lista: aplica el filtro de estado (pendientes/justificadas) y se pagina.
+    const listWhere: any = { ...baseWhere };
+    if (dto.estado === 'pendientes') listWhere.justificacionRazon = null;
+    else if (dto.estado === 'justificadas') listWhere.justificacionRazon = { not: null };
+
+    const [items, totalLista, total, justificadas] = await Promise.all([
+      this.prisma.asistencia.findMany({
+        where: listWhere,
+        skip,
+        take: limit,
+        orderBy: [{ fecha: 'desc' }, { alumno: { apellidos: 'asc' } }],
+        include: {
+          alumno: {
+            select: {
+              id: true, nombre: true, apellidos: true, codigoBarras: true, dni: true,
+              aula: { select: { id: true, nombre: true, area: true } },
+            },
           },
+          justificadoPor: { select: { id: true, nombre: true, apellidos: true, rol: true } },
         },
-        justificadoPor: { select: { id: true, nombre: true, apellidos: true, rol: true } },
-      },
-    });
+      }),
+      this.prisma.asistencia.count({ where: listWhere }),
+      this.prisma.asistencia.count({ where: baseWhere }),
+      this.prisma.asistencia.count({ where: { ...baseWhere, justificacionRazon: { not: null } } }),
+    ]);
 
-    const justificadas = items.filter((i) => i.justificacionRazon).length;
     return {
       data: items,
-      total: items.length,
-      justificadas,
-      pendientes: items.length - justificadas,
+      total,                       // total de faltas del rango (KPI)
+      justificadas,                // KPI (todo el rango)
+      pendientes: total - justificadas,
       desde: desde.toISOString().split('T')[0],
       hasta: hasta.toISOString().split('T')[0],
+      page,
+      limit,
+      totalPages: Math.max(1, Math.ceil(totalLista / limit)),
     };
   }
 
