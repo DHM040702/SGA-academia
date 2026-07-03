@@ -36,12 +36,17 @@ export default function InasistenciasPage() {
   const [hasta,  setHasta]  = useState(ymd(hoy))
   const [aulaId, setAulaId] = useState('')
   const [estado, setEstado] = useState<'todas' | 'pendientes' | 'justificadas'>('pendientes')
+  const [q,      setQ]      = useState('')
+  const [qDeb,   setQDeb]   = useState('')
   const [page,   setPage]   = useState(1)
 
-  // Volver a la página 1 cuando cambia cualquier filtro.
-  useEffect(() => { setPage(1) }, [desde, hasta, aulaId, estado])
+  // Debounce del buscador para no lanzar una petición por tecla.
+  useEffect(() => { const t = setTimeout(() => setQDeb(q.trim()), 300); return () => clearTimeout(t) }, [q])
 
-  const filters: FilterInasistencias = { desde, hasta, aula_id: aulaId || undefined, estado, page, limit: 50 }
+  // Volver a la página 1 cuando cambia cualquier filtro.
+  useEffect(() => { setPage(1) }, [desde, hasta, aulaId, estado, qDeb])
+
+  const filters: FilterInasistencias = { desde, hasta, aula_id: aulaId || undefined, estado, q: qDeb || undefined, page, limit: 50 }
   const { data, isLoading, isError } = useInasistencias(filters)
   const { data: aulas = [] } = useAulas()
 
@@ -106,6 +111,12 @@ export default function InasistenciasPage() {
             <option value="justificadas">Justificadas</option>
             <option value="todas">Todas</option>
           </select>
+        </label>
+        <label className="flex flex-col gap-1 flex-1 min-w-[180px]">
+          <span className="text-[11px] font-medium text-text-mute uppercase tracking-wide">Buscar alumno</span>
+          <input type="text" value={q} onChange={e => setQ(e.target.value)}
+            placeholder="Nombre, apellidos, código o DNI…"
+            className="text-[13px] px-2.5 py-1.5 border border-border rounded-2 bg-surface" />
         </label>
       </div>
 

@@ -1,5 +1,5 @@
 import { ApiPropertyOptional } from '@nestjs/swagger';
-import { IsEnum, IsISO8601, IsOptional, IsUUID } from 'class-validator';
+import { IsEnum, IsISO8601, IsOptional, IsString, IsUUID } from 'class-validator';
 import { PaginationDto } from '../../common/dto/pagination.dto';
 
 export enum EstadoInasistencia {
@@ -28,4 +28,9 @@ export class FilterInasistenciasDto extends PaginationDto {
   @IsOptional()
   @IsEnum(EstadoInasistencia)
   estado?: EstadoInasistencia;
+
+  @ApiPropertyOptional({ description: 'Buscar por nombre, apellidos, código o DNI del alumno' })
+  @IsOptional()
+  @IsString()
+  q?: string;
 }

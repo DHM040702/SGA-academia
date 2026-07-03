@@ -10,6 +10,9 @@ import type {
   ReporteAlumnosParams,
   ReporteHorariosParams,
   ReporteCursosParams,
+  ReporteJustificacionesParams,
+  ReporteAsistenciaAlumnoParams,
+  RangoCicloParams,
 } from './reportes.service';
 
 @ApiTags('Reportes')
@@ -58,5 +61,47 @@ export class ReportesController {
   @ApiQuery({ name: 'con_horario', required: false, description: 'true | false (omitir = todos)' })
   reporteCursos(@Query() params: ReporteCursosParams) {
     return this.service.reporteCursos(params);
+  }
+
+  @Get('justificaciones')
+  @Roles(Rol.admin, Rol.director)
+  @ApiOperation({ summary: 'Faltas justificadas vs pendientes por rango, con expediente y traza' })
+  @ApiQuery({ name: 'ciclo_id', required: false })
+  @ApiQuery({ name: 'aula_id',  required: false })
+  @ApiQuery({ name: 'desde',    required: false, description: 'YYYY-MM-DD' })
+  @ApiQuery({ name: 'hasta',    required: false, description: 'YYYY-MM-DD' })
+  @ApiQuery({ name: 'estado',   required: false, description: 'todas | pendientes | justificadas' })
+  reporteJustificaciones(@Query() params: ReporteJustificacionesParams) {
+    return this.service.reporteJustificaciones(params);
+  }
+
+  @Get('asistencia-alumno')
+  @Roles(Rol.admin, Rol.director)
+  @ApiOperation({ summary: 'Detalle e histórico de asistencia de un alumno' })
+  @ApiQuery({ name: 'alumno_id', required: true })
+  @ApiQuery({ name: 'desde',     required: false, description: 'YYYY-MM-DD' })
+  @ApiQuery({ name: 'hasta',     required: false, description: 'YYYY-MM-DD' })
+  reporteAsistenciaAlumno(@Query() params: ReporteAsistenciaAlumnoParams) {
+    return this.service.reporteAsistenciaAlumno(params);
+  }
+
+  @Get('ranking-aulas')
+  @Roles(Rol.admin, Rol.director)
+  @ApiOperation({ summary: '% de asistencia por aula en un rango, ordenado' })
+  @ApiQuery({ name: 'ciclo_id', required: false })
+  @ApiQuery({ name: 'desde',    required: false, description: 'YYYY-MM-DD' })
+  @ApiQuery({ name: 'hasta',    required: false, description: 'YYYY-MM-DD' })
+  rankingAulas(@Query() params: RangoCicloParams) {
+    return this.service.rankingAulas(params);
+  }
+
+  @Get('resumen-diario')
+  @Roles(Rol.admin, Rol.director)
+  @ApiOperation({ summary: 'Consolidado por día del rango (presentes/tardanzas/faltas/%)' })
+  @ApiQuery({ name: 'ciclo_id', required: false })
+  @ApiQuery({ name: 'desde',    required: false, description: 'YYYY-MM-DD' })
+  @ApiQuery({ name: 'hasta',    required: false, description: 'YYYY-MM-DD' })
+  resumenDiario(@Query() params: RangoCicloParams) {
+    return this.service.resumenDiario(params);
   }
 }

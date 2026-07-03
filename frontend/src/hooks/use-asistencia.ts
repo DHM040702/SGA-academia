@@ -40,6 +40,7 @@ export interface AsistenciaRecord {
 }
 
 export interface FilterAsistencia {
+  q?: string
   fecha?: string
   desde?: string
   hasta?: string
@@ -134,6 +135,7 @@ export interface FilterInasistencias {
   hasta?: string
   aula_id?: string
   estado?: 'todas' | 'pendientes' | 'justificadas'
+  q?: string
   page?: number
   limit?: number
 }
@@ -159,6 +161,7 @@ export function useInasistencias(filters: FilterInasistencias) {
       if (filters.hasta)   params.set('hasta', filters.hasta)
       if (filters.aula_id) params.set('aula_id', filters.aula_id)
       if (filters.estado)  params.set('estado', filters.estado)
+      if (filters.q)       params.set('q', filters.q)
       if (filters.page)    params.set('page', String(filters.page))
       if (filters.limit)   params.set('limit', String(filters.limit))
       return api.get(`/asistencia/inasistencias?${params.toString()}`).then((r) => r.data)

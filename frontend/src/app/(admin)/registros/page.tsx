@@ -1,6 +1,6 @@
 'use client'
 
-import { useMemo, useState } from 'react'
+import { useEffect, useMemo, useState } from 'react'
 import { useAsistencia, useDeleteAsistencia, type FilterAsistencia } from '@/hooks/use-asistencia'
 import { useAulas } from '@/hooks/use-ciclos'
 import { useAuth } from '@/contexts/auth-context'
@@ -66,10 +66,17 @@ export default function RegistrosPage() {
   const [desde,  setDesde]  = useState(ymd(hace30))
   const [hasta,  setHasta]  = useState(ymd(hoy))
   const [aulaId, setAulaId] = useState('')
+  const [q,      setQ]      = useState('')
+  const [qDeb,   setQDeb]   = useState('')
   const [page,   setPage]   = useState(1)
+
+  // Debounce del buscador + reset de página al buscar.
+  useEffect(() => { const t = setTimeout(() => setQDeb(q.trim()), 300); return () => clearTimeout(t) }, [q])
+  useEffect(() => { setPage(1) }, [qDeb])
 
   const filters: FilterAsistencia = {
     tipo, desde, hasta, page, limit: 25,
+    q: qDeb || undefined,
     aula_id: tipo === 'alumno' ? (aulaId || undefined) : undefined,
   }
   const { data, isLoading, isError } = useAsistencia(filters)
@@ -120,6 +127,14 @@ export default function RegistrosPage() {
 
       {/* Filtros */}
       <div className="flex flex-wrap items-end gap-3 p-4 bg-surface border border-border rounded-3">
+        <label className="flex flex-col gap-1 flex-1 min-w-[180px]">
+          <span className="text-[11px] font-medium text-text-mute uppercase tracking-wide">
+            Buscar {tipo === 'alumno' ? 'alumno' : 'docente'}
+          </span>
+          <input type="text" value={q} onChange={e => setQ(e.target.value)}
+            placeholder={tipo === 'alumno' ? 'Nombre, código o DNI…' : 'Nombre o DNI…'}
+            className="text-[13px] px-2.5 py-1.5 border border-border rounded-2 bg-surface" />
+        </label>
         <label className="flex flex-col gap-1">
           <span className="text-[11px] font-medium text-text-mute uppercase tracking-wide">Desde</span>
           <input type="date" value={desde} max={hasta} onChange={e => updateFilter(() => setDesde(e.target.value))}

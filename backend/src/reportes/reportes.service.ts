@@ -1,4 +1,4 @@
-import { Injectable } from '@nestjs/common';
+import { Injectable, NotFoundException } from '@nestjs/common';
 import { TipoPersona } from '@prisma/client';
 import { PrismaService } from '../prisma/prisma.service';
 
@@ -22,6 +22,23 @@ export interface ReporteHorariosParams {
 export interface ReporteCursosParams {
   ciclo_id?: string;
   con_horario?: string; // 'true' | 'false' | '' (todos)
+}
+export interface ReporteJustificacionesParams {
+  ciclo_id?: string;
+  aula_id?: string;
+  desde?: string;
+  hasta?: string;
+  estado?: 'todas' | 'pendientes' | 'justificadas';
+}
+export interface ReporteAsistenciaAlumnoParams {
+  alumno_id: string;
+  desde?: string;
+  hasta?: string;
+}
+export interface RangoCicloParams {
+  ciclo_id?: string;
+  desde?: string;
+  hasta?: string;
 }
 
 function isoDate(d: Date): string {
@@ -562,5 +579,221 @@ export class ReportesService {
     por_curso.sort((a, b) => b.total_clases - a.total_clases);
 
     return { kpis, por_curso };
+  }
+
+  // ══════════════════════════════════════════════════════════════════
+  // JUSTIFICACIONES  (faltas justificadas vs pendientes + traza)
+  // ══════════════════════════════════════════════════════════════════
+  async reporteJustificaciones(params: ReporteJustificacionesParams) {
+    const { ciclo_id, aula_id, desde, hasta, estado } = params;
+    const ahora = new Date();
+    const fechaHasta = hasta ? new Date(hasta) : new Date(ahora.getFullYear(), ahora.getMonth(), ahora.getDate());
+    const fechaDesde = desde ? new Date(desde) : new Date(fechaHasta.getTime() - 29 * 24 * 3600 * 1000);
+    const aulaIds = await this.scopedAulaIds(ciclo_id, aula_id);
+
+    const baseWhere: any = {
+      tipoPersona: TipoPersona.alumno,
+      esAusente: true,
+      fecha: { gte: fechaDesde, lte: fechaHasta },
+      ...(aulaIds !== undefined && { alumno: { aulaId: { in: aulaIds } } }),
+    };
+    const listWhere: any = { ...baseWhere };
+    if (estado === 'pendientes') listWhere.justificacionRazon = null;
+    else if (estado === 'justificadas') listWhere.justificacionRazon = { not: null };
+
+    const [detalle, total, justificadas] = await Promise.all([
+      this.prisma.asistencia.findMany({
+        where: listWhere,
+        orderBy: [{ fecha: 'desc' }, { alumno: { apellidos: 'asc' } }],
+        take: 2000,
+        include: {
+          alumno: { select: { nombre: true, apellidos: true, codigoBarras: true, dni: true, aula: { select: { nombre: true } } } },
+          justificadoPor: { select: { nombre: true, apellidos: true, rol: true } },
+        },
+      }),
+      this.prisma.asistencia.count({ where: baseWhere }),
+      this.prisma.asistencia.count({ where: { ...baseWhere, justificacionRazon: { not: null } } }),
+    ]);
+
+    return {
+      total,
+      justificadas,
+      pendientes: total - justificadas,
+      desde: isoDate(fechaDesde),
+      hasta: isoDate(fechaHasta),
+      detalle: detalle.map((d) => ({
+        fecha:           isoDate(d.fecha),
+        alumno:          `${d.alumno?.apellidos ?? ''} ${d.alumno?.nombre ?? ''}`.trim(),
+        codigo:          d.alumno?.codigoBarras ?? '',
+        dni:             d.alumno?.dni ?? '',
+        aula:            d.alumno?.aula?.nombre ?? '',
+        estado:          d.justificacionRazon ? 'justificada' : 'pendiente',
+        razon:           d.justificacionRazon ?? '',
+        expediente:      d.justificacionDoc ?? '',
+        justificado_por: d.justificadoPor
+          ? (`${d.justificadoPor.nombre ?? ''} ${d.justificadoPor.apellidos ?? ''}`.trim() || d.justificadoPor.rol)
+          : '',
+        justificado_en:  d.justificadoEn ? d.justificadoEn.toISOString() : null,
+      })),
+    };
+  }
+
+  // ══════════════════════════════════════════════════════════════════
+  // ASISTENCIA POR ALUMNO  (detalle e histórico de un alumno)
+  // ══════════════════════════════════════════════════════════════════
+  async reporteAsistenciaAlumno(params: ReporteAsistenciaAlumnoParams) {
+    const { alumno_id, desde, hasta } = params;
+    const alumno = await this.prisma.alumno.findFirst({
+      where: { id: alumno_id, deletedAt: null },
+      select: { id: true, nombre: true, apellidos: true, codigoBarras: true, dni: true, aula: { select: { nombre: true } } },
+    });
+    if (!alumno) throw new NotFoundException('Alumno no encontrado');
+
+    const ahora = new Date();
+    const fechaHasta = hasta ? new Date(hasta) : new Date(ahora.getFullYear(), ahora.getMonth(), ahora.getDate());
+    const fechaDesde = desde ? new Date(desde) : new Date(fechaHasta.getTime() - 29 * 24 * 3600 * 1000);
+
+    const registros = await this.prisma.asistencia.findMany({
+      where: { alumnoId: alumno_id, tipoPersona: TipoPersona.alumno, fecha: { gte: fechaDesde, lte: fechaHasta } },
+      orderBy: { fecha: 'desc' },
+      select: { fecha: true, horaIngreso: true, esTardanza: true, esAusente: true, justificacionRazon: true, justificacionDoc: true },
+    });
+
+    const presentes    = registros.filter((r) => !r.esAusente && !r.esTardanza).length;
+    const tardanzas    = registros.filter((r) => r.esTardanza).length;
+    const faltas       = registros.filter((r) => r.esAusente).length;
+    const justificadas = registros.filter((r) => r.esAusente && r.justificacionRazon).length;
+    const conRegistro  = registros.length;
+    const asistio      = presentes + tardanzas;
+    const pct          = conRegistro > 0 ? Math.round((asistio / conRegistro) * 100) : 100;
+
+    return {
+      alumno: {
+        id:     alumno.id,
+        nombre: `${alumno.apellidos} ${alumno.nombre}`.trim(),
+        codigo: alumno.codigoBarras,
+        dni:    alumno.dni,
+        aula:   alumno.aula?.nombre ?? null,
+      },
+      desde: isoDate(fechaDesde),
+      hasta: isoDate(fechaHasta),
+      kpis: { presentes, tardanzas, faltas, justificadas, dias_con_registro: conRegistro, pct },
+      detalle: registros.map((r) => ({
+        fecha:      isoDate(r.fecha),
+        hora:       r.esAusente ? null : (r.horaIngreso ? r.horaIngreso.toISOString() : null),
+        estado:     r.esAusente ? (r.justificacionRazon ? 'justificada' : 'falta') : (r.esTardanza ? 'tardanza' : 'puntual'),
+        razon:      r.justificacionRazon ?? '',
+        expediente: r.justificacionDoc ?? '',
+      })),
+    };
+  }
+
+  // ══════════════════════════════════════════════════════════════════
+  // RANKING POR AULA  (% de asistencia por aula, ordenado)
+  // ══════════════════════════════════════════════════════════════════
+  async rankingAulas(params: RangoCicloParams) {
+    const { ciclo_id, desde, hasta } = params;
+    const ahora = new Date();
+    const fechaHasta = hasta ? new Date(hasta) : new Date(ahora.getFullYear(), ahora.getMonth(), ahora.getDate());
+    const fechaDesde = desde ? new Date(desde) : new Date(fechaHasta.getTime() - 29 * 24 * 3600 * 1000);
+    const aulaIds = await this.scopedAulaIds(ciclo_id);
+
+    const aulas = await this.prisma.aula.findMany({
+      where: aulaIds !== undefined ? { id: { in: aulaIds } } : undefined,
+      select: { id: true, nombre: true, turno: true, area: true },
+    });
+    const alumnos = await this.prisma.alumno.findMany({
+      where: { deletedAt: null, ...(aulaIds !== undefined && { aulaId: { in: aulaIds } }) },
+      select: { id: true, aulaId: true },
+    });
+    const alumnoToAula = new Map(alumnos.map((a) => [a.id, a.aulaId]));
+    const alumnoIds = alumnos.map((a) => a.id);
+    const countByAula: Record<string, number> = {};
+    for (const a of alumnos) if (a.aulaId) countByAula[a.aulaId] = (countByAula[a.aulaId] ?? 0) + 1;
+
+    const asistencias = await this.prisma.asistencia.findMany({
+      where: {
+        tipoPersona: TipoPersona.alumno, esAusente: false,
+        fecha: { gte: fechaDesde, lte: fechaHasta },
+        ...(alumnoIds.length && { alumnoId: { in: alumnoIds } }),
+      },
+      select: { alumnoId: true, fecha: true },
+    });
+
+    const perAula: Record<string, { total: number; dias: Set<string> }> = {};
+    for (const a of aulas) perAula[a.id] = { total: 0, dias: new Set() };
+    for (const ast of asistencias) {
+      if (!ast.alumnoId) continue;
+      const aid = alumnoToAula.get(ast.alumnoId);
+      if (!aid || !perAula[aid]) continue;
+      perAula[aid].total++;
+      perAula[aid].dias.add(isoDate(ast.fecha));
+    }
+
+    const ranking = aulas.map((a) => {
+      const { total, dias } = perAula[a.id];
+      const nAlumnos = countByAula[a.id] ?? 0;
+      const sesiones = dias.size;
+      const esperado = nAlumnos * sesiones;
+      return {
+        aulaId: a.id, nombre: a.nombre, turno: a.turno, area: a.area,
+        alumnos: nAlumnos, sesiones,
+        pct_asistencia: esperado > 0 ? Math.min(100, Math.round((total / esperado) * 100)) : 0,
+      };
+    }).sort((a, b) => b.pct_asistencia - a.pct_asistencia);
+
+    return { desde: isoDate(fechaDesde), hasta: isoDate(fechaHasta), ranking };
+  }
+
+  // ══════════════════════════════════════════════════════════════════
+  // RESUMEN DIARIO  (consolidado por día del rango)
+  // ══════════════════════════════════════════════════════════════════
+  async resumenDiario(params: RangoCicloParams) {
+    const { ciclo_id, desde, hasta } = params;
+    const ahora = new Date();
+    const fechaHasta = hasta ? new Date(hasta) : new Date(ahora.getFullYear(), ahora.getMonth(), ahora.getDate());
+    const fechaDesde = desde ? new Date(desde) : new Date(fechaHasta.getTime() - 13 * 24 * 3600 * 1000);
+    const aulaIds = await this.scopedAulaIds(ciclo_id);
+
+    const alumnos = await this.prisma.alumno.findMany({
+      where: { deletedAt: null, ...(aulaIds !== undefined && { aulaId: { in: aulaIds } }) },
+      select: { id: true },
+    });
+    const alumnoIds = alumnos.map((a) => a.id);
+    const nScope = alumnos.length || 1;
+
+    const registros = await this.prisma.asistencia.findMany({
+      where: {
+        tipoPersona: TipoPersona.alumno,
+        fecha: { gte: fechaDesde, lte: fechaHasta },
+        ...(aulaIds !== undefined && alumnoIds.length ? { alumnoId: { in: alumnoIds } } : {}),
+      },
+      select: { fecha: true, esTardanza: true, esAusente: true, justificacionRazon: true },
+    });
+
+    const porDia: Record<string, { presentes: number; tardanzas: number; faltas: number; justificadas: number }> = {};
+    for (const r of registros) {
+      const key = isoDate(r.fecha);
+      if (!porDia[key]) porDia[key] = { presentes: 0, tardanzas: 0, faltas: 0, justificadas: 0 };
+      if (r.esAusente) { porDia[key].faltas++; if (r.justificacionRazon) porDia[key].justificadas++; }
+      else if (r.esTardanza) porDia[key].tardanzas++;
+      else porDia[key].presentes++;
+    }
+
+    const dias: Array<Record<string, unknown>> = [];
+    const totalDias = Math.round((fechaHasta.getTime() - fechaDesde.getTime()) / (24 * 3600 * 1000));
+    for (let i = 0; i <= totalDias; i++) {
+      const d = new Date(fechaDesde.getTime() + i * 24 * 3600 * 1000);
+      const key = isoDate(d);
+      const e = porDia[key] ?? { presentes: 0, tardanzas: 0, faltas: 0, justificadas: 0 };
+      const asistio = e.presentes + e.tardanzas;
+      dias.push({
+        fecha: key,
+        presentes: e.presentes, tardanzas: e.tardanzas, faltas: e.faltas, justificadas: e.justificadas,
+        pct: Math.min(100, Math.round((asistio / nScope) * 100)),
+      });
+    }
+
+    return { desde: isoDate(fechaDesde), hasta: isoDate(fechaHasta), total_alumnos: alumnos.length, dias };
   }
 }

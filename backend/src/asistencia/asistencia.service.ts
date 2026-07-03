@@ -187,7 +187,7 @@ export class AsistenciaService {
   }
 
   async findAll(dto: FilterAsistenciaDto, caller?: { id: string; rol: string }) {
-    const { page = 1, limit = 20, fecha, desde, hasta, aula_id, alumno_id, docente_id, tipo, turno } = dto as any;
+    const { page = 1, limit = 20, q, fecha, desde, hasta, aula_id, alumno_id, docente_id, tipo, turno } = dto as any;
     const skip = (page - 1) * limit;
 
     const where: any = {};
@@ -272,6 +272,32 @@ export class AsistenciaService {
     } else {
       // admin, director, auxiliar: aplica filtro si viene en el query
       if (alumno_id) where.alumnoId = alumno_id;
+    }
+
+    // Búsqueda por texto sobre la persona (según el tipo efectivo). Se mergea
+    // con los filtros de rol/aula ya aplicados (AND).
+    if (q?.trim()) {
+      const term = q.trim();
+      if (where.tipoPersona === TipoPersona.docente || tipo === TipoPersona.docente) {
+        where.docente = {
+          ...(where.docente ?? {}),
+          OR: [
+            { nombre:    { contains: term, mode: 'insensitive' } },
+            { apellidos: { contains: term, mode: 'insensitive' } },
+            { dni:       { contains: term } },
+          ],
+        };
+      } else {
+        where.alumno = {
+          ...(where.alumno ?? {}),
+          OR: [
+            { nombre:       { contains: term, mode: 'insensitive' } },
+            { apellidos:    { contains: term, mode: 'insensitive' } },
+            { codigoBarras: { contains: term } },
+            { dni:          { contains: term } },
+          ],
+        };
+      }
     }
 
     const [items, total] = await Promise.all([
@@ -572,7 +598,19 @@ export class AsistenciaService {
       esAusente: true,
       fecha: { gte: desde, lte: hasta },
     };
-    if (dto.aula_id) baseWhere.alumno = { aulaId: dto.aula_id };
+    // Filtro por aula y/o búsqueda por alumno (nombre/apellidos/código/DNI).
+    const alumnoFilter: any = {};
+    if (dto.aula_id) alumnoFilter.aulaId = dto.aula_id;
+    if (dto.q?.trim()) {
+      const q = dto.q.trim();
+      alumnoFilter.OR = [
+        { nombre:       { contains: q, mode: 'insensitive' } },
+        { apellidos:    { contains: q, mode: 'insensitive' } },
+        { codigoBarras: { contains: q } },
+        { dni:          { contains: q } },
+      ];
+    }
+    if (Object.keys(alumnoFilter).length) baseWhere.alumno = alumnoFilter;
 
     // Lista: aplica el filtro de estado (pendientes/justificadas) y se pagina.
     const listWhere: any = { ...baseWhere };
