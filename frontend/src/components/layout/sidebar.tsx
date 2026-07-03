@@ -68,6 +68,8 @@ const GROUPS_DIRECTOR: NavGroup[] = [
   {
     label: 'Académico',
     items: [
+      { href: '/alumnos',  icon: Users,    label: 'Alumnos' },
+      { href: '/docentes', icon: Teacher,  label: 'Docentes' },
       { href: '/carreras', icon: Award,    label: 'Carreras' },
       { href: '/horarios', icon: Calendar, label: 'Horarios' },
     ],
@@ -85,6 +87,7 @@ const GROUPS_DIRECTOR: NavGroup[] = [
     label: 'Comunicación',
     items: [
       { href: '/comunicados', icon: Megaphone, label: 'Comunicados' },
+      { href: '/biblioteca',  icon: Book,      label: 'Biblioteca' },
     ],
   },
   {

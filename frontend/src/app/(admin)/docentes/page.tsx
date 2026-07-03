@@ -93,7 +93,8 @@ function RowMenu({ id, name, onClose, readOnly }: { id: string; name: string; on
 export default function DocentesPage() {
   const router = useRouter()
   const { user } = useAuth()
-  const isAuxiliar = user?.rol === 'auxiliar'
+  // Auxiliar y director tienen acceso de solo lectura (sin crear/editar/eliminar)
+  const readOnly = user?.rol === 'auxiliar' || user?.rol === 'director'
   const [q, setQ] = React.useState('')
   const [debouncedQ, setDebouncedQ] = React.useState('')
   const [page, setPage] = React.useState(1)
@@ -123,7 +124,7 @@ export default function DocentesPage() {
       <PageHeader
         title="Docentes"
         crumbs={['Administración', 'Docentes']}
-        action={!isAuxiliar ? (
+        action={!readOnly ? (
           <>
             <Btn variant="secondary" size="sm" onClick={() => router.push('/reportes')}>
               <Download size={14} />Reporte asistencia
@@ -248,7 +249,7 @@ export default function DocentesPage() {
                             <More size={15} />
                           </Btn>
                           {openMenu === d.id && (
-                            <RowMenu id={d.id} name={name} onClose={() => setOpenMenu(null)} readOnly={isAuxiliar} />
+                            <RowMenu id={d.id} name={name} onClose={() => setOpenMenu(null)} readOnly={readOnly} />
                           )}
                         </div>
                       </td>

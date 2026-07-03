@@ -62,7 +62,7 @@ export class BibliotecaController {
   }
 
   @Post()
-  @Roles(Rol.admin, Rol.director, Rol.docente)
+  @Roles(Rol.admin, Rol.docente)
   @ApiOperation({ summary: 'Crear recurso — multipart/form-data (PDF) o JSON (otros tipos)' })
   @ApiConsumes('multipart/form-data', 'application/json')
   @UseInterceptors(PDF_INTERCEPTOR)
@@ -75,7 +75,7 @@ export class BibliotecaController {
   }
 
   @Patch(':id')
-  @Roles(Rol.admin, Rol.director, Rol.docente)
+  @Roles(Rol.admin, Rol.docente)
   @ApiOperation({ summary: 'Editar recurso (docente: solo propios). Guarda auditoría.' })
   @ApiConsumes('multipart/form-data', 'application/json')
   @UseInterceptors(PDF_INTERCEPTOR)

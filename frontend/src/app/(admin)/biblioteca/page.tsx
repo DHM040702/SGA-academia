@@ -34,7 +34,8 @@ function timeAgo(s: string) {
 export default function BibliotecaPage() {
   const { user } = useAuth()
   const rol = user?.rol ?? ''
-  const puedeCrear   = ['admin', 'director', 'docente'].includes(rol)
+  // Director: solo visualización (sin crear/editar/eliminar). Conserva el historial (lectura).
+  const puedeCrear   = ['admin', 'docente'].includes(rol)
   const puedeEliminar = rol === 'admin'
   const puedeHistorial = ['admin', 'director', 'docente'].includes(rol)
 

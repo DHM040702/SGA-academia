@@ -12,6 +12,7 @@ import { Btn } from '@/components/ui/btn'
 import { PageHeader } from '@/components/layout/page-header'
 import { Edit, Mail, Phone, Calendar, Layers } from '@/components/icons'
 import type { DocenteHorario } from '@/hooks/use-docentes'
+import { useAuth } from '@/contexts/auth-context'
 
 /* ─── Constantes ──────────────────────────────────────────────── */
 const DIAS: Record<number, string> = {
@@ -52,6 +53,8 @@ function InfoRow({ icon, value }: { icon: React.ReactNode; value: string }) {
 export default function DocenteDetallePage() {
   const { id } = useParams<{ id: string }>()
   const router = useRouter()
+  const { user } = useAuth()
+  const puedeEditar = user?.rol === 'admin'
   const [tab, setTab] = React.useState<Tab>('Resumen')
 
   const { data: docente, isLoading } = useDocente(id)
@@ -100,9 +103,11 @@ export default function DocenteDetallePage() {
           { label: docente.dni },
         ]}
         action={
-          <Btn variant="secondary" size="sm" onClick={() => router.push(`/docentes/${id}/editar`)}>
-            <Edit size={14} />Editar
-          </Btn>
+          puedeEditar ? (
+            <Btn variant="secondary" size="sm" onClick={() => router.push(`/docentes/${id}/editar`)}>
+              <Edit size={14} />Editar
+            </Btn>
+          ) : undefined
         }
       />
 

@@ -14,6 +14,7 @@ import { Barcode } from '@/components/ui/barcode'
 import { PageHeader } from '@/components/layout/page-header'
 import { Download, Edit, Mail, Phone, Calendar, MapPin, Book } from '@/components/icons'
 import { useState } from 'react'
+import { useAuth } from '@/contexts/auth-context'
 import api from '@/lib/api'
 
 const TABS = ['Resumen', 'Cursos', 'Asistencia', 'Apoderados', 'Comunicados'] as const
@@ -95,6 +96,8 @@ export default function AlumnoDetallePage() {
   const { id } = useParams<{ id: string }>()
   const router = useRouter()
   const { selectedCiclo } = useCicloCtx()
+  const { user } = useAuth()
+  const puedeEditar = user?.rol === 'admin'
   const [tab, setTab] = useState<Tab>('Resumen')
   const [reporteLoading, setReporteLoading] = useState(false)
 
@@ -148,10 +151,12 @@ export default function AlumnoDetallePage() {
               onClick={() => descargarCarnet(alumno)}>
               Carnet PDF
             </Btn>
-            <Btn variant="secondary" icon={<Edit size={14} />} size="sm"
-              onClick={() => router.push(`/alumnos/${id}/editar`)}>
-              Editar
-            </Btn>
+            {puedeEditar && (
+              <Btn variant="secondary" icon={<Edit size={14} />} size="sm"
+                onClick={() => router.push(`/alumnos/${id}/editar`)}>
+                Editar
+              </Btn>
+            )}
           </>
         }
       />
