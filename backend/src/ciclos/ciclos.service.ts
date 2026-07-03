@@ -71,6 +71,12 @@ export class CiclosService {
     return this.prisma.$transaction(async (tx) => {
       if (dto.activo === true) {
         await tx.ciclo.updateMany({ where: { activo: true, NOT: { id } }, data: { activo: false } });
+      } else if (dto.activo === false) {
+        // Evitar quedarse sin NINGÚN ciclo activo (rompería el scoping por ciclo).
+        const actual = await tx.ciclo.findUnique({ where: { id }, select: { activo: true } });
+        if (actual?.activo) {
+          throw new BadRequestException('No puedes desactivar el ciclo activo. Activa otro ciclo para reemplazarlo.');
+        }
       }
       return tx.ciclo.update({
         where: { id },

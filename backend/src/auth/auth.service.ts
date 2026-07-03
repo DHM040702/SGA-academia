@@ -97,8 +97,13 @@ export class AuthService {
         DELETE FROM refresh_tokens WHERE id = ${matchedId}::uuid
       `;
     } catch (e) {
-      // Si es error de autenticación, relanzar; si es error de tabla, omitir
-      if (e instanceof UnauthorizedException) throw e;
+      // Fail-closed: cualquier fallo de validación (token revocado/no encontrado
+      // o error de BD) DENIEGA el refresh. Antes se tragaba los errores no-Unauthorized
+      // y el refresh continuaba sin validar la revocación. El usuario simplemente
+      // vuelve a iniciar sesión.
+      throw e instanceof UnauthorizedException
+        ? e
+        : new UnauthorizedException('No se pudo validar la sesión');
     }
 
     return this.login(dbUser as any);

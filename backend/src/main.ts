@@ -7,6 +7,7 @@ const cookieParser = require('cookie-parser');
 // eslint-disable-next-line @typescript-eslint/no-require-imports
 const compression = require('compression');
 import { AppModule } from './app.module';
+import { PrismaExceptionFilter } from './common/filters/prisma-exception.filter';
 
 const logger = new Logger('Bootstrap');
 
@@ -59,6 +60,10 @@ async function bootstrap() {
       transformOptions: { enableImplicitConversion: true },
     }),
   );
+
+  // ── Filtro de errores de Prisma ────────────────────────────────
+  // Convierte colisiones de unicidad / FK en 409/404 limpios (no 500).
+  app.useGlobalFilters(new PrismaExceptionFilter());
 
   // ── Swagger ────────────────────────────────────────────────────
   // En producción se OCULTA (expone todo el mapa de la API). Se puede forzar
