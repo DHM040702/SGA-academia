@@ -241,6 +241,17 @@ function EmptyState({ msg }: { msg: string }) {
   return <p className="text-[13px] text-text-mute text-center py-8">{msg}</p>
 }
 
+/** Encabezado de sección para separar bloques (p. ej. Alumnos / Docentes). */
+function SectionTitle({ label, hint }: { label: string; hint?: string }) {
+  return (
+    <div className="flex items-center gap-2.5 mt-1">
+      <h3 className="font-serif text-[16px] font-semibold whitespace-nowrap">{label}</h3>
+      {hint && <span className="text-[12px] text-text-mute whitespace-nowrap">· {hint}</span>}
+      <div className="flex-1 h-px bg-border ml-1" />
+    </div>
+  )
+}
+
 function ChartTooltip({ active, payload, label }: any) {
   if (!active || !payload?.length) return null
   return (
@@ -909,17 +920,30 @@ export default function ReportesPage() {
         {tab === 'asistencia' && asisQ.data && !isLoading && (() => {
           const r = asisQ.data
           const k = r.kpis
+          const totalAulas = r.por_seccion.length
+          const aulaOpt = r.por_seccion.filter((s) => s.pct_asistencia >= 85).length
+          const aulaReg = r.por_seccion.filter((s) => s.pct_asistencia >= 70 && s.pct_asistencia < 85).length
+          const aulaRie = r.por_seccion.filter((s) => s.pct_asistencia < 70).length
+
+          const nDoc = r.por_docente.length
+          const tardanzasDoc = r.por_docente.reduce((s, d) => s + d.tardanzas, 0)
+          const sesionesDoc  = r.por_docente.reduce((s, d) => s + d.total_sesiones, 0)
+          const docPunt = r.por_docente.filter((d) => d.puntualidad >= 90).length
+          const docReg  = r.por_docente.filter((d) => d.puntualidad >= 75 && d.puntualidad < 90).length
+          const docTar  = r.por_docente.filter((d) => d.puntualidad < 75).length
+
           return (
             <>
-              <div className="grid grid-cols-2 sm:grid-cols-4 gap-3.5">
-                <KPI label="Asistencia media"    value={`${k.asistencia_media}%`}     sub={periodo}            accent="var(--color-primary)" />
-                <KPI label="Tardanzas"           value={`${k.tardanzas_pct}%`}        sub="del total"          accent="var(--color-warning)" />
-                <KPI label="Puntualidad doc."    value={`${k.puntualidad_docentes}%`} sub="del período"        accent="var(--color-success)" />
-                <KPI label="Sesiones registradas" value={k.sesiones_registradas}      sub={cicloActivo?.nombre ?? '—'} accent="var(--color-info)" />
+              {/* ════════════════ ALUMNOS ════════════════ */}
+              <SectionTitle label="Alumnos" hint="Asistencia y tardanzas del período" />
+              <div className="grid grid-cols-3 gap-3.5">
+                <KPI label="Asistencia media"     value={`${k.asistencia_media}%`} sub={periodo}                    accent="var(--color-primary)" />
+                <KPI label="Tardanzas"            value={`${k.tardanzas_pct}%`}    sub="del total"                  accent="var(--color-warning)" />
+                <KPI label="Sesiones registradas" value={k.sesiones_registradas}  sub={cicloActivo?.nombre ?? '—'} accent="var(--color-info)" />
               </div>
 
               {tendenciaData.length > 0 && (
-                <Card title="Tendencia de asistencia" subtitle={`${periodo} · línea 85% = umbral óptimo`}>
+                <Card title="Tendencia de asistencia" subtitle={`${periodo} · 85% = umbral óptimo`}>
                   <div className="px-4 pb-4">
                     <ResponsiveContainer width="100%" height={220}>
                       <LineChart data={tendenciaData} margin={{ top: 8, right: 8, bottom: 0, left: -16 }}>
@@ -936,87 +960,116 @@ export default function ReportesPage() {
                 </Card>
               )}
 
-              {/* Tabla aulas */}
-              <Card title="Asistencia por aula" subtitle={`${filteredAsisAulas.length} de ${r.por_seccion.length} aulas`}>
-                <div className="px-3.5 pb-3 flex flex-wrap gap-2 items-center border-b border-border-s">
-                  <SearchInput value={aulaSearch} onChange={setAulaSearch} placeholder="Buscar aula…" />
-                  <div className="flex rounded-2 border border-border overflow-hidden text-[11px]">
-                    {(['todos','optimo','regular','riesgo'] as const).map((e) => (
-                      <button key={e} onClick={() => setEstadoFiltro(e)}
-                        className={`px-2.5 py-1.5 transition-colors whitespace-nowrap ${estadoFiltro === e ? (e==='optimo'?'bg-success text-white':e==='regular'?'bg-warning text-white':e==='riesgo'?'bg-danger text-white':'bg-primary text-white') + ' font-medium' : 'bg-surface hover:bg-surface-2 text-text-mute'}`}>
-                        {e==='todos'?'Todos':e==='optimo'?'≥85%':e==='regular'?'70-84%':'<70%'}
-                      </button>
-                    ))}
+              <div className="grid gap-3.5 grid-cols-1 lg:grid-cols-[minmax(0,1fr)_300px]">
+                {/* Tabla compacta de aulas */}
+                <Card title="Detalle por aula" subtitle={`${filteredAsisAulas.length} de ${totalAulas} aulas`}>
+                  <div className="px-3.5 pb-3 flex flex-wrap gap-2 items-center border-b border-border-s">
+                    <SearchInput value={aulaSearch} onChange={setAulaSearch} placeholder="Buscar aula…" />
+                    <div className="flex rounded-2 border border-border overflow-hidden text-[11px]">
+                      {(['todos','optimo','regular','riesgo'] as const).map((e) => (
+                        <button key={e} onClick={() => setEstadoFiltro(e)}
+                          className={`px-2.5 py-1.5 transition-colors whitespace-nowrap ${estadoFiltro === e ? (e==='optimo'?'bg-success text-white':e==='regular'?'bg-warning text-white':e==='riesgo'?'bg-danger text-white':'bg-primary text-white') + ' font-medium' : 'bg-surface hover:bg-surface-2 text-text-mute'}`}>
+                          {e==='todos'?'Todos':e==='optimo'?'≥85%':e==='regular'?'70-84%':'<70%'}
+                        </button>
+                      ))}
+                    </div>
+                    {(aulaSearch || estadoFiltro !== 'todos') && (
+                      <button onClick={() => { setAulaSearch(''); setEstadoFiltro('todos') }} className="text-[11px] text-text-mute hover:text-text flex items-center gap-1"><X size={11}/> Limpiar</button>
+                    )}
                   </div>
-                  {(aulaSearch || estadoFiltro !== 'todos') && (
-                    <button onClick={() => { setAulaSearch(''); setEstadoFiltro('todos') }} className="text-[11px] text-text-mute hover:text-text flex items-center gap-1"><X size={11}/> Limpiar</button>
-                  )}
-                </div>
-                {filteredAsisAulas.length > 0 ? (
-                  <table className="w-full border-collapse text-[13px]">
-                    <thead>
-                      <tr className="border-b border-border bg-surface-2/50">
-                        {[['nombre','Aula'],['total_alumnos','Alumnos'],['sesiones','Sesiones'],['pct_asistencia','Asistencia'],['pct_tardanza','Tardanza']].map(([k,l]) => (
-                          <SortTh key={k} label={l} sortKey={k} current={aulaSortKey} dir={aulaSortDir} onSort={mkToggle(aulaSortKey,setAulaSortKey,aulaSortDir,setAulaSortDir)} />
-                        ))}
-                        <th className="px-3.5 py-2.5 text-[11px] text-text-mute uppercase tracking-[0.04em] font-semibold text-left">Estado</th>
-                      </tr>
-                    </thead>
-                    <tbody>
-                      {filteredAsisAulas.map((s) => (
-                        <tr key={s.aulaId} className="border-t border-border-s hover:bg-surface-2/40">
-                          <td className="px-3.5 py-2.5 font-semibold">{s.nombre}</td>
-                          <td className="px-3.5 py-2.5 font-mono text-[12px]">{s.total_alumnos}</td>
-                          <td className="px-3.5 py-2.5 font-mono text-[12px]">{s.sesiones}</td>
-                          <td className="px-3.5 py-2.5"><PctBar pct={s.pct_asistencia} /></td>
-                          <td className="px-3.5 py-2.5"><PctBar pct={s.pct_tardanza} warn={999} /></td>
-                          <td className="px-3.5 py-2.5">
-                            <Pill tone={s.pct_asistencia>=85?'success':s.pct_asistencia>=70?'warning':'danger'}>
-                              {s.pct_asistencia>=85?'Óptimo':s.pct_asistencia>=70?'Regular':'En riesgo'}
-                            </Pill>
-                          </td>
+                  {filteredAsisAulas.length > 0 ? (
+                    <table className="w-full border-collapse text-[13px]">
+                      <thead>
+                        <tr className="border-b border-border bg-surface-2/50">
+                          {[['nombre','Aula'],['total_alumnos','Alumnos'],['pct_asistencia','Asistencia']].map(([k2,l]) => (
+                            <SortTh key={k2} label={l} sortKey={k2} current={aulaSortKey} dir={aulaSortDir} onSort={mkToggle(aulaSortKey,setAulaSortKey,aulaSortDir,setAulaSortDir)} />
+                          ))}
+                          <th className="px-3.5 py-2.5 text-[11px] text-text-mute uppercase tracking-[0.04em] font-semibold text-left">Estado</th>
                         </tr>
-                      ))}
-                    </tbody>
-                  </table>
-                ) : <EmptyState msg={r.por_seccion.length===0?'Sin datos para el período.':'Ninguna aula coincide con los filtros.'} />}
-              </Card>
+                      </thead>
+                      <tbody>
+                        {filteredAsisAulas.map((s) => (
+                          <tr key={s.aulaId} className="border-t border-border-s hover:bg-surface-2/40">
+                            <td className="px-3.5 py-2.5 font-semibold">{s.nombre}</td>
+                            <td className="px-3.5 py-2.5 font-mono text-[12px]">{s.total_alumnos}</td>
+                            <td className="px-3.5 py-2.5"><PctBar pct={s.pct_asistencia} /></td>
+                            <td className="px-3.5 py-2.5">
+                              <Pill tone={s.pct_asistencia>=85?'success':s.pct_asistencia>=70?'warning':'danger'}>
+                                {s.pct_asistencia>=85?'Óptimo':s.pct_asistencia>=70?'Regular':'En riesgo'}
+                              </Pill>
+                            </td>
+                          </tr>
+                        ))}
+                      </tbody>
+                    </table>
+                  ) : <EmptyState msg={totalAulas===0?'Sin datos para el período.':'Ninguna aula coincide con los filtros.'} />}
+                </Card>
 
-              {/* Tabla docentes */}
-              <Card title="Puntualidad de docentes" subtitle={`${filteredAsisDoc.length} docentes`}>
-                <div className="px-3.5 pb-3 flex gap-2 items-center border-b border-border-s">
-                  <SearchInput value={docSearch} onChange={setDocSearch} placeholder="Buscar docente…" />
-                  {docSearch && <button onClick={()=>setDocSearch('')} className="text-[11px] text-text-mute hover:text-text flex items-center gap-1"><X size={11}/>Limpiar</button>}
-                  {filteredAsisDoc.length>0 && <span className="ml-auto text-[11px] text-text-mute">Prom: <strong>{Math.round(filteredAsisDoc.reduce((s,d)=>s+d.puntualidad,0)/filteredAsisDoc.length)}%</strong></span>}
-                </div>
-                {filteredAsisDoc.length > 0 ? (
-                  <table className="w-full border-collapse text-[13px]">
-                    <thead>
-                      <tr className="border-b border-border bg-surface-2/50">
-                        {[['nombre','Docente'],['total_sesiones','Sesiones'],['tardanzas','Tardanzas'],['puntualidad','Puntualidad']].map(([k,l]) => (
-                          <SortTh key={k} label={l} sortKey={k} current={docSortKey} dir={docSortDir} onSort={mkToggle(docSortKey,setDocSortKey,docSortDir,setDocSortDir)} />
-                        ))}
-                        <th className="px-3.5 py-2.5 text-[11px] text-text-mute uppercase tracking-[0.04em] font-semibold text-left">Estado</th>
-                      </tr>
-                    </thead>
-                    <tbody>
-                      {filteredAsisDoc.map((d) => (
-                        <tr key={d.docente_id} className="border-t border-border-s hover:bg-surface-2/40">
-                          <td className="px-3.5 py-2.5 font-medium">{d.nombre}</td>
-                          <td className="px-3.5 py-2.5 font-mono text-[12px]">{d.total_sesiones}</td>
-                          <td className="px-3.5 py-2.5 font-mono text-[12px] text-warning">{d.tardanzas}</td>
-                          <td className="px-3.5 py-2.5"><PctBar pct={d.puntualidad} /></td>
-                          <td className="px-3.5 py-2.5">
-                            <Pill tone={d.puntualidad>=90?'success':d.puntualidad>=75?'warning':'danger'}>
-                              {d.puntualidad>=90?'Puntual':d.puntualidad>=75?'Regular':'Con tardanzas'}
-                            </Pill>
-                          </td>
+                {/* Resumen visual: aulas por estado */}
+                <Card title="Aulas por estado" subtitle={`${totalAulas} aulas`}>
+                  <div className="p-3 flex flex-col gap-1">
+                    <MiniBar label="Óptimo"    value={aulaOpt} max={totalAulas || 1} color="var(--color-success)" />
+                    <MiniBar label="Regular"   value={aulaReg} max={totalAulas || 1} color="var(--color-warning)" />
+                    <MiniBar label="En riesgo" value={aulaRie} max={totalAulas || 1} color="var(--color-danger)" />
+                    {totalAulas === 0 && <span className="text-[12px] text-text-mute">Sin datos</span>}
+                  </div>
+                </Card>
+              </div>
+
+              {/* ════════════════ DOCENTES ════════════════ */}
+              <SectionTitle label="Docentes" hint="Puntualidad del período" />
+              <div className="grid grid-cols-2 sm:grid-cols-4 gap-3.5">
+                <KPI label="Puntualidad prom." value={`${k.puntualidad_docentes}%`} sub="del período"  accent="var(--color-success)" />
+                <KPI label="Docentes"          value={nDoc}                         sub="con registro"  accent="var(--color-primary)" />
+                <KPI label="Tardanzas"         value={tardanzasDoc}                 sub="acumuladas"    accent="var(--color-warning)" />
+                <KPI label="Sesiones"          value={sesionesDoc}                  sub="de docentes"   accent="var(--color-info)" />
+              </div>
+
+              <div className="grid gap-3.5 grid-cols-1 lg:grid-cols-[minmax(0,1fr)_300px]">
+                {/* Tabla compacta de docentes */}
+                <Card title="Detalle por docente" subtitle={`${filteredAsisDoc.length} de ${nDoc} docentes`}>
+                  <div className="px-3.5 pb-3 flex gap-2 items-center border-b border-border-s">
+                    <SearchInput value={docSearch} onChange={setDocSearch} placeholder="Buscar docente…" />
+                    {docSearch && <button onClick={()=>setDocSearch('')} className="text-[11px] text-text-mute hover:text-text flex items-center gap-1"><X size={11}/>Limpiar</button>}
+                  </div>
+                  {filteredAsisDoc.length > 0 ? (
+                    <table className="w-full border-collapse text-[13px]">
+                      <thead>
+                        <tr className="border-b border-border bg-surface-2/50">
+                          {[['nombre','Docente'],['tardanzas','Tardanzas'],['puntualidad','Puntualidad']].map(([k2,l]) => (
+                            <SortTh key={k2} label={l} sortKey={k2} current={docSortKey} dir={docSortDir} onSort={mkToggle(docSortKey,setDocSortKey,docSortDir,setDocSortDir)} />
+                          ))}
+                          <th className="px-3.5 py-2.5 text-[11px] text-text-mute uppercase tracking-[0.04em] font-semibold text-left">Estado</th>
                         </tr>
-                      ))}
-                    </tbody>
-                  </table>
-                ) : <EmptyState msg="Sin registros de docentes en el período." />}
-              </Card>
+                      </thead>
+                      <tbody>
+                        {filteredAsisDoc.map((d) => (
+                          <tr key={d.docente_id} className="border-t border-border-s hover:bg-surface-2/40">
+                            <td className="px-3.5 py-2.5 font-medium">{d.nombre}</td>
+                            <td className="px-3.5 py-2.5 font-mono text-[12px] text-warning">{d.tardanzas}</td>
+                            <td className="px-3.5 py-2.5"><PctBar pct={d.puntualidad} /></td>
+                            <td className="px-3.5 py-2.5">
+                              <Pill tone={d.puntualidad>=90?'success':d.puntualidad>=75?'warning':'danger'}>
+                                {d.puntualidad>=90?'Puntual':d.puntualidad>=75?'Regular':'Con tardanzas'}
+                              </Pill>
+                            </td>
+                          </tr>
+                        ))}
+                      </tbody>
+                    </table>
+                  ) : <EmptyState msg={nDoc===0?'Sin registros de docentes en el período.':'Ningún docente coincide con la búsqueda.'} />}
+                </Card>
+
+                {/* Resumen visual: docentes por puntualidad */}
+                <Card title="Docentes por puntualidad" subtitle={`${nDoc} docentes`}>
+                  <div className="p-3 flex flex-col gap-1">
+                    <MiniBar label="Puntual"   value={docPunt} max={nDoc || 1} color="var(--color-success)" />
+                    <MiniBar label="Regular"   value={docReg}  max={nDoc || 1} color="var(--color-warning)" />
+                    <MiniBar label="C/ tardanzas" value={docTar} max={nDoc || 1} color="var(--color-danger)" />
+                    {nDoc === 0 && <span className="text-[12px] text-text-mute">Sin datos</span>}
+                  </div>
+                </Card>
+              </div>
             </>
           )
         })()}
