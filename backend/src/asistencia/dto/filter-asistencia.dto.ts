@@ -1,14 +1,10 @@
 import { ApiPropertyOptional } from '@nestjs/swagger';
-import { IsEnum, IsISO8601, IsOptional, IsString, IsUUID } from 'class-validator';
+import { IsEnum, IsISO8601, IsOptional, IsUUID } from 'class-validator';
 import { TipoPersona, Turno } from '@prisma/client';
 import { PaginationDto } from '../../common/dto/pagination.dto';
 
+// `q` (buscador por nombre/código/DNI) se hereda de PaginationDto.
 export class FilterAsistenciaDto extends PaginationDto {
-  @ApiPropertyOptional({ description: 'Buscar por nombre, apellidos, código o DNI de la persona' })
-  @IsOptional()
-  @IsString()
-  q?: string;
-
   @ApiPropertyOptional({ description: 'Fecha exacta en formato YYYY-MM-DD', example: '2026-05-20' })
   @IsOptional()
   @IsISO8601({ strict: false })
