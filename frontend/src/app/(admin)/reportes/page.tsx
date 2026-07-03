@@ -1080,6 +1080,11 @@ export default function ReportesPage() {
         {tab === 'justificaciones' && justQ.data && !isLoading && (() => {
           const r = justQ.data
           const pctJust = r.total > 0 ? Math.round((r.justificadas / r.total) * 100) : 0
+          // Faltas PENDIENTES agrupadas por aula (top 10) — para priorizar seguimiento.
+          const pendByAula: Record<string, number> = {}
+          for (const d of r.detalle) if (d.estado === 'pendiente') { const a = d.aula || '— sin aula'; pendByAula[a] = (pendByAula[a] ?? 0) + 1 }
+          const topPendAulas = Object.entries(pendByAula).map(([aula, n]) => ({ aula, n })).sort((a, b) => b.n - a.n).slice(0, 10)
+          const maxPend = topPendAulas[0]?.n ?? 1
           return (
             <>
               <div className="grid grid-cols-2 sm:grid-cols-4 gap-3.5">
@@ -1088,6 +1093,16 @@ export default function ReportesPage() {
                 <KPI label="Pendientes"     value={r.pendientes}   sub="sin justificar"           accent="var(--color-danger)" />
                 <KPI label="% Justificadas" value={`${pctJust}%`}  sub="del total de faltas"      accent="var(--color-info)" />
               </div>
+
+              {topPendAulas.length > 0 && (
+                <Card title="Faltas pendientes por aula" subtitle="Aulas con más faltas sin justificar · top 10">
+                  <div className="p-3 flex flex-col gap-0.5">
+                    {topPendAulas.map((a) => (
+                      <MiniBar key={a.aula} label={a.aula} value={a.n} max={maxPend} color="var(--color-danger)" />
+                    ))}
+                  </div>
+                </Card>
+              )}
 
               <Card title="Detalle de faltas" subtitle={`${filteredJust.length} de ${r.detalle.length} registros`}>
                 <div className="px-3.5 pb-3 flex flex-wrap gap-2 items-center border-b border-border-s">
@@ -1149,6 +1164,15 @@ export default function ReportesPage() {
           const rankMap = new Map(r.ranking.map((a, i) => [a.aulaId, i + 1]))
           const prom = r.ranking.length ? Math.round(r.ranking.reduce((s, a) => s + a.pct_asistencia, 0) / r.ranking.length) : 0
           const mejor = r.ranking[0]
+          // Comparativa: asistencia promedio por turno y por área (insight que la
+          // tabla, fila a fila, no resume).
+          const avgBy = (keyFn: (a: RankingAulaRow) => string) => {
+            const acc: Record<string, { sum: number; n: number }> = {}
+            for (const a of r.ranking) { const key = keyFn(a); if (!acc[key]) acc[key] = { sum: 0, n: 0 }; acc[key].sum += a.pct_asistencia; acc[key].n++ }
+            return Object.entries(acc).map(([key, v]) => ({ key, pct: Math.round(v.sum / v.n) })).sort((a, b) => b.pct - a.pct)
+          }
+          const porTurno = avgBy((a) => a.turno === 'manana' ? 'Mañana' : 'Tarde')
+          const porArea  = avgBy((a) => AREA_LABEL[a.area] ?? a.area)
           return (
             <>
               <div className="grid grid-cols-2 sm:grid-cols-4 gap-3.5">
@@ -1157,6 +1181,31 @@ export default function ReportesPage() {
                 <KPI label="Promedio"        value={`${prom}%`}                       sub="asistencia media"                accent="var(--color-info)" />
                 <KPI label="En riesgo"       value={r.ranking.filter((a) => a.pct_asistencia < 70).length} sub="< 70% asistencia" accent="var(--color-danger)" />
               </div>
+
+              {r.ranking.length > 0 && (
+                <div className="grid gap-3.5 grid-cols-1 sm:grid-cols-2">
+                  <Card title="Asistencia promedio por turno">
+                    <div className="p-3 flex flex-col gap-1.5">
+                      {porTurno.map((t) => (
+                        <div key={t.key} className="flex items-center gap-2 py-0.5">
+                          <span className="text-[12px] w-16 truncate">{t.key}</span>
+                          <PctBar pct={t.pct} />
+                        </div>
+                      ))}
+                    </div>
+                  </Card>
+                  <Card title="Asistencia promedio por área">
+                    <div className="p-3 flex flex-col gap-1.5">
+                      {porArea.map((t) => (
+                        <div key={t.key} className="flex items-center gap-2 py-0.5">
+                          <span className="text-[12px] w-16 truncate">{t.key}</span>
+                          <PctBar pct={t.pct} />
+                        </div>
+                      ))}
+                    </div>
+                  </Card>
+                </div>
+              )}
 
               <Card title="Ranking de asistencia por aula" subtitle={`${filteredRanking.length} de ${r.ranking.length} aulas`}>
                 <div className="px-3.5 pb-3 flex flex-wrap gap-2 items-center border-b border-border-s">
@@ -1346,7 +1395,10 @@ export default function ReportesPage() {
         ════════════════════════════════════════════════════════════ */}
         {tab === 'horarios' && horQ.data && !isLoading && (() => {
           const r = horQ.data; const k = r.kpis
-          const maxClases = Math.max(...r.por_dia.map((d) => d.total_clases), 1)
+          // Top docentes por carga (horas/semana) — reemplaza al gráfico por día,
+          // que no aportaba (la carga diaria suele ser uniforme).
+          const topDocHoras = [...r.por_docente].sort((a, b) => b.horas_semana - a.horas_semana).slice(0, 10)
+          const maxHoras = topDocHoras[0]?.horas_semana ?? 1
           return (
             <>
               <div className="grid grid-cols-2 sm:grid-cols-5 gap-3.5">
@@ -1357,32 +1409,17 @@ export default function ReportesPage() {
                 <KPI label="Docentes activos" value={k.docentes_activos} sub="con clases asignadas"   accent="oklch(0.55 0.13 145)" />
               </div>
 
-              {/* Gráfico por día */}
-              <Card title="Distribución por día de semana">
-                <div className="grid gap-4 grid-cols-1 sm:grid-cols-[minmax(0,1fr)_200px]">
-                  <div className="px-4 pb-4">
-                    <ResponsiveContainer width="100%" height={180}>
-                      <BarChart data={r.por_dia} margin={{ top: 4, right: 8, bottom: 0, left: -16 }}>
-                        <CartesianGrid strokeDasharray="3 3" stroke="var(--color-border)" />
-                        <XAxis dataKey="nombre" tick={{ fontSize: 10, fill: 'var(--color-text-mute)' }} />
-                        <YAxis tick={{ fontSize: 10, fill: 'var(--color-text-mute)' }} />
-                        <Tooltip content={<ChartTooltip />} />
-                        <Bar dataKey="total_clases" name="Clases" radius={[3, 3, 0, 0]}>
-                          {r.por_dia.map((_, i) => <Cell key={i} fill="var(--color-primary)" fillOpacity={0.7 + i * 0.05} />)}
-                        </Bar>
-                      </BarChart>
-                    </ResponsiveContainer>
-                  </div>
-                  <div className="flex flex-col gap-1 py-4 pr-4">
-                    {r.por_dia.map((d) => (
-                      <MiniBar key={d.dia} label={d.nombre} value={d.total_clases} max={maxClases} />
-                    ))}
-                  </div>
+              {/* Carga por docente (top 10 por horas/semana) */}
+              <Card title="Docentes con mayor carga" subtitle="Horas por semana · top 10">
+                <div className="p-3 flex flex-col gap-0.5">
+                  {topDocHoras.length > 0 ? topDocHoras.map((d) => (
+                    <MiniBar key={d.docente_id} label={d.nombre} value={d.horas_semana} max={maxHoras} />
+                  )) : <span className="text-[12px] text-text-mute">Sin docentes con clases asignadas</span>}
                 </div>
               </Card>
 
               {/* Tabla docentes */}
-              <Card title="Carga docente" subtitle={`${r.por_docente.length} docentes`}>
+              <Card title="Detalle por docente" subtitle={`${r.por_docente.length} docentes`}>
                 <table className="w-full border-collapse text-[13px]">
                   <thead>
                     <tr className="border-b border-border bg-surface-2/50">
