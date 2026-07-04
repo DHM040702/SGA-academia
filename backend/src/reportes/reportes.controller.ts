@@ -104,4 +104,13 @@ export class ReportesController {
   resumenDiario(@Query() params: RangoCicloParams) {
     return this.service.resumenDiario(params);
   }
+
+  @Get('docentes-mensual')
+  @Roles(Rol.admin, Rol.director)
+  @ApiOperation({ summary: 'Asistencia/puntualidad de docentes agrupada por mes (por defecto últimos 6 meses)' })
+  @ApiQuery({ name: 'desde', required: false, description: 'YYYY-MM-DD' })
+  @ApiQuery({ name: 'hasta', required: false, description: 'YYYY-MM-DD' })
+  docentesMensual(@Query() params: RangoCicloParams) {
+    return this.service.docentesMensual(params);
+  }
 }

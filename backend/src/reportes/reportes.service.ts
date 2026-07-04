@@ -45,6 +45,13 @@ function isoDate(d: Date): string {
   return `${d.getFullYear()}-${String(d.getMonth() + 1).padStart(2, '0')}-${String(d.getDate()).padStart(2, '0')}`;
 }
 
+const MES_ABBR = ['Ene', 'Feb', 'Mar', 'Abr', 'May', 'Jun', 'Jul', 'Ago', 'Sep', 'Oct', 'Nov', 'Dic'];
+/** 'YYYY-MM' → 'Jun 2026'. */
+function mesLabel(mes: string): string {
+  const [y, m] = mes.split('-').map(Number);
+  return `${MES_ABBR[(m - 1) % 12]} ${y}`;
+}
+
 function minutesBetween(inicio: Date, fin: Date): number {
   return (fin.getHours() * 60 + fin.getMinutes()) - (inicio.getHours() * 60 + inicio.getMinutes());
 }
@@ -795,5 +802,97 @@ export class ReportesService {
     }
 
     return { desde: isoDate(fechaDesde), hasta: isoDate(fechaHasta), total_alumnos: alumnos.length, dias };
+  }
+
+  // ══════════════════════════════════════════════════════════════════
+  // DOCENTES POR MES  (asistencia/puntualidad de docentes agrupada por mes)
+  // ══════════════════════════════════════════════════════════════════
+  async docentesMensual(params: RangoCicloParams) {
+    const { desde, hasta } = params; // ciclo_id no aplica: los docentes no se scopean por ciclo
+    const ahora = new Date();
+    const fechaHasta = hasta ? new Date(hasta) : new Date(ahora.getFullYear(), ahora.getMonth(), ahora.getDate());
+    // Por defecto: los últimos 6 meses (mes actual + 5 anteriores).
+    const fechaDesde = desde ? new Date(desde) : new Date(fechaHasta.getFullYear(), fechaHasta.getMonth() - 5, 1);
+
+    const docentes = await this.prisma.docente.findMany({
+      where: { deletedAt: null },
+      select: { id: true, nombre: true, apellidos: true },
+    });
+
+    const registros = await this.prisma.asistencia.findMany({
+      where: {
+        tipoPersona: TipoPersona.docente,
+        esAusente: false,
+        fecha: { gte: fechaDesde, lte: fechaHasta },
+      },
+      select: { docenteId: true, fecha: true, esTardanza: true },
+    });
+
+    const monthKeys = new Set<string>();
+    const perMonth: Record<string, { sesiones: number; tardanzas: number }> = {};
+    const perDoc: Record<string, { sesiones: number; tardanzas: number; porMes: Record<string, { sesiones: number; tardanzas: number }> }> = {};
+
+    for (const r of registros) {
+      if (!r.docenteId) continue;
+      const mes = isoDate(r.fecha).slice(0, 7); // YYYY-MM
+      monthKeys.add(mes);
+
+      if (!perMonth[mes]) perMonth[mes] = { sesiones: 0, tardanzas: 0 };
+      perMonth[mes].sesiones++;
+      if (r.esTardanza) perMonth[mes].tardanzas++;
+
+      if (!perDoc[r.docenteId]) perDoc[r.docenteId] = { sesiones: 0, tardanzas: 0, porMes: {} };
+      const pd = perDoc[r.docenteId];
+      pd.sesiones++;
+      if (r.esTardanza) pd.tardanzas++;
+      if (!pd.porMes[mes]) pd.porMes[mes] = { sesiones: 0, tardanzas: 0 };
+      pd.porMes[mes].sesiones++;
+      if (r.esTardanza) pd.porMes[mes].tardanzas++;
+    }
+
+    const meses = Array.from(monthKeys).sort();
+    const pct = (sesiones: number, tardanzas: number) =>
+      sesiones > 0 ? Math.round(((sesiones - tardanzas) / sesiones) * 100) : 0;
+
+    const mesesOut = meses.map((mes) => {
+      const { sesiones, tardanzas } = perMonth[mes];
+      return {
+        mes,
+        label: mesLabel(mes),
+        sesiones,
+        tardanzas,
+        puntuales: sesiones - tardanzas,
+        pct_puntualidad: pct(sesiones, tardanzas),
+      };
+    });
+
+    const docentesOut = docentes
+      .filter((d) => perDoc[d.id])
+      .map((d) => {
+        const pd = perDoc[d.id];
+        return {
+          docente_id: d.id,
+          nombre: `${d.nombre} ${d.apellidos}`,
+          sesiones: pd.sesiones,
+          tardanzas: pd.tardanzas,
+          pct_puntualidad: pct(pd.sesiones, pd.tardanzas),
+          por_mes: Object.fromEntries(
+            meses.map((m) => {
+              const e = pd.porMes[m];
+              return [m, e
+                ? { sesiones: e.sesiones, tardanzas: e.tardanzas, pct: pct(e.sesiones, e.tardanzas) }
+                : { sesiones: 0, tardanzas: 0, pct: null }];
+            }),
+          ),
+        };
+      })
+      .sort((a, b) => a.nombre.localeCompare(b.nombre));
+
+    return {
+      desde: isoDate(fechaDesde),
+      hasta: isoDate(fechaHasta),
+      meses: mesesOut,
+      docentes: docentesOut,
+    };
   }
 }

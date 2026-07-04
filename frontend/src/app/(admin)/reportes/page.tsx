@@ -88,8 +88,35 @@ interface ReporteAlumnoDetalleData {
   detalle: AlumnoDetalleRow[]
 }
 
-type ReportTab = 'asistencia' | 'justificaciones' | 'ranking' | 'resumen' | 'alumnos' | 'horarios' | 'cursos' | 'individual'
+// Docentes por mes
+interface MesDocenteRow { mes: string; label: string; sesiones: number; tardanzas: number; puntuales: number; pct_puntualidad: number }
+interface DocenteMensualRow {
+  docente_id: string; nombre: string; sesiones: number; tardanzas: number; pct_puntualidad: number
+  por_mes: Record<string, { sesiones: number; tardanzas: number; pct: number | null }>
+}
+interface ReporteDocentesMensualData {
+  desde: string; hasta: string; meses: MesDocenteRow[]; docentes: DocenteMensualRow[]
+}
+
+type ReportTab = 'asistencia' | 'docentes-mensual' | 'justificaciones' | 'ranking' | 'resumen' | 'alumnos' | 'horarios' | 'cursos' | 'individual'
 type SortDir   = 'asc' | 'desc'
+
+/** Menú de reportes agrupado por categoría (navegación lateral). */
+const REPORT_MENU: { group: string; items: { key: ReportTab; label: string }[] }[] = [
+  { group: 'Asistencia', items: [
+    { key: 'asistencia',       label: 'General' },
+    { key: 'docentes-mensual', label: 'Docentes por mes' },
+    { key: 'justificaciones',  label: 'Justificaciones' },
+    { key: 'ranking',          label: 'Ranking de aulas' },
+    { key: 'resumen',          label: 'Resumen diario' },
+    { key: 'individual',       label: 'Por alumno' },
+  ] },
+  { group: 'Gestión académica', items: [
+    { key: 'alumnos',  label: 'Alumnos' },
+    { key: 'horarios', label: 'Horarios' },
+    { key: 'cursos',   label: 'Cursos' },
+  ] },
+]
 
 /* ══════════════════════════════════════════════════════════════════
    HELPERS
@@ -176,6 +203,13 @@ function useReporteAlumnoDetalle(params: Record<string, string>, enabled: boolea
   return useQuery<ReporteAlumnoDetalleData>({
     queryKey: ['reportes', 'asistencia-alumno', params],
     queryFn: async () => { const { data } = await api.get('/reportes/asistencia-alumno', { params }); return data },
+    enabled, staleTime: 0,
+  })
+}
+function useReporteDocentesMensual(params: Record<string, string>, enabled: boolean) {
+  return useQuery<ReporteDocentesMensualData>({
+    queryKey: ['reportes', 'docentes-mensual', params],
+    queryFn: async () => { const { data } = await api.get('/reportes/docentes-mensual', { params }); return data },
     enabled, staleTime: 0,
   })
 }
@@ -413,6 +447,24 @@ function exportExcelResumen(r: ReporteResumenData) {
   XLSX.writeFile(wb, 'reporte-resumen-diario.xlsx')
 }
 
+function exportExcelDocentesMensual(r: ReporteDocentesMensualData) {
+  const wb = XLSX.utils.book_new()
+  // Hoja 1: totales por mes
+  XLSX.utils.book_append_sheet(wb, XLSX.utils.aoa_to_sheet([
+    ['Mes', 'Sesiones', 'Puntuales', 'Tardanzas', '% Puntualidad'],
+    ...r.meses.map((m) => [m.label, m.sesiones, m.puntuales, m.tardanzas, m.pct_puntualidad]),
+  ]), 'Por mes')
+  // Hoja 2: matriz docente × mes (% puntualidad)
+  XLSX.utils.book_append_sheet(wb, XLSX.utils.aoa_to_sheet([
+    ['Docente', 'Sesiones', 'Tardanzas', '% Puntualidad', ...r.meses.map((m) => m.label)],
+    ...r.docentes.map((d) => [
+      d.nombre, d.sesiones, d.tardanzas, d.pct_puntualidad,
+      ...r.meses.map((m) => { const e = d.por_mes[m.mes]; return e && e.pct !== null ? e.pct : '—' }),
+    ]),
+  ]), 'Por docente')
+  XLSX.writeFile(wb, 'reporte-docentes-mensual.xlsx')
+}
+
 function exportExcelAlumnoDetalle(r: ReporteAlumnoDetalleData) {
   const ESTADO_LABEL: Record<string, string> = { puntual: 'Puntual', tardanza: 'Tardanza', falta: 'Falta', justificada: 'Justificada' }
   const wb = XLSX.utils.book_new()
@@ -507,6 +559,8 @@ export default function ReportesPage() {
   const [justSort,    setJustSort]    = useState('fecha');          const [justDir,     setJustDir]     = useState<SortDir>('desc')
   const [rkSearch,    setRkSearch]    = useState('')
   const [rkSort,      setRkSort]      = useState('pct_asistencia');  const [rkDir,       setRkDir]       = useState<SortDir>('desc')
+  const [dmSearch,    setDmSearch]    = useState('')
+  const [dmSort,      setDmSort]      = useState('nombre');          const [dmDir,       setDmDir]       = useState<SortDir>('asc')
 
   /* ── Estados de query por tab ── */
   const [asisParams,  setAsisParams]   = useState<Record<string, string>>({})
@@ -523,6 +577,8 @@ export default function ReportesPage() {
   const [rkEnabled,   setRkEnabled]    = useState(false)
   const [resParams,   setResParams]    = useState<Record<string, string>>({})
   const [resEnabled,  setResEnabled]   = useState(false)
+  const [dmParams,    setDmParams]     = useState<Record<string, string>>({})
+  const [dmEnabled,   setDmEnabled]    = useState(false)
 
   const asisQ = useReporteAsistencia(asisParams, asisEnabled)
   const almQ  = useReporteAlumnos(almParams, almEnabled)
@@ -531,6 +587,7 @@ export default function ReportesPage() {
   const justQ = useReporteJustificaciones(justParams, justEnabled)
   const rkQ   = useReporteRanking(rkParams, rkEnabled)
   const resQ  = useReporteResumen(resParams, resEnabled)
+  const dmQ   = useReporteDocentesMensual(dmParams, dmEnabled)
 
   /* ── Detalle on-screen del alumno seleccionado (tab Por alumno) ── */
   const indivDetalleParams = useMemo(() => {
@@ -591,6 +648,14 @@ export default function ReportesPage() {
       if (desdeEfec) p.desde    = desdeEfec
       if (hastaEfec) p.hasta    = hastaEfec
       setResParams(p); setResEnabled(true)
+    }
+    if (tab === 'docentes-mensual') {
+      // docentes no se scopean por ciclo; solo rango de fechas
+      const p: Record<string, string> = {}
+      if (desdeEfec) p.desde = desdeEfec
+      if (hastaEfec) p.hasta = hastaEfec
+      setDmParams(p); setDmEnabled(true)
+      setDmSearch('')
     }
   }
 
@@ -699,8 +764,15 @@ export default function ReportesPage() {
     [resQ.data],
   )
 
+  const filteredDm = useMemo(() => {
+    let rows = dmQ.data?.docentes ?? []
+    if (dmSearch) rows = rows.filter((d) => d.nombre.toLowerCase().includes(dmSearch.toLowerCase()))
+    return sortRows(rows, dmSort, dmDir)
+  }, [dmQ.data, dmSearch, dmSort, dmDir])
+
   /* ── Estado de carga del tab actual ── */
   const currentQ   = tab === 'asistencia' ? asisQ
+    : tab === 'docentes-mensual' ? dmQ
     : tab === 'justificaciones' ? justQ
     : tab === 'ranking' ? rkQ
     : tab === 'resumen' ? resQ
@@ -710,6 +782,7 @@ export default function ReportesPage() {
   const isLoading  = currentQ.isFetching
   const isError    = currentQ.isError
   const triggered  = tab === 'asistencia' ? asisEnabled
+    : tab === 'docentes-mensual' ? dmEnabled
     : tab === 'justificaciones' ? justEnabled
     : tab === 'ranking' ? rkEnabled
     : tab === 'resumen' ? resEnabled
@@ -720,7 +793,7 @@ export default function ReportesPage() {
   /* ── Filtros comunes que aplican al tab actual ── */
   const showAula    = tab === 'asistencia' || tab === 'alumnos' || tab === 'horarios' || tab === 'justificaciones'
   const showDocente = tab === 'asistencia' || tab === 'horarios'
-  const showPeriodo = tab === 'asistencia' || tab === 'justificaciones' || tab === 'ranking' || tab === 'resumen'
+  const showPeriodo = tab === 'asistencia' || tab === 'docentes-mensual' || tab === 'justificaciones' || tab === 'ranking' || tab === 'resumen'
 
   return (
     <>
@@ -741,6 +814,7 @@ export default function ReportesPage() {
                   }}>{pdfLoading ? 'Generando…' : 'PDF'}</Btn>
               </>
             )}
+            {tab === 'docentes-mensual' && dmQ.data && <Btn variant="secondary" icon={<Download size={14} />} size="sm" onClick={() => exportExcelDocentesMensual(dmQ.data!)}>Excel</Btn>}
             {tab === 'alumnos'  && almQ.data  && <Btn variant="secondary" icon={<Download size={14} />} size="sm" onClick={() => exportExcelAlumnos(almQ.data!)}>Excel</Btn>}
             {tab === 'horarios' && horQ.data  && <Btn variant="secondary" icon={<Download size={14} />} size="sm" onClick={() => exportExcelHorarios(horQ.data!)}>Excel</Btn>}
             {tab === 'cursos'   && curQ.data  && <Btn variant="secondary" icon={<Download size={14} />} size="sm" onClick={() => exportExcelCursos(curQ.data!)}>Excel</Btn>}
@@ -751,31 +825,33 @@ export default function ReportesPage() {
         }
       />
 
-      <div className="p-4 md:p-7 flex flex-col gap-4">
+      <div className="p-4 md:p-7 flex flex-col md:flex-row gap-4 md:gap-6">
 
-        {/* ── Tabs ── */}
-        <div className="flex flex-wrap gap-1 border-b border-border">
-          {([
-            { key: 'asistencia',     label: 'Asistencia',   sub: asisEnabled && asisQ.data ? `${asisQ.data.kpis.sesiones_registradas} sesiones` : '' },
-            { key: 'justificaciones', label: 'Justificaciones', sub: justEnabled && justQ.data ? `${justQ.data.pendientes} pend.` : '' },
-            { key: 'ranking',        label: 'Ranking aulas', sub: rkEnabled && rkQ.data ? `${rkQ.data.ranking.length} aulas` : '' },
-            { key: 'resumen',        label: 'Resumen diario', sub: resEnabled && resQ.data ? `${resQ.data.dias.length} días` : '' },
-            { key: 'alumnos',        label: 'Alumnos',      sub: almEnabled  && almQ.data  ? `${almQ.data.kpis.total} alumnos`  : '' },
-            { key: 'horarios',       label: 'Horarios',     sub: horEnabled  && horQ.data  ? `${horQ.data.kpis.total_clases} clases` : '' },
-            { key: 'cursos',         label: 'Cursos',       sub: curEnabled  && curQ.data  ? `${curQ.data.kpis.total_cursos} cursos` : '' },
-            { key: 'individual',     label: 'Por alumno',   sub: '' },
-          ] as { key: ReportTab; label: string; sub: string }[]).map((t) => (
-            <button key={t.key} onClick={() => setTab(t.key)}
-              className={`px-4 py-2 text-[13px] border-b-2 transition-colors ${
-                tab === t.key
-                  ? 'border-primary text-primary font-semibold'
-                  : 'border-transparent text-text-mute hover:text-text'
-              }`}>
-              {t.label}
-              {t.sub && <span className="ml-1.5 text-[10px] text-text-mute">{t.sub}</span>}
-            </button>
-          ))}
-        </div>
+        {/* ── Menú de reportes (lateral) ── */}
+        <nav className="md:w-52 shrink-0">
+          <div className="flex md:flex-col gap-3 md:gap-4 overflow-x-auto md:overflow-visible md:sticky md:top-4 pb-1 md:pb-0">
+            {REPORT_MENU.map((g) => (
+              <div key={g.group} className="shrink-0 md:shrink">
+                <div className="text-[10px] tracking-[0.1em] uppercase text-text-soft font-semibold px-2 pb-1.5 whitespace-nowrap">{g.group}</div>
+                <div className="flex md:flex-col gap-0.5">
+                  {g.items.map((it) => (
+                    <button key={it.key} onClick={() => setTab(it.key)}
+                      className={`text-left px-2.5 py-1.5 rounded-2 text-[13px] whitespace-nowrap transition-colors ${
+                        tab === it.key
+                          ? 'bg-primary-light text-primary font-semibold'
+                          : 'text-text hover:bg-surface-2'
+                      }`}>
+                      {it.label}
+                    </button>
+                  ))}
+                </div>
+              </div>
+            ))}
+          </div>
+        </nav>
+
+        {/* ── Contenido del reporte activo ── */}
+        <div className="flex-1 min-w-0 flex flex-col gap-4">
 
         {/* ── Panel de filtros ── */}
         {tab !== 'individual' && <div className="bg-surface border border-border rounded-3 p-4 shadow-1 flex flex-col gap-3">
@@ -1070,6 +1146,88 @@ export default function ReportesPage() {
                   </div>
                 </Card>
               </div>
+            </>
+          )
+        })()}
+
+        {/* ════════════════════════════════════════════════════════════
+            TAB: DOCENTES POR MES
+        ════════════════════════════════════════════════════════════ */}
+        {tab === 'docentes-mensual' && dmQ.data && !isLoading && (() => {
+          const r = dmQ.data
+          const totalSes = r.meses.reduce((s, m) => s + m.sesiones, 0)
+          const totalTar = r.meses.reduce((s, m) => s + m.tardanzas, 0)
+          const promPunt = totalSes > 0 ? Math.round(((totalSes - totalTar) / totalSes) * 100) : 0
+          return (
+            <>
+              <div className="grid grid-cols-2 sm:grid-cols-4 gap-3.5">
+                <KPI label="Docentes"          value={r.docentes.length} sub="con registro"              accent="var(--color-primary)" />
+                <KPI label="Puntualidad prom." value={`${promPunt}%`}     sub="del rango"                 accent="var(--color-success)" />
+                <KPI label="Tardanzas"         value={totalTar}          sub="acumuladas"                accent="var(--color-warning)" />
+                <KPI label="Meses"             value={r.meses.length}    sub={`${r.desde} → ${r.hasta}`} accent="var(--color-info)" />
+              </div>
+
+              {r.meses.length > 0 && (
+                <Card title="Puntualidad de docentes por mes" subtitle="% de sesiones puntuales · 90% = referencia">
+                  <div className="px-4 pb-4 pt-2">
+                    <ResponsiveContainer width="100%" height={240}>
+                      <BarChart data={r.meses} margin={{ top: 8, right: 8, bottom: 0, left: -16 }}>
+                        <CartesianGrid strokeDasharray="3 3" stroke="var(--color-border)" />
+                        <XAxis dataKey="label" tick={{ fontSize: 10, fill: 'var(--color-text-mute)' }} />
+                        <YAxis domain={[0, 100]} tick={{ fontSize: 10, fill: 'var(--color-text-mute)' }} tickFormatter={(v) => `${v}%`} />
+                        <Tooltip content={<ChartTooltip />} />
+                        <ReferenceLine y={90} stroke="var(--color-success)" strokeDasharray="4 3" strokeOpacity={0.6} />
+                        <Bar dataKey="pct_puntualidad" name="Puntualidad" radius={[3, 3, 0, 0]}>
+                          {r.meses.map((m, i) => <Cell key={i} fill={m.pct_puntualidad >= 90 ? 'var(--color-success)' : m.pct_puntualidad >= 75 ? 'var(--color-warning)' : 'var(--color-danger)'} />)}
+                        </Bar>
+                      </BarChart>
+                    </ResponsiveContainer>
+                  </div>
+                </Card>
+              )}
+
+              <Card title="Detalle por docente" subtitle={`${filteredDm.length} de ${r.docentes.length} docentes`}>
+                <div className="px-3.5 pb-3 flex gap-2 items-center border-b border-border-s">
+                  <SearchInput value={dmSearch} onChange={setDmSearch} placeholder="Buscar docente…" />
+                  {dmSearch && <button onClick={() => setDmSearch('')} className="text-[11px] text-text-mute hover:text-text flex items-center gap-1"><X size={11}/>Limpiar</button>}
+                </div>
+                {filteredDm.length > 0 ? (
+                  <div className="overflow-x-auto">
+                    <table className="w-full border-collapse text-[13px]">
+                      <thead>
+                        <tr className="border-b border-border bg-surface-2/50">
+                          {[['nombre','Docente'],['sesiones','Sesiones'],['tardanzas','Tardanzas'],['pct_puntualidad','Puntualidad']].map(([k2,l]) => (
+                            <SortTh key={k2} label={l} sortKey={k2} current={dmSort} dir={dmDir} onSort={mkToggle(dmSort,setDmSort,dmDir,setDmDir)} />
+                          ))}
+                          {r.meses.map((m) => (
+                            <th key={m.mes} className="px-3 py-2.5 text-[11px] text-text-mute uppercase tracking-[0.04em] font-semibold text-center whitespace-nowrap">{m.label}</th>
+                          ))}
+                        </tr>
+                      </thead>
+                      <tbody>
+                        {filteredDm.map((d) => (
+                          <tr key={d.docente_id} className="border-t border-border-s hover:bg-surface-2/40">
+                            <td className="px-3.5 py-2.5 font-medium whitespace-nowrap">{d.nombre}</td>
+                            <td className="px-3.5 py-2.5 font-mono text-[12px]">{d.sesiones}</td>
+                            <td className="px-3.5 py-2.5 font-mono text-[12px] text-warning">{d.tardanzas}</td>
+                            <td className="px-3.5 py-2.5"><PctBar pct={d.pct_puntualidad} warn={90} /></td>
+                            {r.meses.map((m) => {
+                              const e = d.por_mes[m.mes]
+                              return (
+                                <td key={m.mes} className="px-3 py-2.5 text-center font-mono text-[12px]">
+                                  {e && e.pct !== null
+                                    ? <span className={e.pct>=90?'text-success':e.pct>=75?'text-warning':'text-danger'}>{e.pct}%</span>
+                                    : <span className="text-text-mute">—</span>}
+                                </td>
+                              )
+                            })}
+                          </tr>
+                        ))}
+                      </tbody>
+                    </table>
+                  </div>
+                ) : <EmptyState msg={r.docentes.length === 0 ? 'Sin registros de docentes en el rango.' : 'Ningún docente coincide con la búsqueda.'} />}
+              </Card>
             </>
           )
         })()}
@@ -1726,6 +1884,7 @@ export default function ReportesPage() {
           </>
         )}
 
+        </div>
       </div>
     </>
   )
