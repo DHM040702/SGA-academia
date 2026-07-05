@@ -1,4 +1,4 @@
-import { useQuery } from '@tanstack/react-query'
+import { useQuery, useMutation, useQueryClient } from '@tanstack/react-query'
 import api from '@/lib/api'
 
 export interface AuditoriaEvento {
@@ -59,6 +59,16 @@ export function useAuditoriaResumen() {
   return useQuery({
     queryKey: ['auditoria', 'resumen'],
     queryFn: () => api.get<AuditoriaResumen>('/auditoria/resumen').then((r) => r.data),
+  })
+}
+
+/** Purga el historial de auditoría hasta una fecha (sin `hasta` = todo hasta hoy). Solo admin. */
+export function usePurgarAuditoria() {
+  const qc = useQueryClient()
+  return useMutation({
+    mutationFn: (hasta?: string) =>
+      api.delete<{ eliminados: number }>('/auditoria', { params: hasta ? { hasta } : {} }).then((r) => r.data),
+    onSuccess: () => qc.invalidateQueries({ queryKey: ['auditoria'] }),
   })
 }
 

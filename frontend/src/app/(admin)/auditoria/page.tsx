@@ -5,10 +5,12 @@ import { Card } from '@/components/ui/card'
 import { Btn } from '@/components/ui/btn'
 import { Field } from '@/components/ui/field'
 import { Input } from '@/components/ui/input'
-import { Download } from '@/components/icons'
+import { Download, Trash } from '@/components/icons'
+import { useAuth } from '@/contexts/auth-context'
 import {
   useAuditoria,
   useAuditoriaResumen,
+  usePurgarAuditoria,
   exportarAuditoriaCsv,
   ACCION_LABELS,
   type AuditoriaFiltros,
@@ -34,14 +36,33 @@ function fmtFecha(iso: string) {
 }
 
 export default function AuditoriaPage() {
+  const { user } = useAuth()
+  const isAdmin = user?.rol === 'admin'
   const [filtros, setFiltros] = React.useState<AuditoriaFiltros>({ page: 1, limit: 20 })
   const [exportando, setExportando] = React.useState(false)
 
   const { data: page, isLoading } = useAuditoria(filtros)
   const { data: resumen } = useAuditoriaResumen()
+  const purgar = usePurgarAuditoria()
 
   function setF(patch: Partial<AuditoriaFiltros>) {
     setFiltros((f) => ({ ...f, ...patch, page: patch.page ?? 1 }))
+  }
+
+  async function handlePurgar() {
+    // Si hay un filtro "hasta" activo, se purga hasta esa fecha; si no, todo hasta hoy.
+    const hasta = filtros.hasta || undefined
+    const alcance = hasta ? `hasta el ${hasta}` : 'HASTA LA FECHA DE HOY (todo el historial)'
+    if (!confirm(
+      `⚠️ Vas a ELIMINAR de forma permanente los registros de auditoría ${alcance}.\n\n` +
+      `Esta acción no se puede deshacer. ¿Deseas continuar?`,
+    )) return
+    try {
+      const { eliminados } = await purgar.mutateAsync(hasta)
+      alert(`Se eliminaron ${eliminados} registro(s) de auditoría.`)
+    } catch {
+      alert('No se pudo purgar el registro de auditoría.')
+    }
   }
 
   async function handleExport() {
@@ -63,10 +84,20 @@ export default function AuditoriaPage() {
         title="Auditoría del sistema"
         crumbs={[{ label: 'Administración' }, { label: 'Auditoría' }]}
         action={
-          <Btn variant="secondary" size="sm" onClick={handleExport} disabled={exportando}>
-            <Download size={14} />
-            {exportando ? 'Exportando…' : 'Exportar CSV'}
-          </Btn>
+          <>
+            <Btn variant="secondary" size="sm" onClick={handleExport} disabled={exportando}>
+              <Download size={14} />
+              {exportando ? 'Exportando…' : 'Exportar CSV'}
+            </Btn>
+            {/* Purga del historial: SOLO admin */}
+            {isAdmin && (
+              <Btn variant="secondary" size="sm" onClick={handlePurgar} disabled={purgar.isPending}
+                className="text-danger border-danger/40 hover:bg-danger-light">
+                <Trash size={14} />
+                {purgar.isPending ? 'Borrando…' : 'Borrar historial'}
+              </Btn>
+            )}
+          </>
         }
       />
 

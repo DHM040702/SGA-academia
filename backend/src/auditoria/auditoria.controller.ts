@@ -1,6 +1,6 @@
-import { Controller, Get, Query, Res, UseGuards } from '@nestjs/common';
+import { Controller, Delete, Get, Query, Res, UseGuards } from '@nestjs/common';
 import type { Response } from 'express';
-import { ApiBearerAuth, ApiOperation, ApiTags } from '@nestjs/swagger';
+import { ApiBearerAuth, ApiOperation, ApiQuery, ApiTags } from '@nestjs/swagger';
 import { Rol } from '@prisma/client';
 import { JwtAuthGuard } from '../common/guards/jwt-auth.guard';
 import { RolesGuard } from '../common/guards/roles.guard';
@@ -37,5 +37,13 @@ export class AuditoriaController {
     res.setHeader('Content-Disposition', `attachment; filename="auditoria-${fecha}.csv"`);
     // BOM para que Excel respete los acentos
     res.send('﻿' + csv);
+  }
+
+  @Delete()
+  @Roles(Rol.admin) // sobrescribe el @Roles de la clase: SOLO admin puede purgar
+  @ApiOperation({ summary: 'Purgar el registro de auditoría hasta una fecha (solo admin)' })
+  @ApiQuery({ name: 'hasta', required: false, description: 'YYYY-MM-DD (sin valor = todo hasta hoy)' })
+  purgar(@Query('hasta') hasta?: string) {
+    return this.service.purgar(hasta);
   }
 }

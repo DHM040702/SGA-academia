@@ -151,4 +151,17 @@ export class AuditoriaService {
 
     return [head.map(esc).join(','), ...lines].join('\n');
   }
+
+  /**
+   * Purga registros de auditoría hasta una fecha (inclusive). Sin `hasta`,
+   * elimina TODO el historial hasta el momento actual. Devuelve cuántos borró.
+   * Solo debe exponerse a admin (control en el controller).
+   */
+  async purgar(hasta?: string): Promise<{ eliminados: number }> {
+    const corte = hasta ? new Date(`${hasta}T23:59:59`) : new Date();
+    const { count } = await this.prisma.auditoria.deleteMany({
+      where: { createdAt: { lte: corte } },
+    });
+    return { eliminados: count };
+  }
 }
