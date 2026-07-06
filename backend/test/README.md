@@ -38,24 +38,26 @@ cd ~/sga-academia/backend
 # 1) Crear una BD de prueba en el contenedor existente (no toca sga_db)
 docker exec sga-academia-postgres-1 psql -U sga_user -d sga_db -c "CREATE DATABASE sga_test;" || true
 
-# 2) Apuntar Prisma a la BD de prueba (usa el puerto host 5433 y la pass de backend/.env)
-export DATABASE_URL="postgresql://sga_user:LA_PASSWORD@localhost:5433/sga_test"
+# 2) Derivar la URL de prueba desde backend/.env (misma password/host, BD = sga_test)
+BASE=$(grep -E '^DATABASE_URL=' .env | cut -d= -f2- | tr -d '"')
+export DATABASE_URL="${BASE/\/sga_db/\/sga_test}"
+echo "$DATABASE_URL"   # ⚠️ DEBE terminar en /sga_test — NO /sga_db
 export JWT_SECRET=test JWT_REFRESH_SECRET=test JWT_EXPIRES_IN=15m NODE_ENV=test
 
-# 3) Esquema + datos de prueba
-#    (--url explícito: el datasource del schema no define `url`)
-pnpm prisma db push --skip-generate --url "$DATABASE_URL"
+# 3) Esquema + datos de prueba (dotenv NO pisa el export → usa sga_test)
+pnpm prisma db push --url "$DATABASE_URL"
 pnpm prisma db seed
 
-# 4) Correr
-pnpm test:e2e -- --runInBand --forceExit
+# 4) Correr (jest directo: NO `pnpm test:e2e -- ...`)
+pnpm exec jest --config ./test/jest-e2e.json --runInBand --forceExit
+pnpm test   # unit
 
 # 5) (Opcional) limpiar
 docker exec sga-academia-postgres-1 psql -U sga_user -d sga_db -c "DROP DATABASE sga_test;"
 ```
 
-> ⚠️ Nunca apuntes `DATABASE_URL` a `sga_db` (producción): `db push`/`seed`
-> **modifican** la base. Usa siempre `sga_test`.
+> ⚠️ Antes del `seed`, confirma que `echo $DATABASE_URL` diga **/sga_test**.
+> El seed hace `deleteMany()` al inicio: si apunta a `sga_db` **borra producción**.
 
 ## Notas
 - Las credenciales de prueba (contraseña = DNI) las siembra `prisma/seed.ts`:

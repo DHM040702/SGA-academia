@@ -56,14 +56,14 @@ jobs:
         run: pnpm prisma generate
 
       - name: Crear esquema en la BD de prueba
-        # El datasource del schema no define `url` (Prisma 7 + driver adapter),
-        # así que se la pasamos explícita al CLI.
-        run: pnpm prisma db push --skip-generate --url "$DATABASE_URL"
+        # prisma.config.js lee la URL de DATABASE_URL; se la pasamos explícita.
+        run: pnpm prisma db push --url "$DATABASE_URL"
 
       - name: Sembrar datos de prueba
         run: pnpm prisma db seed
 
       - name: Pruebas e2e
+        # jest directo (no `pnpm test:e2e -- ...`, que pasa los flags como patrón).
         # runInBand: una sola conexión a la BD; forceExit: el cliente ioredis del
         # throttle (fail-open) puede dejar un handle abierto sin Redis.
-        run: pnpm test:e2e -- --runInBand --forceExit
+        run: pnpm exec jest --config ./test/jest-e2e.json --runInBand --forceExit
