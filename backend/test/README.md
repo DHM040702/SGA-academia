@@ -14,9 +14,13 @@ código), solo `DATABASE_URL`.
   - **Reactivar alumno** y **purgar auditoría**: solo admin (director → 403).
   - **Biblioteca**: director en solo lectura (crear → 403).
 
-> Próximas tandas sugeridas: `asistencia.e2e-spec.ts` (scan marca presente/tardanza,
-> doble escaneo respeta `@@unique(persona,fecha)`, `stats?fecha`), `reportes`
-> (scoping al ciclo activo), y unit tests de los helpers de fecha UTC.
+- **`asistencia.e2e-spec.ts`** — flujos del kiosco:
+  - Scan de alumno por código (siempre presente) y de docente por DNI.
+  - **Doble escaneo** el mismo día → `yaRegistrado` (respeta `@@unique(persona,fecha)`).
+  - Código inexistente → 404, código corto → 400, `stats` devuelve métricas.
+
+> Próximas tandas sugeridas: `reportes` (scoping al ciclo activo, tardanzas
+> docentes con horario) y unit tests de los helpers de fecha/hora (Lima, UTC).
 
 ## Cómo ejecutarlas
 

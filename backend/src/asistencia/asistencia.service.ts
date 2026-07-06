@@ -2,6 +2,7 @@ import { BadRequestException, Injectable, NotFoundException } from '@nestjs/comm
 import { Prisma, TipoPersona } from '@prisma/client';
 import { PrismaService } from '../prisma/prisma.service';
 import { paginate } from '../common/dto/pagination.dto';
+import { limaMinutesOfDay, limaDiaSemana } from '../common/util/lima-time';
 import type { RegisterScanDto } from './dto/register-scan.dto';
 import type { ManualCorrectionDto } from './dto/manual-correction.dto';
 import type { FilterAsistenciaDto } from './dto/filter-asistencia.dto';
@@ -71,8 +72,8 @@ export class AsistenciaService {
     let esTardanza = false;
 
     if (docenteId) {
-      // Día de la semana: 0=Dom → 7, 1=Lun → 1, …, 6=Sáb → 6
-      const diaSemana = now.getDay() === 0 ? 7 : now.getDay();
+      // Día de la semana en Lima (independiente de la TZ del proceso).
+      const diaSemana = limaDiaSemana(now);
 
       const horariosHoy = await this.prisma.horario.findMany({
         where:   { docenteId, diaSemana },
@@ -83,17 +84,16 @@ export class AsistenciaService {
       if (horariosHoy.length > 0) {
         // Primera clase del día
         const primera = horariosHoy[0];
-        const TOLERANCIA_MS = 5 * 60_000; // 5 minutos de margen
+        const TOLERANCIA_MIN = 5; // 5 minutos de margen
 
-        const inicioMs =
-          primera.horaInicio.getUTCHours()   * 3_600_000 +
-          primera.horaInicio.getUTCMinutes() * 60_000;
+        // horaInicio (@db.Time) = hora de pared guardada en UTC → getUTC*.
+        const inicioMin =
+          primera.horaInicio.getUTCHours() * 60 + primera.horaInicio.getUTCMinutes();
 
-        const ahoraMs =
-          now.getHours()   * 3_600_000 +
-          now.getMinutes() * 60_000;
+        // Marca (@db.Timestamptz) = instante real → hora de pared de Lima.
+        const marcaMin = limaMinutesOfDay(now);
 
-        esTardanza = ahoraMs > inicioMs + TOLERANCIA_MS;
+        esTardanza = marcaMin > inicioMin + TOLERANCIA_MIN;
       }
     }
 

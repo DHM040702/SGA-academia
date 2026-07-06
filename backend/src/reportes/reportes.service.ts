@@ -1,6 +1,7 @@
 import { Injectable, NotFoundException } from '@nestjs/common';
 import { TipoPersona } from '@prisma/client';
 import { PrismaService } from '../prisma/prisma.service';
+import { limaMinutesOfDay } from '../common/util/lima-time';
 
 export interface AsistenciaGeneralParams {
   ciclo_id?: string;
@@ -956,7 +957,8 @@ export class ReportesService {
       const ref = primera[`${r.docenteId}|${dia}`];
       if (!ref) continue; // sin clase ese día → no aplica tardanza
 
-      const markMin = r.horaIngreso.getHours() * 60 + r.horaIngreso.getMinutes();
+      // Marca (@db.Timestamptz) → hora de pared de Lima, sin depender de la TZ del proceso.
+      const markMin = limaMinutesOfDay(r.horaIngreso);
       const minutosTarde = markMin - ref.min;
       if (minutosTarde > TOLERANCIA_MIN) {
         perDoc[r.docenteId].tardanzas++;
