@@ -59,6 +59,13 @@ jobs:
         # prisma.config.js lee la URL de DATABASE_URL; se la pasamos explícita.
         run: pnpm prisma db push --url "$DATABASE_URL"
 
+      - name: Tablas gestionadas por SQL manual (fuera de schema.prisma)
+        # refresh_tokens y el historial de biblioteca no están en el schema;
+        # sin ellas el seed falla (DELETE FROM refresh_tokens).
+        run: |
+          pnpm prisma db execute --url "$DATABASE_URL" --file prisma/migrations/manual_refresh_tokens.sql
+          pnpm prisma db execute --url "$DATABASE_URL" --file prisma/migrations/manual_biblioteca_historial.sql
+
       - name: Sembrar datos de prueba
         run: pnpm prisma db seed
 
