@@ -29,8 +29,9 @@ echo "==> 1/3 Esquema (db push)…"
 pnpm prisma db push --url "$DATABASE_URL"
 
 echo "==> 2/3 Tablas de SQL manual (fuera de schema.prisma)…"
-pnpm prisma db execute --url "$DATABASE_URL" --file prisma/migrations/manual_refresh_tokens.sql
-pnpm prisma db execute --url "$DATABASE_URL" --file prisma/migrations/manual_biblioteca_historial.sql
+# `prisma db execute` NO acepta --url en Prisma 7: usa la URL de DATABASE_URL (env).
+pnpm prisma db execute --file prisma/migrations/manual_refresh_tokens.sql
+pnpm prisma db execute --file prisma/migrations/manual_biblioteca_historial.sql
 
 echo "==> 3/3 Seed…"
 pnpm prisma db seed
