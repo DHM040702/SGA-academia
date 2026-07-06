@@ -895,4 +895,112 @@ export class ReportesService {
       docentes: docentesOut,
     };
   }
+
+  // ══════════════════════════════════════════════════════════════════
+  // TARDANZAS DE DOCENTES (relativas al HORARIO de cada docente)
+  // ──────────────────────────────────────────────────────────────────
+  // Un docente llega tarde si marca DESPUÉS del horaInicio de su primera clase
+  // del día (con 5 min de tolerancia, igual que el kiosco). Se recomputa contra
+  // el horario del ciclo para mostrar hora esperada y minutos de tardanza.
+  // Convención de horas idéntica al scan: horaInicio (@db.Time) → getUTC*;
+  // horaIngreso (@db.Timestamptz) → hora local del servidor.
+  // ══════════════════════════════════════════════════════════════════
+  async tardanzasDocentes(params: RangoCicloParams) {
+    const { ciclo_id, desde, hasta } = params;
+    const ahora = new Date();
+    const fechaHasta = hasta ? new Date(hasta) : new Date(ahora.getFullYear(), ahora.getMonth(), ahora.getDate());
+    const fechaDesde = desde ? new Date(desde) : new Date(fechaHasta.getTime() - 29 * 24 * 3600 * 1000);
+    const TOLERANCIA_MIN = 5;
+
+    // Primera clase (horaInicio mínimo) por docente y día de semana, dentro del
+    // ciclo (activo o pedido). Guarda minutos-del-día y el aula de esa clase.
+    const aulaIds = await this.scopedAulaIds(ciclo_id);
+    const horarios = await this.prisma.horario.findMany({
+      where: aulaIds !== undefined ? { aulaId: { in: aulaIds } } : undefined,
+      select: { docenteId: true, diaSemana: true, horaInicio: true, aula: { select: { nombre: true } } },
+    });
+    const primera: Record<string, { min: number; aula: string }> = {};
+    for (const h of horarios) {
+      const key = `${h.docenteId}|${h.diaSemana}`;
+      const min = h.horaInicio.getUTCHours() * 60 + h.horaInicio.getUTCMinutes();
+      if (!primera[key] || min < primera[key].min) primera[key] = { min, aula: h.aula?.nombre ?? '' };
+    }
+
+    const registros = await this.prisma.asistencia.findMany({
+      where: {
+        tipoPersona: TipoPersona.docente,
+        esAusente: false,
+        fecha: { gte: fechaDesde, lte: fechaHasta },
+      },
+      orderBy: [{ fecha: 'desc' }, { horaIngreso: 'asc' }],
+      select: {
+        docenteId: true, fecha: true, horaIngreso: true,
+        docente: { select: { nombre: true, apellidos: true } },
+      },
+    });
+
+    const hhmm = (min: number) =>
+      `${String(Math.floor(min / 60)).padStart(2, '0')}:${String(min % 60).padStart(2, '0')}`;
+
+    const perDoc: Record<string, { nombre: string; marcas: number; tardanzas: number; minutos: number }> = {};
+    const detalle: Array<Record<string, unknown>> = [];
+
+    for (const r of registros) {
+      if (!r.docenteId || !r.horaIngreso) continue;
+      const nombre = `${r.docente?.nombre ?? ''} ${r.docente?.apellidos ?? ''}`.trim();
+      if (!perDoc[r.docenteId]) perDoc[r.docenteId] = { nombre, marcas: 0, tardanzas: 0, minutos: 0 };
+      perDoc[r.docenteId].marcas++;
+
+      // Día de la semana del registro (fecha @db.Date guardada como medianoche UTC).
+      const dia = r.fecha.getUTCDay() === 0 ? 7 : r.fecha.getUTCDay();
+      const ref = primera[`${r.docenteId}|${dia}`];
+      if (!ref) continue; // sin clase ese día → no aplica tardanza
+
+      const markMin = r.horaIngreso.getHours() * 60 + r.horaIngreso.getMinutes();
+      const minutosTarde = markMin - ref.min;
+      if (minutosTarde > TOLERANCIA_MIN) {
+        perDoc[r.docenteId].tardanzas++;
+        perDoc[r.docenteId].minutos += minutosTarde;
+        detalle.push({
+          fecha: isoDate(r.fecha),
+          docente: nombre,
+          aula: ref.aula,
+          hora_esperada: hhmm(ref.min),
+          hora_marca: hhmm(markMin),
+          minutos_tarde: minutosTarde,
+        });
+      }
+    }
+
+    const docentes = Object.entries(perDoc)
+      .map(([docente_id, d]) => ({
+        docente_id,
+        nombre: d.nombre,
+        marcas: d.marcas,
+        tardanzas: d.tardanzas,
+        pct_tardanza: d.marcas > 0 ? Math.round((d.tardanzas / d.marcas) * 100) : 0,
+        minutos_totales: d.minutos,
+        minutos_promedio: d.tardanzas > 0 ? Math.round(d.minutos / d.tardanzas) : 0,
+      }))
+      .sort((a, b) => b.tardanzas - a.tardanzas || b.minutos_totales - a.minutos_totales);
+
+    const totMarcas = docentes.reduce((s, d) => s + d.marcas, 0);
+    const totTardanzas = docentes.reduce((s, d) => s + d.tardanzas, 0);
+    const totMinutos = docentes.reduce((s, d) => s + d.minutos_totales, 0);
+
+    return {
+      desde: isoDate(fechaDesde),
+      hasta: isoDate(fechaHasta),
+      tolerancia_min: TOLERANCIA_MIN,
+      kpis: {
+        docentes: docentes.length,
+        marcas: totMarcas,
+        tardanzas: totTardanzas,
+        pct_tardanza: totMarcas > 0 ? Math.round((totTardanzas / totMarcas) * 100) : 0,
+        minutos_totales: totMinutos,
+      },
+      docentes,
+      detalle,
+    };
+  }
 }

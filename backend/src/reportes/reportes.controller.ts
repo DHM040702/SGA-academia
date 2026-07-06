@@ -113,4 +113,14 @@ export class ReportesController {
   docentesMensual(@Query() params: RangoCicloParams) {
     return this.service.docentesMensual(params);
   }
+
+  @Get('tardanzas-docentes')
+  @Roles(Rol.admin, Rol.director)
+  @ApiOperation({ summary: 'Tardanzas de docentes según el horaInicio de su primera clase del día (tolerancia 5 min)' })
+  @ApiQuery({ name: 'ciclo_id', required: false })
+  @ApiQuery({ name: 'desde',    required: false, description: 'YYYY-MM-DD' })
+  @ApiQuery({ name: 'hasta',    required: false, description: 'YYYY-MM-DD' })
+  tardanzasDocentes(@Query() params: RangoCicloParams) {
+    return this.service.tardanzasDocentes(params);
+  }
 }

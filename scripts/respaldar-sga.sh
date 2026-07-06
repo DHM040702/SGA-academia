@@ -69,6 +69,9 @@ echo "==> Subido a $REMOTO/$FECHA/"
 # ── 4) Retención ──────────────────────────────────────────────────────────
 find "$DIR" -name "sga_db_*.dump"  -mtime "+$RETENCION_LOCAL_DIAS" -delete
 find "$DIR" -name "minio_*.tar.gz" -mtime "+$RETENCION_LOCAL_DIAS" -delete
-rclone delete "$REMOTO" --min-age "${RETENCION_NUBE_DIAS}d" --rmdirs || true
+# Borra copias en la nube más viejas que la retención; luego elimina SOLO las
+# carpetas de fecha que hayan quedado vacías (rmdirs ignora las no vacías, sin error).
+rclone delete "$REMOTO" --min-age "${RETENCION_NUBE_DIAS}d" || true
+rclone rmdirs "$REMOTO" --leave-root || true
 
 echo "==> [$(ts)] Respaldo completado."

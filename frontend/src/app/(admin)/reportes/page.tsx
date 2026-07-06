@@ -98,15 +98,30 @@ interface ReporteDocentesMensualData {
   desde: string; hasta: string; meses: MesDocenteRow[]; docentes: DocenteMensualRow[]
 }
 
-type ReportTab = 'asistencia' | 'docentes-mensual' | 'justificaciones' | 'ranking' | 'resumen' | 'alumnos' | 'horarios' | 'cursos' | 'individual'
+// Tardanzas de docentes (según horario de cada docente)
+interface TardanzaDocenteRow {
+  docente_id: string; nombre: string; marcas: number; tardanzas: number
+  pct_tardanza: number; minutos_totales: number; minutos_promedio: number
+}
+interface TardanzaDetalleRow {
+  fecha: string; docente: string; aula: string; hora_esperada: string; hora_marca: string; minutos_tarde: number
+}
+interface ReporteTardanzasDocentesData {
+  desde: string; hasta: string; tolerancia_min: number
+  kpis: { docentes: number; marcas: number; tardanzas: number; pct_tardanza: number; minutos_totales: number }
+  docentes: TardanzaDocenteRow[]; detalle: TardanzaDetalleRow[]
+}
+
+type ReportTab = 'asistencia' | 'docentes-mensual' | 'tardanzas-docentes' | 'justificaciones' | 'ranking' | 'resumen' | 'alumnos' | 'horarios' | 'cursos' | 'individual'
 type SortDir   = 'asc' | 'desc'
 
 /** Menú de reportes agrupado por categoría (navegación lateral). */
 const REPORT_MENU: { group: string; items: { key: ReportTab; label: string }[] }[] = [
   { group: 'Asistencia', items: [
-    { key: 'asistencia',       label: 'General' },
-    { key: 'docentes-mensual', label: 'Docentes por mes' },
-    { key: 'justificaciones',  label: 'Justificaciones' },
+    { key: 'asistencia',        label: 'General' },
+    { key: 'docentes-mensual',  label: 'Docentes por mes' },
+    { key: 'tardanzas-docentes', label: 'Tardanzas docentes' },
+    { key: 'justificaciones',   label: 'Justificaciones' },
     { key: 'ranking',          label: 'Ranking de aulas' },
     { key: 'resumen',          label: 'Resumen diario' },
     { key: 'individual',       label: 'Por alumno' },
@@ -210,6 +225,13 @@ function useReporteDocentesMensual(params: Record<string, string>, enabled: bool
   return useQuery<ReporteDocentesMensualData>({
     queryKey: ['reportes', 'docentes-mensual', params],
     queryFn: async () => { const { data } = await api.get('/reportes/docentes-mensual', { params }); return data },
+    enabled, staleTime: 0,
+  })
+}
+function useReporteTardanzasDocentes(params: Record<string, string>, enabled: boolean) {
+  return useQuery<ReporteTardanzasDocentesData>({
+    queryKey: ['reportes', 'tardanzas-docentes', params],
+    queryFn: async () => { const { data } = await api.get('/reportes/tardanzas-docentes', { params }); return data },
     enabled, staleTime: 0,
   })
 }
@@ -465,6 +487,19 @@ function exportExcelDocentesMensual(r: ReporteDocentesMensualData) {
   XLSX.writeFile(wb, 'reporte-docentes-mensual.xlsx')
 }
 
+function exportExcelTardanzasDocentes(r: ReporteTardanzasDocentesData) {
+  const wb = XLSX.utils.book_new()
+  XLSX.utils.book_append_sheet(wb, XLSX.utils.aoa_to_sheet([
+    ['Docente', 'Marcas', 'Tardanzas', '% Tardanza', 'Min. acumulados', 'Min. promedio'],
+    ...r.docentes.map((d) => [d.nombre, d.marcas, d.tardanzas, d.pct_tardanza, d.minutos_totales, d.minutos_promedio]),
+  ]), 'Por docente')
+  XLSX.utils.book_append_sheet(wb, XLSX.utils.aoa_to_sheet([
+    ['Fecha', 'Docente', 'Aula', 'Hora esperada', 'Hora de marca', 'Min. de tardanza'],
+    ...r.detalle.map((d) => [d.fecha, d.docente, d.aula, d.hora_esperada, d.hora_marca, d.minutos_tarde]),
+  ]), 'Detalle')
+  XLSX.writeFile(wb, 'reporte-tardanzas-docentes.xlsx')
+}
+
 function exportExcelAlumnoDetalle(r: ReporteAlumnoDetalleData) {
   const ESTADO_LABEL: Record<string, string> = { puntual: 'Puntual', tardanza: 'Tardanza', falta: 'Falta', justificada: 'Justificada' }
   const wb = XLSX.utils.book_new()
@@ -561,6 +596,8 @@ export default function ReportesPage() {
   const [rkSort,      setRkSort]      = useState('pct_asistencia');  const [rkDir,       setRkDir]       = useState<SortDir>('desc')
   const [dmSearch,    setDmSearch]    = useState('')
   const [dmSort,      setDmSort]      = useState('nombre');          const [dmDir,       setDmDir]       = useState<SortDir>('asc')
+  const [tdSearch,    setTdSearch]    = useState('')
+  const [tdSort,      setTdSort]      = useState('tardanzas');       const [tdDir,       setTdDir]       = useState<SortDir>('desc')
 
   /* ── Estados de query por tab ── */
   const [asisParams,  setAsisParams]   = useState<Record<string, string>>({})
@@ -579,6 +616,8 @@ export default function ReportesPage() {
   const [resEnabled,  setResEnabled]   = useState(false)
   const [dmParams,    setDmParams]     = useState<Record<string, string>>({})
   const [dmEnabled,   setDmEnabled]    = useState(false)
+  const [tdParams,    setTdParams]     = useState<Record<string, string>>({})
+  const [tdEnabled,   setTdEnabled]    = useState(false)
 
   const asisQ = useReporteAsistencia(asisParams, asisEnabled)
   const almQ  = useReporteAlumnos(almParams, almEnabled)
@@ -588,6 +627,7 @@ export default function ReportesPage() {
   const rkQ   = useReporteRanking(rkParams, rkEnabled)
   const resQ  = useReporteResumen(resParams, resEnabled)
   const dmQ   = useReporteDocentesMensual(dmParams, dmEnabled)
+  const tdQ   = useReporteTardanzasDocentes(tdParams, tdEnabled)
 
   /* ── Detalle on-screen del alumno seleccionado (tab Por alumno) ── */
   const indivDetalleParams = useMemo(() => {
@@ -656,6 +696,13 @@ export default function ReportesPage() {
       if (hastaEfec) p.hasta = hastaEfec
       setDmParams(p); setDmEnabled(true)
       setDmSearch('')
+    }
+    if (tab === 'tardanzas-docentes') {
+      // usa el horario del ciclo (activo o pedido) + rango de fechas
+      if (desdeEfec) base.desde = desdeEfec
+      if (hastaEfec) base.hasta = hastaEfec
+      setTdParams(base); setTdEnabled(true)
+      setTdSearch('')
     }
   }
 
@@ -770,9 +817,16 @@ export default function ReportesPage() {
     return sortRows(rows, dmSort, dmDir)
   }, [dmQ.data, dmSearch, dmSort, dmDir])
 
+  const filteredTd = useMemo(() => {
+    let rows = tdQ.data?.docentes ?? []
+    if (tdSearch) rows = rows.filter((d) => d.nombre.toLowerCase().includes(tdSearch.toLowerCase()))
+    return sortRows(rows, tdSort, tdDir)
+  }, [tdQ.data, tdSearch, tdSort, tdDir])
+
   /* ── Estado de carga del tab actual ── */
   const currentQ   = tab === 'asistencia' ? asisQ
     : tab === 'docentes-mensual' ? dmQ
+    : tab === 'tardanzas-docentes' ? tdQ
     : tab === 'justificaciones' ? justQ
     : tab === 'ranking' ? rkQ
     : tab === 'resumen' ? resQ
@@ -783,6 +837,7 @@ export default function ReportesPage() {
   const isError    = currentQ.isError
   const triggered  = tab === 'asistencia' ? asisEnabled
     : tab === 'docentes-mensual' ? dmEnabled
+    : tab === 'tardanzas-docentes' ? tdEnabled
     : tab === 'justificaciones' ? justEnabled
     : tab === 'ranking' ? rkEnabled
     : tab === 'resumen' ? resEnabled
@@ -793,7 +848,7 @@ export default function ReportesPage() {
   /* ── Filtros comunes que aplican al tab actual ── */
   const showAula    = tab === 'asistencia' || tab === 'alumnos' || tab === 'horarios' || tab === 'justificaciones'
   const showDocente = tab === 'asistencia' || tab === 'horarios'
-  const showPeriodo = tab === 'asistencia' || tab === 'docentes-mensual' || tab === 'justificaciones' || tab === 'ranking' || tab === 'resumen'
+  const showPeriodo = tab === 'asistencia' || tab === 'docentes-mensual' || tab === 'tardanzas-docentes' || tab === 'justificaciones' || tab === 'ranking' || tab === 'resumen'
 
   return (
     <>
@@ -815,6 +870,7 @@ export default function ReportesPage() {
               </>
             )}
             {tab === 'docentes-mensual' && dmQ.data && <Btn variant="secondary" icon={<Download size={14} />} size="sm" onClick={() => exportExcelDocentesMensual(dmQ.data!)}>Excel</Btn>}
+            {tab === 'tardanzas-docentes' && tdQ.data && <Btn variant="secondary" icon={<Download size={14} />} size="sm" onClick={() => exportExcelTardanzasDocentes(tdQ.data!)}>Excel</Btn>}
             {tab === 'alumnos'  && almQ.data  && <Btn variant="secondary" icon={<Download size={14} />} size="sm" onClick={() => exportExcelAlumnos(almQ.data!)}>Excel</Btn>}
             {tab === 'horarios' && horQ.data  && <Btn variant="secondary" icon={<Download size={14} />} size="sm" onClick={() => exportExcelHorarios(horQ.data!)}>Excel</Btn>}
             {tab === 'cursos'   && curQ.data  && <Btn variant="secondary" icon={<Download size={14} />} size="sm" onClick={() => exportExcelCursos(curQ.data!)}>Excel</Btn>}
@@ -1227,6 +1283,98 @@ export default function ReportesPage() {
                     </table>
                   </div>
                 ) : <EmptyState msg={r.docentes.length === 0 ? 'Sin registros de docentes en el rango.' : 'Ningún docente coincide con la búsqueda.'} />}
+              </Card>
+            </>
+          )
+        })()}
+
+        {/* ════════════════════════════════════════════════════════════
+            TAB: TARDANZAS DE DOCENTES (según su horario)
+        ════════════════════════════════════════════════════════════ */}
+        {tab === 'tardanzas-docentes' && tdQ.data && !isLoading && (() => {
+          const r = tdQ.data
+          const k = r.kpis
+          const top = r.docentes.filter((d) => d.tardanzas > 0).slice(0, 10)
+          const maxTd = top[0]?.tardanzas ?? 1
+          return (
+            <>
+              <div className="grid grid-cols-2 sm:grid-cols-4 gap-3.5">
+                <KPI label="Docentes"           value={k.docentes}          sub="con marcas"                    accent="var(--color-primary)" />
+                <KPI label="Tardanzas"          value={k.tardanzas}         sub={`de ${k.marcas} marcas`}       accent="var(--color-danger)" />
+                <KPI label="% Tardanza"         value={`${k.pct_tardanza}%`} sub={`tolerancia ${r.tolerancia_min} min`} accent="var(--color-warning)" />
+                <KPI label="Minutos acumulados" value={k.minutos_totales}   sub="de retraso"                    accent="var(--color-info)" />
+              </div>
+
+              {top.length > 0 && (
+                <Card title="Docentes con más tardanzas" subtitle="Top 10 · respecto al inicio de su primera clase">
+                  <div className="p-3 flex flex-col gap-0.5">
+                    {top.map((d) => (
+                      <MiniBar key={d.docente_id} label={d.nombre} value={d.tardanzas} max={maxTd} color="var(--color-danger)" />
+                    ))}
+                  </div>
+                </Card>
+              )}
+
+              <Card title="Resumen por docente" subtitle={`${filteredTd.length} de ${r.docentes.length} docentes`}>
+                <div className="px-3.5 pb-3 flex gap-2 items-center border-b border-border-s">
+                  <SearchInput value={tdSearch} onChange={setTdSearch} placeholder="Buscar docente…" />
+                  {tdSearch && <button onClick={() => setTdSearch('')} className="text-[11px] text-text-mute hover:text-text flex items-center gap-1"><X size={11}/>Limpiar</button>}
+                </div>
+                {filteredTd.length > 0 ? (
+                  <div className="overflow-x-auto">
+                    <table className="w-full border-collapse text-[13px]">
+                      <thead>
+                        <tr className="border-b border-border bg-surface-2/50">
+                          {[['nombre','Docente'],['marcas','Marcas'],['tardanzas','Tardanzas'],['pct_tardanza','% Tardanza'],['minutos_totales','Min. acum.'],['minutos_promedio','Min. prom.']].map(([k2,l]) => (
+                            <SortTh key={k2} label={l} sortKey={k2} current={tdSort} dir={tdDir} onSort={mkToggle(tdSort,setTdSort,tdDir,setTdDir)} />
+                          ))}
+                        </tr>
+                      </thead>
+                      <tbody>
+                        {filteredTd.map((d) => (
+                          <tr key={d.docente_id} className="border-t border-border-s hover:bg-surface-2/40">
+                            <td className="px-3.5 py-2.5 font-medium">{d.nombre}</td>
+                            <td className="px-3.5 py-2.5 font-mono text-[12px]">{d.marcas}</td>
+                            <td className="px-3.5 py-2.5 font-mono text-[12px] font-semibold text-danger">{d.tardanzas}</td>
+                            <td className="px-3.5 py-2.5 font-mono text-[12px]">
+                              <span className={d.pct_tardanza>=30?'text-danger':d.pct_tardanza>=10?'text-warning':'text-success'}>{d.pct_tardanza}%</span>
+                            </td>
+                            <td className="px-3.5 py-2.5 font-mono text-[12px]">{d.minutos_totales}′</td>
+                            <td className="px-3.5 py-2.5 font-mono text-[12px]">{d.minutos_promedio}′</td>
+                          </tr>
+                        ))}
+                      </tbody>
+                    </table>
+                  </div>
+                ) : <EmptyState msg={r.docentes.length === 0 ? 'Sin marcas de docentes en el período.' : 'Ningún docente coincide con la búsqueda.'} />}
+              </Card>
+
+              <Card title="Detalle de tardanzas" subtitle={`${r.detalle.length} eventos · hora esperada = inicio de la 1.ª clase`}>
+                {r.detalle.length > 0 ? (
+                  <div className="overflow-x-auto">
+                    <table className="w-full border-collapse text-[13px]">
+                      <thead>
+                        <tr className="border-b border-border bg-surface-2/50">
+                          {['Fecha','Docente','Aula','Esperada','Marca','Min. tarde'].map((l) => (
+                            <th key={l} className="px-3.5 py-2.5 text-[11px] text-text-mute uppercase tracking-[0.04em] font-semibold text-left">{l}</th>
+                          ))}
+                        </tr>
+                      </thead>
+                      <tbody>
+                        {r.detalle.map((d, i) => (
+                          <tr key={`${d.docente}-${d.fecha}-${i}`} className="border-t border-border-s hover:bg-surface-2/40">
+                            <td className="px-3.5 py-2.5 font-mono text-[12px] whitespace-nowrap">{d.fecha}</td>
+                            <td className="px-3.5 py-2.5 font-medium">{d.docente}</td>
+                            <td className="px-3.5 py-2.5 text-[12px] text-text-mute">{d.aula || '—'}</td>
+                            <td className="px-3.5 py-2.5 font-mono text-[12px]">{d.hora_esperada}</td>
+                            <td className="px-3.5 py-2.5 font-mono text-[12px] text-danger">{d.hora_marca}</td>
+                            <td className="px-3.5 py-2.5 font-mono text-[12px] font-semibold text-danger">+{d.minutos_tarde}′</td>
+                          </tr>
+                        ))}
+                      </tbody>
+                    </table>
+                  </div>
+                ) : <EmptyState msg="Sin tardanzas de docentes en el período." />}
               </Card>
             </>
           )

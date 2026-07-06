@@ -1,0 +1,69 @@
+name: backend-e2e
+
+# Ejecuta las pruebas e2e del backend contra un Postgres efímero.
+# Corre en Linux (donde pnpm y Prisma funcionan) en cada push / PR.
+on:
+  push:
+    paths: ['backend/**', '.github/workflows/backend-e2e.yml']
+  pull_request:
+    paths: ['backend/**']
+  workflow_dispatch: {}
+
+jobs:
+  e2e:
+    runs-on: ubuntu-latest
+    defaults:
+      run:
+        working-directory: backend
+
+    services:
+      postgres:
+        image: postgres:16
+        env:
+          POSTGRES_USER: sga_user
+          POSTGRES_PASSWORD: sga_pass
+          POSTGRES_DB: sga_test
+        ports: ['5432:5432']
+        options: >-
+          --health-cmd "pg_isready -U sga_user -d sga_test"
+          --health-interval 5s --health-timeout 5s --health-retries 20
+
+    env:
+      DATABASE_URL: postgresql://sga_user:sga_pass@localhost:5432/sga_test
+      JWT_SECRET: test-jwt-secret
+      JWT_REFRESH_SECRET: test-jwt-refresh-secret
+      JWT_EXPIRES_IN: 15m
+      NODE_ENV: test
+      # Sin Redis ni MinIO: ambos son fail-open en el código.
+
+    steps:
+      - uses: actions/checkout@v4
+
+      - uses: pnpm/action-setup@v4
+        with:
+          version: 9
+
+      - uses: actions/setup-node@v4
+        with:
+          node-version: 20
+          cache: pnpm
+          cache-dependency-path: backend/pnpm-lock.yaml
+
+      - name: Instalar dependencias
+        run: pnpm install --frozen-lockfile
+
+      - name: Generar cliente Prisma
+        run: pnpm prisma generate
+
+      - name: Crear esquema en la BD de prueba
+        # El datasource del schema no define `url` (Prisma 7 + driver adapter),
+        # así que se la pasamos explícita al CLI.
+        run: pnpm prisma db push --skip-generate --url "$DATABASE_URL"
+
+      - name: Sembrar datos de prueba
+        run: pnpm prisma db seed
+
+      - name: Pruebas e2e
+        # runInBand: una sola conexión a la BD; forceExit: el cliente ioredis del
+        # throttle (fail-open) puede dejar un handle abierto sin Redis.
+        run: pnpm test:e2e -- --runInBand --forceExit
