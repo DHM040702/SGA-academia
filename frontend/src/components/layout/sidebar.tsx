@@ -38,6 +38,7 @@ const GROUPS_ADMIN: NavGroup[] = [
     label: 'Operaciones',
     items: [
       { href: '/asistencia',    icon: Check,      label: 'Asistencia' },
+      { href: '/salidas',       icon: LogOut,     label: 'Salidas' },
       { href: '/inasistencias', icon: FileText,   label: 'Inasistencias' },
       { href: '/registros',     icon: Chart,      label: 'Registros' },
       { href: '/carnets',       icon: CreditCard, label: 'Carnets' },
@@ -78,6 +79,7 @@ const GROUPS_DIRECTOR: NavGroup[] = [
     label: 'Operaciones',
     items: [
       { href: '/asistencia',    icon: Check,      label: 'Asistencia' },
+      { href: '/salidas',       icon: LogOut,     label: 'Salidas' },
       { href: '/inasistencias', icon: FileText,   label: 'Inasistencias' },
       { href: '/registros',     icon: Chart,      label: 'Registros' },
       { href: '/carnets',       icon: CreditCard, label: 'Carnets' },
@@ -109,6 +111,7 @@ const GROUPS_AUXILIAR: NavGroup[] = [
     items: [
       { href: '/auxiliar',     icon: ScanLine, label: 'Registro asistencia' },
       { href: '/asistencia',    icon: Check,    label: 'Asistencia' },
+      { href: '/salidas',       icon: LogOut,   label: 'Salidas' },
       { href: '/inasistencias', icon: FileText, label: 'Inasistencias' },
       { href: '/registros',     icon: Chart,    label: 'Registros' },
     ],
