@@ -145,7 +145,7 @@ async function main() {
         data: {
           dni: d.dni, nombre: d.nombre, apellidos: d.apellidos,
           especialidad: d.especialidad, telefonoWhatsapp: d.tel,
-          usuario: { create: { email: d.email, passwordHash: await hashDni(d.dni), rol: Rol.docente } },
+          usuario: { create: { email: d.email, passwordHash: await hashDni(d.dni), rol: Rol.docente, dni: d.dni } },
         },
       }),
     ),
@@ -210,6 +210,7 @@ async function main() {
               email: `alumno${pad(i + 1, 3)}@cepreunasam.edu.pe`,
               passwordHash: await hashDni(a.dni),
               rol: Rol.alumno,
+              dni: a.dni,
             },
           },
         },
@@ -326,7 +327,18 @@ async function main() {
   }
   await prisma.asistencia.createMany({ data: alumnoAsist })
 
-  // ─ Docentes
+  // ─ Docentes: la marca se calcula RELATIVA al inicio de su primera clase del
+  //   día (misma regla que el kiosco/reporte), en hora de pared de Lima, para
+  //   que las tardanzas de docentes sean realistas. ~37 % tardanzas.
+  //   Primera clase (minutos de pared) por docente y día de semana:
+  const primeraClase = new Map<string, number>()
+  for (const h of horariosData) {
+    const key = `${h.docenteId}|${h.diaSemana}`
+    const min = h.horaInicio.getUTCHours() * 60 + h.horaInicio.getUTCMinutes()
+    const cur = primeraClase.get(key)
+    if (cur === undefined || min < cur) primeraClase.set(key, min)
+  }
+
   const docenteAsist: Array<{
     tipoPersona: TipoPersona; docenteId: string; fecha: Date
     horaIngreso: Date; esTardanza: boolean; esManual: boolean; registradoPorId: string
@@ -334,16 +346,23 @@ async function main() {
 
   for (let di = 0; di < docentes.length; di++) {
     for (let dayIdx = 0; dayIdx < schoolDays.length; dayIdx++) {
+      const dateStr = schoolDays[dayIdx]
+      const dow = new Date(`${dateStr}T12:00:00Z`).getUTCDay()  // 0=Dom … 6=Sáb
+      const dia = dow === 0 ? 7 : dow
+      const inicioMin = primeraClase.get(`${docentes[di].id}|${dia}`)
+      if (inicioMin === undefined) continue                     // sin clase ese día
       const v = det(di + 30, dayIdx)
-      if (v < 3) continue                         // 3 % ausencia
-      const tardanza = v < 8
-      const min = tardanza ? 18 + (v % 10) : (v % 8)
+      if (v < 3) continue                                       // 3 % ausencia
+      const tardanza = v < 40                                   // ~37 % tardanza
+      const desfase  = tardanza ? 8 + (v % 30) : -(3 + (v % 10)) // min tarde / antes
+      const markMin  = inicioMin + desfase
       docenteAsist.push({
         tipoPersona: TipoPersona.docente,
         docenteId:   docentes[di].id,
-        fecha:       new Date(schoolDays[dayIdx]),
-        horaIngreso: new Date(`${schoolDays[dayIdx]}T07:${pad(min)}:00.000Z`),
-        esTardanza:  tardanza,
+        fecha:       new Date(dateStr),
+        // Hora de pared de Lima (UTC−5) → instante UTC = pared + 5 h.
+        horaIngreso: new Date(`${dateStr}T${pad(Math.floor(markMin / 60) + 5)}:${pad(markMin % 60)}:00.000Z`),
+        esTardanza:  desfase > 5,
         esManual:    false,
         registradoPorId: auxiliar.id,
       })
