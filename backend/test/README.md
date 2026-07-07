@@ -19,8 +19,19 @@ código), solo `DATABASE_URL`.
   - **Doble escaneo** el mismo día → `yaRegistrado` (respeta `@@unique(persona,fecha)`).
   - Código inexistente → 404, código corto → 400, `stats` devuelve métricas.
 
-> Próximas tandas sugeridas: `reportes` (scoping al ciclo activo, tardanzas
-> docentes con horario) y unit tests de los helpers de fecha/hora (Lima, UTC).
+- **`reportes.e2e-spec.ts`** — cada reporte responde con su forma esperada
+  (asistencia, tardanzas-docentes con tolerancia 5 min, docentes-mensual,
+  ranking-aulas, resumen-diario, asistencia-alumno) + alumno inexistente → 404.
+
+- **`alumnos.e2e-spec.ts`** — ciclo de vida: baja (soft-delete) → desaparece de
+  activos → aparece con `estado=inactivo` → **reactivación** → vuelve a activos.
+
+**Unit** (corren con `pnpm test`):
+- **`src/common/util/lima-time.spec.ts`** — conversión a hora de pared de Lima
+  (cálculo de tardanzas), incluidos los cruces de medianoche y de día.
+
+> Próximas tandas sugeridas: filtro global de Prisma (P2002→409), justificación
+> de inasistencias, y cerrarTurno (genera faltas).
 
 ## Cómo ejecutarlas
 
