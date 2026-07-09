@@ -47,6 +47,9 @@ export default function AuxiliarPage() {
   const [manualCode, setManualCode]     = useState('')
   const [inputFocused, setInputFocused] = useState(false)
   const [sidebarOpen, setSidebarOpen]   = useState(false)
+  const [habilitarPrompt, setHabilitarPrompt] = useState<
+    { codigo: string; nombre: string; puedeHabilitar: boolean } | null
+  >(null)
   const bufferTimer    = useRef<ReturnType<typeof setTimeout> | undefined>(undefined)
   const manualInputRef = useRef<HTMLInputElement>(null)
 
@@ -66,10 +69,21 @@ export default function AuxiliarPage() {
     return () => clearInterval(id)
   }, [])
 
-  function processCode(code: string) {
+  function processCode(code: string, habilitar = false) {
     if (!code || scanMut.isPending) return
-    scanMut.mutateAsync({ codigo: code })
+    scanMut.mutateAsync({ codigo: code, habilitar })
       .then((result) => {
+        // Alumno deshabilitado: preguntar si se desea habilitarlo antes de registrar.
+        if (result?.requiereHabilitacion) {
+          const a = result.alumno
+          setHabilitarPrompt({
+            codigo: code,
+            nombre: `${a.nombre} ${a.apellidos}`.trim(),
+            puedeHabilitar: !!result.puedeHabilitar,
+          })
+          setScanState('idle')
+          return
+        }
         const alumno  = result?.alumno
         const docente = result?.docente
         const persona = alumno ?? docente
@@ -113,8 +127,24 @@ export default function AuxiliarPage() {
     processCode(code)
   }
 
+  function confirmarHabilitar() {
+    if (!habilitarPrompt) return
+    const { codigo } = habilitarPrompt
+    setHabilitarPrompt(null)
+    processCode(codigo, true) // reintenta habilitando al alumno
+  }
+
+  function cancelarHabilitar() {
+    if (!habilitarPrompt) return
+    const { nombre } = habilitarPrompt
+    setHabilitarPrompt(null)
+    setErrorMsg(`${nombre} permanece deshabilitado. Asistencia no registrada.`)
+    setScanState('error')
+    setTimeout(() => setScanState('idle'), 3000)
+  }
+
   const handleKeyDown = useCallback((e: KeyboardEvent) => {
-    if (inputFocused) return
+    if (inputFocused || habilitarPrompt) return
     if (e.key === 'Enter') {
       const code = buffer.trim()
       setBuffer('')
@@ -126,7 +156,7 @@ export default function AuxiliarPage() {
       bufferTimer.current = setTimeout(() => setBuffer(''), 300)
     }
     // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [buffer, inputFocused])
+  }, [buffer, inputFocused, habilitarPrompt])
 
   useEffect(() => {
     window.addEventListener('keydown', handleKeyDown)
@@ -447,6 +477,75 @@ export default function AuxiliarPage() {
           >
             <FeedPanel feed={feed} onClose={() => setSidebarOpen(false)} />
           </aside>
+        </div>
+      )}
+
+      {/* ════════════ PROMPT: alumno deshabilitado ════════════ */}
+      {habilitarPrompt && (
+        <div
+          className="fixed inset-0 z-[60] flex items-center justify-center p-4"
+          style={{ background: 'rgba(0,0,0,.62)' }}
+          onClick={cancelarHabilitar}
+        >
+          <div
+            className="w-full max-w-md rounded-2xl p-6 text-center"
+            style={{ background: '#211d18', border: '1px solid rgba(255,255,255,.14)', boxShadow: '0 20px 60px rgba(0,0,0,.5)' }}
+            onClick={(e) => e.stopPropagation()}
+          >
+            <div
+              className="w-16 h-16 rounded-full flex items-center justify-center mx-auto mb-4 text-3xl"
+              style={{ background: 'rgba(251,191,36,.14)', border: '2px solid rgba(251,191,36,.4)' }}
+            >
+              ⚠
+            </div>
+            <h2 className="font-serif text-xl font-semibold m-0 mb-1" style={{ color: '#fbbf24' }}>
+              Alumno deshabilitado
+            </h2>
+            <p className="text-[14px] m-0 mb-1 font-semibold text-white">
+              {habilitarPrompt.nombre}
+            </p>
+            <p className="text-[12px] opacity-70 m-0 mb-5 font-mono">{habilitarPrompt.codigo}</p>
+
+            {habilitarPrompt.puedeHabilitar ? (
+              <>
+                <p className="text-[13px] opacity-80 m-0 mb-5 leading-relaxed">
+                  Este alumno fue dado de baja. ¿Desea <strong>habilitarlo</strong> y
+                  registrar su asistencia?
+                </p>
+                <div className="flex gap-3 justify-center">
+                  <button
+                    onClick={cancelarHabilitar}
+                    className="px-5 py-2.5 rounded-lg text-[13px] font-semibold flex-1"
+                    style={{ background: 'rgba(255,255,255,.08)', color: '#fff', border: '1px solid rgba(255,255,255,.18)' }}
+                  >
+                    No, cancelar
+                  </button>
+                  <button
+                    onClick={confirmarHabilitar}
+                    disabled={scanMut.isPending}
+                    className="px-5 py-2.5 rounded-lg text-[13px] font-semibold flex-1 disabled:opacity-40"
+                    style={{ background: 'rgba(80,170,90,.25)', color: '#7be087', border: '1px solid rgba(80,170,90,.5)' }}
+                  >
+                    Sí, habilitar y registrar
+                  </button>
+                </div>
+              </>
+            ) : (
+              <>
+                <p className="text-[13px] opacity-80 m-0 mb-5 leading-relaxed">
+                  Este alumno fue dado de baja. Solo un <strong>administrador</strong> o
+                  <strong> auxiliar</strong> puede habilitarlo.
+                </p>
+                <button
+                  onClick={cancelarHabilitar}
+                  className="px-5 py-2.5 rounded-lg text-[13px] font-semibold w-full"
+                  style={{ background: 'rgba(255,255,255,.08)', color: '#fff', border: '1px solid rgba(255,255,255,.18)' }}
+                >
+                  Entendido
+                </button>
+              </>
+            )}
+          </div>
         </div>
       )}
     </div>

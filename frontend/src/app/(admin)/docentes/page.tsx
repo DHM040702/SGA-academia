@@ -2,7 +2,7 @@
 
 import * as React from 'react'
 import { useRouter } from 'next/navigation'
-import { useDocentes, useDeleteDocente } from '@/hooks/use-docentes'
+import { useDocentes, useDeleteDocente, type Docente } from '@/hooks/use-docentes'
 import { Avatar } from '@/components/ui/avatar'
 import { Pill } from '@/components/ui/pill'
 import { KPI } from '@/components/ui/kpi'
@@ -12,6 +12,22 @@ import { PageHeader } from '@/components/layout/page-header'
 import { Search, Plus, Download, More, Eye, Edit, Trash, ChevL, ChevR } from '@/components/icons'
 import { useAuth } from '@/contexts/auth-context'
 import { cn } from '@/lib/utils'
+
+/* ─── Helper: genera y descarga el carnet de un docente ──────── */
+async function descargarCarnetDocente(docente: Docente) {
+  const { CarnetDocentePDF } = await import('@/components/reportes/carnet-docente-pdf')
+  const { pdf } = await import('@react-pdf/renderer')
+  const blob = await pdf(CarnetDocentePDF({ docente }) as React.ReactElement<any>).toBlob()
+  const url  = URL.createObjectURL(blob)
+  const link = Object.assign(document.createElement('a'), {
+    href: url,
+    download: `carnet-docente-${docente.apellidos ?? ''}-${docente.dni}.pdf`,
+  })
+  document.body.appendChild(link)
+  link.click()
+  document.body.removeChild(link)
+  URL.revokeObjectURL(url)
+}
 
 /* ── Pagination ─────────────────────────────────────────────────── */
 function Pagination({ page, totalPages, onPage }: { page: number; totalPages: number; onPage: (p: number) => void }) {
@@ -49,15 +65,25 @@ function Pagination({ page, totalPages, onPage }: { page: number; totalPages: nu
 }
 
 /* ── RowMenu ────────────────────────────────────────────────────── */
-function RowMenu({ id, name, onClose, readOnly }: { id: string; name: string; onClose: () => void; readOnly?: boolean }) {
+function RowMenu({ docente, onClose, readOnly }: { docente: Docente; onClose: () => void; readOnly?: boolean }) {
   const router = useRouter()
   const deleteDocente = useDeleteDocente()
+  const id = docente.id
+  const name = `${docente.nombre} ${docente.apellidos}`
+  const [carnetLoading, setCarnetLoading] = React.useState(false)
 
   function go(path: string) { router.push(path); onClose() }
 
   function handleDelete() {
     if (!confirm(`¿Eliminar a ${name}? Esta acción aplica soft-delete.`)) return
     deleteDocente.mutate(id, { onSuccess: onClose })
+  }
+
+  async function handleCarnet() {
+    setCarnetLoading(true)
+    try { await descargarCarnetDocente(docente); onClose() }
+    catch { alert('No se pudo generar el carnet.') }
+    finally { setCarnetLoading(false) }
   }
 
   return (
@@ -67,6 +93,13 @@ function RowMenu({ id, name, onClose, readOnly }: { id: string; name: string; on
         className="w-full text-left flex items-center gap-2 px-3 py-2 text-[12.5px] hover:bg-surface2 transition-colors border-none bg-transparent cursor-pointer font-sans"
       >
         <Eye size={13} className="text-text-mute" />Ver detalle
+      </button>
+      <button
+        onClick={handleCarnet}
+        disabled={carnetLoading}
+        className="w-full text-left flex items-center gap-2 px-3 py-2 text-[12.5px] hover:bg-surface2 transition-colors border-none bg-transparent cursor-pointer font-sans disabled:opacity-50"
+      >
+        <Download size={13} className="text-text-mute" />{carnetLoading ? 'Generando…' : 'Generar carnet'}
       </button>
       {!readOnly && (
         <>
@@ -249,7 +282,7 @@ export default function DocentesPage() {
                             <More size={15} />
                           </Btn>
                           {openMenu === d.id && (
-                            <RowMenu id={d.id} name={name} onClose={() => setOpenMenu(null)} readOnly={readOnly} />
+                            <RowMenu docente={d} onClose={() => setOpenMenu(null)} readOnly={readOnly} />
                           )}
                         </div>
                       </td>

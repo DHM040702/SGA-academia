@@ -194,6 +194,66 @@ export default function CarnetsPage() {
   const selCount    = Object.values(selAlumnos).length
   const selPagesCnt = Math.ceil(selCount / 10)
 
+  /* ── 5. Docentes ───────────────────────────────────────────── */
+  const [docSearch,     setDocSearch]     = useState('')
+  const [docSeleccion,  setDocSeleccion]  = useState<Record<string, any>>({})
+  const [docLoadSheet,  setDocLoadSheet]  = useState(false)
+  const [docLoadBatch,  setDocLoadBatch]  = useState(false)
+  const [docLoadTodos,  setDocLoadTodos]  = useState(false)
+
+  const { data: docResults = [] } = useQuery<any[]>({
+    queryKey: ['docentes', 'carnets-sel', docSearch],
+    queryFn:  async () => {
+      const { data } = await api.get('/docentes', { params: { q: docSearch, limit: 10, page: 1 } })
+      return data?.data ?? []
+    },
+    enabled:   docSearch.trim().length >= 2,
+    staleTime: 30_000,
+  })
+
+  function toggleDoc(d: any) {
+    setDocSeleccion((prev) => {
+      if (prev[d.id]) { const { [d.id]: _, ...rest } = prev; return rest }
+      return { ...prev, [d.id]: d }
+    })
+  }
+
+  async function descargarDocentesSeleccion(modo: 'sheet' | 'batch') {
+    const docentes = Object.values(docSeleccion)
+    if (!docentes.length) return
+    const setLoad = modo === 'sheet' ? setDocLoadSheet : setDocLoadBatch
+    setLoad(true)
+    try {
+      const cicloLabel = cicloActivo?.nombre ?? '2026-I'
+      const mod = await import('@/components/reportes/carnet-docente-pdf')
+      const comp = modo === 'sheet'
+        ? mod.CarnetDocenteSheetPDF({ docentes, cicloLabel })
+        : mod.CarnetDocenteBatchPDF({ docentes, cicloLabel })
+      await downloadPDF(
+        comp,
+        `carnets-docentes-${modo === 'sheet' ? 'hoja-A4' : 'tarjeton'}-${docentes.length}.pdf`,
+      )
+    } catch { alert('No se pudo generar los carnets.') }
+    finally { setLoad(false) }
+  }
+
+  async function descargarTodosDocentes() {
+    setDocLoadTodos(true)
+    try {
+      const { data } = await api.get('/docentes', { params: { limit: 500, page: 1 } })
+      const docentes = data?.data ?? []
+      if (!docentes.length) { alert('No hay docentes para generar carnets.'); return }
+      const { CarnetDocenteSheetPDF } = await import('@/components/reportes/carnet-docente-pdf')
+      await downloadPDF(
+        CarnetDocenteSheetPDF({ docentes, cicloLabel: cicloActivo?.nombre ?? '2026-I' }),
+        `carnets-docentes-hoja-A4-todos.pdf`,
+      )
+    } catch { alert('No se pudo generar los carnets.') }
+    finally { setDocLoadTodos(false) }
+  }
+
+  const docCount = Object.values(docSeleccion).length
+
   /* ══════════════════════════════════════════════════════════════
      RENDER
   ══════════════════════════════════════════════════════════════ */
@@ -503,6 +563,120 @@ export default function CarnetsPage() {
                 Busca y selecciona alumnos para comenzar.
               </p>
             )}
+          </div>
+        </div>
+      </Card>
+
+      {/* ══ 5. CARNETS DE DOCENTES ════════════════════════════════ */}
+      <Card
+        title="Carnets de docentes"
+        subtitle="El código de barras del carnet es el DNI del docente (igual al que marca el kiosco)"
+      >
+        <div className="p-4 flex flex-col gap-4">
+
+          {/* Todos los docentes */}
+          <div className="flex flex-wrap items-center gap-3 pb-4 border-b border-border-s">
+            <Btn
+              size="sm"
+              icon={<Download size={14} />}
+              disabled={docLoadTodos}
+              onClick={descargarTodosDocentes}
+            >
+              {docLoadTodos ? 'Generando…' : 'Todos los docentes · Hoja A4'}
+            </Btn>
+            <p className="text-[11.5px] text-text-mute">
+              Genera una hoja A4 vertical con todos los docentes (10 por página, guías de corte).
+            </p>
+          </div>
+
+          {/* Selección libre de docentes */}
+          <div className="relative max-w-[520px]">
+            <Search size={13} className="absolute left-2.5 top-1/2 -translate-y-1/2 text-text-mute pointer-events-none" />
+            <input
+              type="text"
+              value={docSearch}
+              onChange={(e) => setDocSearch(e.target.value)}
+              placeholder="Buscar docente por nombre, apellidos o DNI…"
+              autoComplete="off"
+              className="w-full pl-8 pr-3 py-2 text-[13px] border border-border rounded-2 bg-surface focus:outline-none focus:ring-1 focus:ring-primary"
+            />
+            {docSearch.trim().length >= 2 && (
+              <div className="absolute z-10 top-full left-0 right-0 mt-1 bg-surface border border-border rounded-2 shadow-2 overflow-hidden">
+                {docResults.length === 0
+                  ? <p className="text-[12px] text-text-mute text-center py-3">Sin resultados para «{docSearch}»</p>
+                  : docResults.map((d: any) => {
+                      const checked = Boolean(docSeleccion[d.id])
+                      return (
+                        <button key={d.id} onClick={() => toggleDoc(d)}
+                          className={`w-full text-left px-3.5 py-2.5 text-[13px] flex items-center gap-3 border-b border-border-s last:border-0 transition-colors ${
+                            checked ? 'bg-primary/8' : 'hover:bg-surface-2'
+                          }`}>
+                          <span className={`w-4 h-4 rounded border flex-shrink-0 flex items-center justify-center text-[10px] font-bold transition-colors ${
+                            checked ? 'bg-primary border-primary text-white' : 'border-border'
+                          }`}>
+                            {checked ? '✓' : ''}
+                          </span>
+                          <div className="flex-1 min-w-0">
+                            <span className="font-semibold">{d.apellidos ?? ''}{d.apellidos ? ', ' : ''}{d.nombre ?? ''}</span>
+                            {d.especialidad && <span className="text-text-mute ml-2 text-[11px]">· {d.especialidad}</span>}
+                          </div>
+                          <span className="font-mono text-[11px] text-primary flex-shrink-0">{d.dni}</span>
+                        </button>
+                      )
+                    })}
+              </div>
+            )}
+          </div>
+
+          {/* Chips seleccionados */}
+          {docCount > 0 && (
+            <div className="flex flex-col gap-2">
+              <div className="flex items-center justify-between">
+                <span className="text-[12px] font-semibold text-text-mute uppercase tracking-[0.04em]">
+                  Seleccionados ({docCount})
+                </span>
+                <button onClick={() => setDocSeleccion({})} className="text-[11px] text-danger hover:underline">
+                  Limpiar todo
+                </button>
+              </div>
+              <div className="flex flex-wrap gap-2 max-h-[150px] overflow-y-auto">
+                {Object.values(docSeleccion).map((d: any) => (
+                  <span key={d.id}
+                    className="inline-flex items-center gap-1.5 px-2.5 py-1 bg-primary/10 text-primary text-[12px] rounded-full border border-primary/20">
+                    <span className="font-medium truncate max-w-[180px]">
+                      {d.apellidos ?? ''}{d.apellidos ? ', ' : ''}{d.nombre ?? ''}
+                    </span>
+                    <button onClick={() => toggleDoc(d)} className="text-primary/60 hover:text-danger leading-none flex-shrink-0" title="Quitar">✕</button>
+                  </span>
+                ))}
+              </div>
+            </div>
+          )}
+
+          {/* Botones de generación de la selección */}
+          <div className="flex flex-wrap items-center gap-3 pt-1 border-t border-border-s">
+            <Btn
+              variant="secondary"
+              size="sm"
+              icon={<Download size={14} />}
+              disabled={docCount === 0 || docLoadBatch || docLoadSheet}
+              onClick={() => descargarDocentesSeleccion('batch')}
+            >
+              {docLoadBatch ? 'Generando…' : 'Tarjetón individual'}
+            </Btn>
+            <Btn
+              size="sm"
+              icon={<Download size={14} />}
+              disabled={docCount === 0 || docLoadBatch || docLoadSheet}
+              onClick={() => descargarDocentesSeleccion('sheet')}
+            >
+              {docLoadSheet ? 'Generando…' : `Hoja A4${docCount > 0 ? ` (${docCount})` : ''}`}
+            </Btn>
+            <p className="text-[11.5px] text-text-mute">
+              {docCount > 0
+                ? 'Tarjetón: 1 docente por página · Hoja A4: 10 por página con guías de corte.'
+                : 'Busca y selecciona docentes para comenzar.'}
+            </p>
           </div>
         </div>
       </Card>

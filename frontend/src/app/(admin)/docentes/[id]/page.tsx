@@ -10,9 +10,25 @@ import { KPI } from '@/components/ui/kpi'
 import { Card } from '@/components/ui/card'
 import { Btn } from '@/components/ui/btn'
 import { PageHeader } from '@/components/layout/page-header'
-import { Edit, Mail, Phone, Calendar, Layers } from '@/components/icons'
-import type { DocenteHorario } from '@/hooks/use-docentes'
+import { Edit, Mail, Phone, Calendar, Layers, Download } from '@/components/icons'
+import type { Docente, DocenteHorario } from '@/hooks/use-docentes'
 import { useAuth } from '@/contexts/auth-context'
+
+/* ─── Helper: genera y descarga el carnet de un docente ──────── */
+async function descargarCarnetDocente(docente: Docente) {
+  const { CarnetDocentePDF } = await import('@/components/reportes/carnet-docente-pdf')
+  const { pdf } = await import('@react-pdf/renderer')
+  const blob = await pdf(CarnetDocentePDF({ docente }) as React.ReactElement<any>).toBlob()
+  const url  = URL.createObjectURL(blob)
+  const link = Object.assign(document.createElement('a'), {
+    href: url,
+    download: `carnet-docente-${docente.apellidos ?? ''}-${docente.dni}.pdf`,
+  })
+  document.body.appendChild(link)
+  link.click()
+  document.body.removeChild(link)
+  URL.revokeObjectURL(url)
+}
 
 /* ─── Constantes ──────────────────────────────────────────────── */
 const DIAS: Record<number, string> = {
@@ -56,6 +72,7 @@ export default function DocenteDetallePage() {
   const { user } = useAuth()
   const puedeEditar = user?.rol === 'admin'
   const [tab, setTab] = React.useState<Tab>('Resumen')
+  const [carnetLoading, setCarnetLoading] = React.useState(false)
 
   const { data: docente, isLoading } = useDocente(id)
 
@@ -103,11 +120,26 @@ export default function DocenteDetallePage() {
           { label: docente.dni },
         ]}
         action={
-          puedeEditar ? (
-            <Btn variant="secondary" size="sm" onClick={() => router.push(`/docentes/${id}/editar`)}>
-              <Edit size={14} />Editar
+          <>
+            <Btn
+              variant="secondary"
+              size="sm"
+              disabled={carnetLoading}
+              onClick={async () => {
+                setCarnetLoading(true)
+                try { await descargarCarnetDocente(docente) }
+                catch { alert('No se pudo generar el carnet.') }
+                finally { setCarnetLoading(false) }
+              }}
+            >
+              <Download size={14} />{carnetLoading ? 'Generando…' : 'Generar carnet'}
             </Btn>
-          ) : undefined
+            {puedeEditar && (
+              <Btn variant="secondary" size="sm" onClick={() => router.push(`/docentes/${id}/editar`)}>
+                <Edit size={14} />Editar
+              </Btn>
+            )}
+          </>
         }
       />
 

@@ -1,4 +1,4 @@
-import { BadRequestException, Injectable, NotFoundException } from '@nestjs/common';
+import { BadRequestException, ForbiddenException, Injectable, NotFoundException } from '@nestjs/common';
 import { Prisma, TipoPersona } from '@prisma/client';
 import { PrismaService } from '../prisma/prisma.service';
 import { paginate } from '../common/dto/pagination.dto';
@@ -20,7 +20,8 @@ export class AsistenciaService {
    * - 6 dígitos numéricos → alumno (por codigoBarras)
    * - 8 dígitos → docente (por DNI)
    */
-  async scan(dto: RegisterScanDto, registradoPorId: string) {
+  async scan(dto: RegisterScanDto, caller: { id: string; rol: string }) {
+    const registradoPorId = caller.id;
     const now = new Date();
     const today = new Date(now.getFullYear(), now.getMonth(), now.getDate());
 
@@ -34,8 +35,49 @@ export class AsistenciaService {
       const alumno = await this.prisma.alumno.findFirst({
         where: { codigoBarras: dto.codigo, deletedAt: null },
       });
-      if (!alumno) throw new NotFoundException(`Alumno con código ${dto.codigo} no encontrado`);
-      alumnoId = alumno.id;
+      if (alumno) {
+        alumnoId = alumno.id;
+      } else {
+        // ¿El código pertenece a un alumno deshabilitado (dado de baja)?
+        const deshabilitado = await this.prisma.alumno.findFirst({
+          where: { codigoBarras: dto.codigo, deletedAt: { not: null } },
+          select: { id: true, nombre: true, apellidos: true, codigoBarras: true, usuarioId: true },
+        });
+        if (!deshabilitado) {
+          throw new NotFoundException(`Alumno con código ${dto.codigo} no encontrado`);
+        }
+
+        // Director es de solo lectura sobre alumnos → no puede habilitar.
+        const puedeHabilitar = caller.rol === 'admin' || caller.rol === 'auxiliar';
+
+        if (!dto.habilitar) {
+          // Señal para que el kiosco pregunte si se desea habilitar al alumno.
+          return {
+            requiereHabilitacion: true,
+            puedeHabilitar,
+            alumno: {
+              id: deshabilitado.id,
+              nombre: deshabilitado.nombre,
+              apellidos: deshabilitado.apellidos,
+              codigoBarras: deshabilitado.codigoBarras,
+            },
+          };
+        }
+
+        if (!puedeHabilitar) {
+          throw new ForbiddenException('No tiene permiso para habilitar alumnos');
+        }
+
+        // Rehabilitar (limpia soft-delete + reactiva cuenta) y continuar con el registro.
+        await this.prisma.$transaction(async (tx) => {
+          await tx.alumno.update({ where: { id: deshabilitado.id }, data: { deletedAt: null } });
+          await tx.usuario.update({
+            where: { id: deshabilitado.usuarioId },
+            data: { activo: true, deletedAt: null },
+          });
+        });
+        alumnoId = deshabilitado.id;
+      }
     } else {
       const docente = await this.prisma.docente.findFirst({
         where: { dni: dto.codigo, deletedAt: null },

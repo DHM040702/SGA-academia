@@ -1,5 +1,5 @@
-import { ApiProperty } from '@nestjs/swagger';
-import { IsString, Length } from 'class-validator';
+import { ApiProperty, ApiPropertyOptional } from '@nestjs/swagger';
+import { IsBoolean, IsOptional, IsString, Length } from 'class-validator';
 
 export class RegisterScanDto {
   @ApiProperty({
@@ -9,4 +9,14 @@ export class RegisterScanDto {
   @IsString()
   @Length(6, 20)
   codigo: string;
+
+  @ApiPropertyOptional({
+    description:
+      'Si el código pertenece a un alumno deshabilitado (dado de baja), ' +
+      'habilitarlo automáticamente y registrar su asistencia. Solo admin/auxiliar.',
+    example: false,
+  })
+  @IsOptional()
+  @IsBoolean()
+  habilitar?: boolean;
 }

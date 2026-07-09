@@ -29,8 +29,8 @@ export class AsistenciaController {
   @UseGuards(JwtAuthGuard, RolesGuard)
   @Roles(Rol.admin, Rol.director, Rol.auxiliar)
   @ApiOperation({ summary: 'Registrar asistencia por código de barras (modo HID)' })
-  scan(@Body() dto: RegisterScanDto, @CurrentUser() user: { id: string }) {
-    return this.service.scan(dto, user.id);
+  scan(@Body() dto: RegisterScanDto, @CurrentUser() user: { id: string; rol: string }) {
+    return this.service.scan(dto, user);
   }
 
   /** POST /asistencia/cerrar-turno — registrar ausencias masivas */

@@ -63,6 +63,15 @@ export interface PaginatedAsistencia {
 
 export interface ScanDto {
   codigo: string
+  /** Si el código es de un alumno deshabilitado, habilitarlo y registrar (admin/auxiliar). */
+  habilitar?: boolean
+}
+
+/** Respuesta del scan cuando el código pertenece a un alumno dado de baja. */
+export interface RequiereHabilitacion {
+  requiereHabilitacion: true
+  puedeHabilitar: boolean
+  alumno: { id: string; nombre: string; apellidos: string; codigoBarras: string }
 }
 
 export function useAsistencia(filters: FilterAsistencia = {}) {
