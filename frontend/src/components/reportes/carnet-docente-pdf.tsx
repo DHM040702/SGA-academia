@@ -86,56 +86,51 @@ function code128bSegs(text: string): BarSeg[] {
   return segs
 }
 
-/* ─── Paleta (esquema TEAL + BRONCE — distinto al carnet de alumno) ── */
+/* ─── Paleta (CLARA — mínima tinta; teal suave, distinto al alumno) ── */
 const C = {
-  primary:     '#12403c',   // teal profundo
-  primaryDark: '#0c2f2c',
-  bronze:      '#b5713f',    // acento (vs. dorado del alumno)
-  bronzeSoft:  '#e2b183',
-  seal:        '#cbdedb',    // marca de agua vectorial
-  photoBg:     '#2f6f6a',
-  roleBg:      '#d6ece9',
-  role:        '#12403c',
-  text:        '#111827',
-  muted:       '#6b7280',
-  border:      '#e5e7eb',
-  bgSoft:      '#f1f7f6',
-  white:       '#ffffff',
+  ink:      '#1f2937',   // texto principal
+  teal:     '#2f7d78',   // acento medio (líneas, bordes, badge)
+  tealDeep: '#256b66',   // títulos
+  tealSoft: '#eaf3f1',   // fondos muy claros (pill, foto placeholder)
+  sealLine: '#d3e4e1',   // marca de agua (líneas finas)
+  muted:    '#6b7280',
+  border:   '#dfe6e4',
+  white:    '#ffffff',
 }
 
 /* ─── Estilos ─────────────────────────────────────────────────── */
 const s = StyleSheet.create({
   page: { fontFamily: 'Helvetica', backgroundColor: C.white, flexDirection: 'column' },
 
-  /* Marco exterior con filo bronce */
-  card: { flex: 1, flexDirection: 'column', backgroundColor: C.white, borderWidth: 0.75, borderColor: C.bronze },
+  /* Marco exterior: fino filo teal sobre blanco */
+  card: { flex: 1, flexDirection: 'column', backgroundColor: C.white, borderWidth: 0.75, borderColor: C.teal },
 
-  /* ── Cabecera teal con filo bronce ── */
+  /* ── Cabecera BLANCA con filo teal (sin fondo oscuro → poca tinta) ── */
   header: {
     height:            HEADER_H,
-    backgroundColor:   C.primaryDark,
+    backgroundColor:   C.white,
     flexDirection:     'row',
     alignItems:        'center',
-    paddingHorizontal: 8,
-    borderBottomWidth: 1.8,
-    borderBottomColor: C.bronze,
+    paddingHorizontal: 9,
+    borderBottomWidth: 1.2,
+    borderBottomColor: C.teal,
   },
   headerLogo:    { width: 22, height: 22, objectFit: 'contain' as const, marginRight: 5 },
   headerLogo2:   { width: 22, height: 22, objectFit: 'contain' as const, marginRight: 6 },
-  headerLogoSep: { width: 0.7, height: 18, backgroundColor: 'rgba(226,177,131,0.5)', marginRight: 6 },
+  headerLogoSep: { width: 0.7, height: 18, backgroundColor: C.border, marginRight: 6 },
   headerLogoBox: { width: 22, height: 22, marginRight: 6, alignItems: 'center', justifyContent: 'center' },
   headerTextWrap: { flex: 1, justifyContent: 'center' },
-  headerInst: { color: C.white, fontSize: 8, fontWeight: 'bold', letterSpacing: 0.2 },
-  headerSub:  { color: C.bronzeSoft, fontSize: 5.2, marginTop: 1, letterSpacing: 0.2 },
+  headerInst: { color: C.tealDeep, fontSize: 8, fontWeight: 'bold', letterSpacing: 0.2 },
+  headerSub:  { color: C.muted, fontSize: 5.5, marginTop: 1, letterSpacing: 0.2 },
   headerBadge: {
-    borderWidth:       0.6,
-    borderColor:       'rgba(226,177,131,0.6)',
-    backgroundColor:   'rgba(255,255,255,0.08)',
+    borderWidth:       0.8,
+    borderColor:       C.teal,
+    backgroundColor:   C.white,
     borderRadius:      2.5,
     paddingHorizontal: 6,
     paddingVertical:   2.5,
   },
-  headerBadgeText: { color: C.bronzeSoft, fontSize: 6, fontWeight: 'bold', letterSpacing: 1 },
+  headerBadgeText: { color: C.teal, fontSize: 6, fontWeight: 'bold', letterSpacing: 1 },
 
   /* ── Cuerpo central: datos (izq) + foto (der) ── */
   body: {
@@ -151,40 +146,39 @@ const s = StyleSheet.create({
     position: 'absolute', top: 0, left: 0, right: 0, bottom: 0,
     alignItems: 'center', justifyContent: 'center',
   },
-  watermarkImg: { width: 76, height: 76, objectFit: 'contain' as const, opacity: 0.05 },
 
   /* Bloque de datos del docente */
   info: { flex: 1, justifyContent: 'center', gap: 1.5 },
-  name:       { fontSize: 10.5, fontWeight: 'bold', color: C.primary },
-  nameRule:   { width: 24, height: 1.6, backgroundColor: C.bronze, borderRadius: 1, marginTop: 1.5, marginBottom: 1.5 },
-  dniField:   { fontSize: 7.5, fontFamily: 'Courier', color: C.text },
-  espLine:    { fontSize: 7.5, color: C.text },
+  name:       { fontSize: 10.5, fontWeight: 'bold', color: C.tealDeep },
+  nameRule:   { width: 24, height: 1.4, backgroundColor: C.teal, borderRadius: 1, marginTop: 1.5, marginBottom: 1.5 },
+  dniField:   { fontSize: 7.5, fontFamily: 'Courier', color: C.ink },
+  espLine:    { fontSize: 7.5, color: C.ink },
   cursosLine: { fontSize: 7,   color: C.muted },
   footNote:   { fontSize: 5,   color: C.muted, marginTop: 2.5, letterSpacing: 0.3 },
 
-  /* Pill rol */
+  /* Pill rol (fondo muy claro + borde fino) */
   pillRow:  { flexDirection: 'row', alignItems: 'center', marginTop: 2 },
-  pill:     { paddingHorizontal: 7, paddingVertical: 2, borderRadius: 8, backgroundColor: C.roleBg },
-  pillText: { fontSize: 7.5, fontWeight: 'bold', color: C.role, letterSpacing: 0.5 },
+  pill:     { paddingHorizontal: 7, paddingVertical: 2, borderRadius: 8, backgroundColor: C.tealSoft, borderWidth: 0.6, borderColor: C.teal },
+  pillText: { fontSize: 7.5, fontWeight: 'bold', color: C.tealDeep, letterSpacing: 0.5 },
 
-  /* Foto tipo credencial (derecha) */
+  /* Foto tipo credencial (derecha) — placeholder claro */
   photoFrame: {
-    width: 50, height: 62, borderRadius: 3.5, borderWidth: 1.4, borderColor: C.primary,
+    width: 50, height: 62, borderRadius: 3.5, borderWidth: 1.2, borderColor: C.teal,
     backgroundColor: C.white, padding: 1.5, flexShrink: 0,
   },
   photoImg: { width: '100%', height: '100%', borderRadius: 2, objectFit: 'cover' as const },
   photoPlaceholder: {
-    width: '100%', height: '100%', borderRadius: 2, backgroundColor: C.photoBg,
+    width: '100%', height: '100%', borderRadius: 2, backgroundColor: C.tealSoft,
     alignItems: 'center', justifyContent: 'center',
   },
-  photoInitials: { color: C.white, fontSize: 17, fontWeight: 'bold' },
+  photoInitials: { color: C.tealDeep, fontSize: 17, fontWeight: 'bold' },
 
-  /* ── Franja inferior: código de barras HORIZONTAL (DNI) ── */
+  /* ── Franja inferior BLANCA: código de barras HORIZONTAL (DNI) ── */
   barcodeStrip: {
     height:            BARCODE_H,
     borderTopWidth:    1.2,
-    borderTopColor:    C.bronze,
-    backgroundColor:   C.bgSoft,
+    borderTopColor:    C.teal,
+    backgroundColor:   C.white,
     flexDirection:     'row',
     alignItems:        'center',
     justifyContent:    'space-between',
@@ -194,7 +188,7 @@ const s = StyleSheet.create({
   barcodeInfoLbl: { fontSize: 5.5, color: C.muted, fontWeight: 'bold', letterSpacing: 0.8 },
   barcodeInfoSub: { fontSize: 5,   color: C.muted, marginTop: 1 },
   barcodeRight:   { alignItems: 'center' },
-  barcodeCode:    { fontFamily: 'Courier', fontSize: 7, color: C.primary, fontWeight: 'bold', letterSpacing: 2, marginTop: 1.5 },
+  barcodeCode:    { fontFamily: 'Courier', fontSize: 7, color: C.tealDeep, fontWeight: 'bold', letterSpacing: 2, marginTop: 1.5 },
 })
 
 /* ─── Helpers ─────────────────────────────────────────────────── */
@@ -206,22 +200,22 @@ function initials(name: string) {
 function EmblemMini() {
   return (
     <Svg width={22} height={22}>
-      <Circle cx={11} cy={11} r={10} fill="rgba(255,255,255,0.10)" stroke={C.bronzeSoft} strokeWidth={1} />
-      <Path d="M11 4 L17 8.5 L14.6 17 L7.4 17 L5 8.5 Z" fill="none" stroke={C.bronzeSoft} strokeWidth={1} />
-      <Circle cx={11} cy={11} r={2} fill={C.bronzeSoft} />
+      <Circle cx={11} cy={11} r={10} fill={C.white} stroke={C.teal} strokeWidth={1} />
+      <Path d="M11 4 L17 8.5 L14.6 17 L7.4 17 L5 8.5 Z" fill="none" stroke={C.teal} strokeWidth={1} />
+      <Circle cx={11} cy={11} r={2} fill={C.teal} />
     </Svg>
   )
 }
 
-/** Sello vectorial para la marca de agua (fallback si no hay logo academia). */
+/** Sello vectorial (líneas finas y claras) para la marca de agua. Poca tinta. */
 function SealMark() {
   const c = 38
   return (
     <Svg width={76} height={76}>
-      <Circle cx={c} cy={c} r={c - 2} fill="none" stroke={C.seal} strokeWidth={2} />
-      <Circle cx={c} cy={c} r={c - 8} fill="none" stroke={C.seal} strokeWidth={0.8} />
-      <Path d={`M ${c} ${c - 14} L ${c + 14} ${c} L ${c} ${c + 14} L ${c - 14} ${c} Z`} fill="none" stroke={C.seal} strokeWidth={1.3} />
-      <Circle cx={c} cy={c} r={4.5} fill={C.seal} />
+      <Circle cx={c} cy={c} r={c - 2} fill="none" stroke={C.sealLine} strokeWidth={1.4} />
+      <Circle cx={c} cy={c} r={c - 8} fill="none" stroke={C.sealLine} strokeWidth={0.6} />
+      <Path d={`M ${c} ${c - 14} L ${c + 14} ${c} L ${c} ${c + 14} L ${c - 14} ${c} Z`} fill="none" stroke={C.sealLine} strokeWidth={0.9} />
+      <Circle cx={c} cy={c} r={3.5} fill={C.sealLine} />
     </Svg>
   )
 }
@@ -298,12 +292,8 @@ function CarnetCardContent({
         {logoUnasamUrl
           ? <Image src={logoUnasamUrl} style={s.headerLogo} />
           : <View style={s.headerLogoBox}><EmblemMini /></View>}
-        {logoUrl && (
-          <>
-            <View style={s.headerLogoSep} />
-            <Image src={logoUrl} style={s.headerLogo2} />
-          </>
-        )}
+        {logoUrl && <View style={s.headerLogoSep} />}
+        {logoUrl && <Image src={logoUrl} style={s.headerLogo2} />}
         <View style={s.headerTextWrap}>
           <Text style={s.headerInst}>Centro Preuniversitario</Text>
           <Text style={s.headerSub}>UNASAM · Ciclo {cicloLabel}</Text>
@@ -316,11 +306,9 @@ function CarnetCardContent({
       {/* ── Cuerpo central: datos (izq) + foto (der) ── */}
       <View style={s.body}>
 
-        {/* Marca de agua tras la información */}
+        {/* Marca de agua: sello vectorial claro (poca tinta) */}
         <View style={s.watermark}>
-          {logoUrl
-            ? <Image src={logoUrl} style={s.watermarkImg} />
-            : <SealMark />}
+          <SealMark />
         </View>
 
         {/* Datos */}
@@ -378,7 +366,7 @@ function CarnetCardContent({
           <Svg width={BAR_AREA_W} height={BAR_HEIGHT}>
             <Rect x={0} y={0} width={BAR_AREA_W} height={BAR_HEIGHT} fill={C.white} />
             {hbars.map(({ x, w }, i) => (
-              <Rect key={i} x={x * uw} y={0} width={w * uw} height={BAR_HEIGHT} fill={C.text} />
+              <Rect key={i} x={x * uw} y={0} width={w * uw} height={BAR_HEIGHT} fill={C.ink} />
             ))}
           </Svg>
           <Text style={s.barcodeCode}>{dni}</Text>

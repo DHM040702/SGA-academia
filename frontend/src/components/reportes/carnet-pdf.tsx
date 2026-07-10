@@ -400,12 +400,8 @@ function CarnetCardContent({
           ? <Image src={logoUnasamUrl} style={s.headerLogo} />
           : <View style={s.headerLogoBox}><EmblemMini /></View>}
         {/* Logo de la academia (CEPRE), a la derecha del de UNASAM */}
-        {logoUrl && (
-          <>
-            <View style={s.headerLogoSep} />
-            <Image src={logoUrl} style={s.headerLogo2} />
-          </>
-        )}
+        {logoUrl && <View style={s.headerLogoSep} />}
+        {logoUrl && <Image src={logoUrl} style={s.headerLogo2} />}
         <View style={s.headerTextWrap}>
           <Text style={s.headerInst}>Centro Preuniversitario</Text>
           <Text style={s.headerSub}>UNASAM · Ciclo {ciclo}</Text>
