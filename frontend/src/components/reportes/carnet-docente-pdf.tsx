@@ -3,9 +3,10 @@
  * Carnet de DOCENTE — tamaño físico 9.3 cm × 5.6 cm (landscape).
  *
  * El código de barras del carnet es el DNI del docente (el kiosco marca
- * asistencia de docentes por DNI). Replica la estética de carnet-pdf.tsx
- * (carnet de alumno) adaptando los campos: especialidad + cursos en vez de
- * aula/carrera, y DNI como código de barras.
+ * asistencia de docentes por DNI). Diseño DISTINTO al carnet de alumno para
+ * diferenciarlos: esquema teal + bronce (vs. azul + dorado), foto a la
+ * derecha y código de barras HORIZONTAL en una franja inferior (vs. la
+ * columna vertical del alumno). Campos: especialidad + cursos, DNI como código.
  *
  * Importar SIEMPRE de forma dinámica:
  *   const { CarnetDocentePDF }      = await import('@/components/reportes/carnet-docente-pdf')
@@ -13,15 +14,15 @@
  *   const { CarnetDocenteSheetPDF } = await import('@/components/reportes/carnet-docente-pdf')
  */
 
-import { Document, Page, Text, View, StyleSheet, Image, Svg, G, Rect } from '@react-pdf/renderer'
+import { Document, Page, Text, View, StyleSheet, Image, Svg, Rect, Path, Circle } from '@react-pdf/renderer'
 
 /* ─── Dimensiones en puntos (pt) ─────────────────────────────── */
-const CARD_W        = 263.62   // 9.3 cm × 28.3465 pt/cm
-const CARD_H        = 158.74   // 5.6 cm × 28.3465 pt/cm
-const HEADER_H      = 26
-const BARCODE_COL_W = 50       // columna derecha (código de barras vertical)
-const BARCODE_BAR_W = 40       // ancho visual de la barra dentro del SVG
-const BARCODE_SVG_H = 112      // alto del SVG (≈ alto del cuerpo menos texto inferior)
+const CARD_W     = 263.62   // 9.3 cm × 28.3465 pt/cm
+const CARD_H     = 158.74   // 5.6 cm × 28.3465 pt/cm
+const HEADER_H   = 33       // cabecera (aloja los logos)
+const BARCODE_H  = 34       // franja inferior del código de barras horizontal
+const BAR_AREA_W = 150      // ancho de las barras horizontales (pt)
+const BAR_HEIGHT = 20       // alto de las barras (pt)
 
 /* ─── Hoja A4 vertical — 2 × 5 = 10 carnets por página ────────── */
 const SHEET_COLS     = 2
@@ -85,134 +86,144 @@ function code128bSegs(text: string): BarSeg[] {
   return segs
 }
 
-/* ─── Paleta ──────────────────────────────────────────────────── */
+/* ─── Paleta (esquema TEAL + BRONCE — distinto al carnet de alumno) ── */
 const C = {
-  primary:   '#1e3a5f',
-  secondary: '#4a6fa5',
-  success:   '#166534',
-  successBg: '#dcfce7',
-  info:      '#1e40af',
-  infoBg:    '#dbeafe',
-  text:      '#111827',
-  muted:     '#6b7280',
-  border:    '#e5e7eb',
-  white:     '#ffffff',
+  primary:     '#12403c',   // teal profundo
+  primaryDark: '#0c2f2c',
+  bronze:      '#b5713f',    // acento (vs. dorado del alumno)
+  bronzeSoft:  '#e2b183',
+  seal:        '#cbdedb',    // marca de agua vectorial
+  photoBg:     '#2f6f6a',
+  roleBg:      '#d6ece9',
+  role:        '#12403c',
+  text:        '#111827',
+  muted:       '#6b7280',
+  border:      '#e5e7eb',
+  bgSoft:      '#f1f7f6',
+  white:       '#ffffff',
 }
 
 /* ─── Estilos ─────────────────────────────────────────────────── */
 const s = StyleSheet.create({
-  page: {
-    fontFamily:      'Helvetica',
-    backgroundColor: C.white,
-    flexDirection:   'column',
-  },
+  page: { fontFamily: 'Helvetica', backgroundColor: C.white, flexDirection: 'column' },
 
-  /* ── Cabecera azul ── */
+  /* Marco exterior con filo bronce */
+  card: { flex: 1, flexDirection: 'column', backgroundColor: C.white, borderWidth: 0.75, borderColor: C.bronze },
+
+  /* ── Cabecera teal con filo bronce ── */
   header: {
-    backgroundColor:   C.primary,
     height:            HEADER_H,
-    paddingHorizontal: 10,
-    paddingVertical:   5,
+    backgroundColor:   C.primaryDark,
     flexDirection:     'row',
     alignItems:        'center',
-    justifyContent:    'space-between',
+    paddingHorizontal: 8,
+    borderBottomWidth: 1.8,
+    borderBottomColor: C.bronze,
   },
-  headerInst: { color: C.white, fontSize: 7.5, fontWeight: 'bold' },
-  headerSub:  { color: 'rgba(255,255,255,0.72)', fontSize: 5.5, marginTop: 1.5 },
+  headerLogo:    { width: 22, height: 22, objectFit: 'contain' as const, marginRight: 5 },
+  headerLogo2:   { width: 22, height: 22, objectFit: 'contain' as const, marginRight: 6 },
+  headerLogoSep: { width: 0.7, height: 18, backgroundColor: 'rgba(226,177,131,0.5)', marginRight: 6 },
+  headerLogoBox: { width: 22, height: 22, marginRight: 6, alignItems: 'center', justifyContent: 'center' },
+  headerTextWrap: { flex: 1, justifyContent: 'center' },
+  headerInst: { color: C.white, fontSize: 8, fontWeight: 'bold', letterSpacing: 0.2 },
+  headerSub:  { color: C.bronzeSoft, fontSize: 5.2, marginTop: 1, letterSpacing: 0.2 },
   headerBadge: {
-    backgroundColor:   'rgba(255,255,255,0.15)',
-    borderRadius:      8,
+    borderWidth:       0.6,
+    borderColor:       'rgba(226,177,131,0.6)',
+    backgroundColor:   'rgba(255,255,255,0.08)',
+    borderRadius:      2.5,
     paddingHorizontal: 6,
-    paddingVertical:   3,
+    paddingVertical:   2.5,
   },
-  headerBadgeText: {
-    color:         C.white,
-    fontSize:      6,
-    fontWeight:    'bold',
-    letterSpacing: 0.5,
-  },
+  headerBadgeText: { color: C.bronzeSoft, fontSize: 6, fontWeight: 'bold', letterSpacing: 1 },
 
-  /* ── Cuerpo (flex row, ocupa el resto del carnet) ── */
+  /* ── Cuerpo central: datos (izq) + foto (der) ── */
   body: {
-    flex:          1,
-    flexDirection: 'row',
-  },
-
-  /* Sección izquierda: avatar + datos */
-  infoSection: {
     flex:              1,
     flexDirection:     'row',
     alignItems:        'center',
-    paddingHorizontal: 9,
-    paddingVertical:   8,
-    gap:               7,
+    paddingHorizontal: 10,
+    paddingVertical:   7,
+    gap:               8,
+    position:          'relative',
   },
-
-  /* Avatar circular */
-  avatar: {
-    width:           52,
-    height:          52,
-    borderRadius:    26,
-    backgroundColor: C.secondary,
-    alignItems:      'center',
-    justifyContent:  'center',
-    flexShrink:      0,
+  watermark: {
+    position: 'absolute', top: 0, left: 0, right: 0, bottom: 0,
+    alignItems: 'center', justifyContent: 'center',
   },
-  avatarText: { color: C.white, fontSize: 17, fontWeight: 'bold' },
-  avatarImg: {
-    width:        52,
-    height:       52,
-    borderRadius: 26,
-    objectFit:    'cover' as const,
-  },
-
-  /* Divisor vertical */
-  vline: {
-    width:            1,
-    alignSelf:        'stretch',
-    backgroundColor:  C.border,
-    marginHorizontal: 2,
-    flexShrink:       0,
-  },
+  watermarkImg: { width: 76, height: 76, objectFit: 'contain' as const, opacity: 0.05 },
 
   /* Bloque de datos del docente */
-  info: { flex: 1, justifyContent: 'center', gap: 2 },
-
-  name:        { fontSize: 10.5, fontWeight: 'bold', color: C.primary },
-  dniField:    { fontSize: 7.5,  fontFamily: 'Courier', color: C.text },
-  espLine:     { fontSize: 7.5,  color: C.text },
-  cursosLine:  { fontSize: 7,    color: C.muted },
+  info: { flex: 1, justifyContent: 'center', gap: 1.5 },
+  name:       { fontSize: 10.5, fontWeight: 'bold', color: C.primary },
+  nameRule:   { width: 24, height: 1.6, backgroundColor: C.bronze, borderRadius: 1, marginTop: 1.5, marginBottom: 1.5 },
+  dniField:   { fontSize: 7.5, fontFamily: 'Courier', color: C.text },
+  espLine:    { fontSize: 7.5, color: C.text },
+  cursosLine: { fontSize: 7,   color: C.muted },
+  footNote:   { fontSize: 5,   color: C.muted, marginTop: 2.5, letterSpacing: 0.3 },
 
   /* Pill rol */
-  pillRow:     { flexDirection: 'row', alignItems: 'center', marginTop: 1 },
-  pill:        { paddingHorizontal: 6, paddingVertical: 2, borderRadius: 8 },
-  pillText:    { fontSize: 7.5, fontWeight: 'bold' },
-  pillInfo:    { backgroundColor: C.infoBg },
+  pillRow:  { flexDirection: 'row', alignItems: 'center', marginTop: 2 },
+  pill:     { paddingHorizontal: 7, paddingVertical: 2, borderRadius: 8, backgroundColor: C.roleBg },
+  pillText: { fontSize: 7.5, fontWeight: 'bold', color: C.role, letterSpacing: 0.5 },
 
-  /* ── Columna derecha: código de barras vertical ── */
-  barcodeCol: {
-    width:           BARCODE_COL_W,
-    borderLeftWidth: 1,
-    borderLeftColor: C.border,
-    backgroundColor: '#f9fafb',
-    alignItems:      'center',
-    paddingBottom:   4,
-    paddingTop:      0,
+  /* Foto tipo credencial (derecha) */
+  photoFrame: {
+    width: 50, height: 62, borderRadius: 3.5, borderWidth: 1.4, borderColor: C.primary,
+    backgroundColor: C.white, padding: 1.5, flexShrink: 0,
   },
-  barcodeColCode: {
-    fontFamily:    'Courier',
-    fontSize:      6.5,
-    color:         C.primary,
-    fontWeight:    'bold',
-    letterSpacing: 1,
-    marginTop:     2,
-    textAlign:     'center',
+  photoImg: { width: '100%', height: '100%', borderRadius: 2, objectFit: 'cover' as const },
+  photoPlaceholder: {
+    width: '100%', height: '100%', borderRadius: 2, backgroundColor: C.photoBg,
+    alignItems: 'center', justifyContent: 'center',
   },
+  photoInitials: { color: C.white, fontSize: 17, fontWeight: 'bold' },
+
+  /* ── Franja inferior: código de barras HORIZONTAL (DNI) ── */
+  barcodeStrip: {
+    height:            BARCODE_H,
+    borderTopWidth:    1.2,
+    borderTopColor:    C.bronze,
+    backgroundColor:   C.bgSoft,
+    flexDirection:     'row',
+    alignItems:        'center',
+    justifyContent:    'space-between',
+    paddingHorizontal: 10,
+  },
+  barcodeInfo:    { justifyContent: 'center' },
+  barcodeInfoLbl: { fontSize: 5.5, color: C.muted, fontWeight: 'bold', letterSpacing: 0.8 },
+  barcodeInfoSub: { fontSize: 5,   color: C.muted, marginTop: 1 },
+  barcodeRight:   { alignItems: 'center' },
+  barcodeCode:    { fontFamily: 'Courier', fontSize: 7, color: C.primary, fontWeight: 'bold', letterSpacing: 2, marginTop: 1.5 },
 })
 
 /* ─── Helpers ─────────────────────────────────────────────────── */
 function initials(name: string) {
   return name.trim().split(/\s+/).slice(0, 2).map((w) => w[0] ?? '').join('').toUpperCase()
+}
+
+/** Emblema mini vectorial para la cabecera (fallback si no hay logo UNASAM). */
+function EmblemMini() {
+  return (
+    <Svg width={22} height={22}>
+      <Circle cx={11} cy={11} r={10} fill="rgba(255,255,255,0.10)" stroke={C.bronzeSoft} strokeWidth={1} />
+      <Path d="M11 4 L17 8.5 L14.6 17 L7.4 17 L5 8.5 Z" fill="none" stroke={C.bronzeSoft} strokeWidth={1} />
+      <Circle cx={11} cy={11} r={2} fill={C.bronzeSoft} />
+    </Svg>
+  )
+}
+
+/** Sello vectorial para la marca de agua (fallback si no hay logo academia). */
+function SealMark() {
+  const c = 38
+  return (
+    <Svg width={76} height={76}>
+      <Circle cx={c} cy={c} r={c - 2} fill="none" stroke={C.seal} strokeWidth={2} />
+      <Circle cx={c} cy={c} r={c - 8} fill="none" stroke={C.seal} strokeWidth={0.8} />
+      <Path d={`M ${c} ${c - 14} L ${c + 14} ${c} L ${c} ${c + 14} L ${c - 14} ${c} Z`} fill="none" stroke={C.seal} strokeWidth={1.3} />
+      <Circle cx={c} cy={c} r={4.5} fill={C.seal} />
+    </Svg>
+  )
 }
 
 /* ─── Tipos ───────────────────────────────────────────────────── */
@@ -228,22 +239,32 @@ export interface DocenteCarnet {
 }
 
 export interface CarnetDocentePDFProps {
-  docente:     DocenteCarnet
-  cicloLabel?: string
+  docente:        DocenteCarnet
+  cicloLabel?:    string
+  logoUrl?:       string
+  logoUnasamUrl?: string
 }
 
 export interface CarnetDocenteBatchPDFProps {
-  docentes:    DocenteCarnet[]
-  cicloLabel?: string
+  docentes:       DocenteCarnet[]
+  cicloLabel?:    string
+  logoUrl?:       string
+  logoUnasamUrl?: string
 }
 
 export interface CarnetDocenteSheetPDFProps {
-  docentes:    DocenteCarnet[]
-  cicloLabel?: string
+  docentes:       DocenteCarnet[]
+  cicloLabel?:    string
+  logoUrl?:       string
+  logoUnasamUrl?: string
 }
 
 /* ─── Contenido del carnet (reutilizable en hoja A4) ─────────── */
-function CarnetCardContent({ docente, cicloLabel }: { docente: DocenteCarnet; cicloLabel: string }) {
+function CarnetCardContent({
+  docente, cicloLabel, logoUrl, logoUnasamUrl,
+}: {
+  docente: DocenteCarnet; cicloLabel: string; logoUrl?: string; logoUnasamUrl?: string
+}) {
   const nombre    = docente.nombre ?? docente.nombres ?? ''
   const apellidos = docente.apellidos ?? ''
   const fullName  = `${nombre} ${apellidos}`.trim()
@@ -257,105 +278,125 @@ function CarnetCardContent({ docente, cicloLabel }: { docente: DocenteCarnet; ci
       .filter(Boolean),
   )]
 
-  /* ── Barcode vertical (DNI): pre-calcular posiciones de barras ── */
+  /* ── Barcode HORIZONTAL (DNI): pre-calcular posiciones de barras ── */
   const segs = code128bSegs(dni)
-  const QUIET = 5  // módulos de zona de silencio
+  const QUIET = 6  // módulos de zona de silencio
   let xCur = QUIET
-  const bars: { x: number; w: number }[] = []
+  const hbars: { x: number; w: number }[] = []
   for (const seg of segs) {
-    if (seg.bar) bars.push({ x: xCur, w: seg.w })
+    if (seg.bar) hbars.push({ x: xCur, w: seg.w })
     xCur += seg.w
   }
   const totalMods = xCur + QUIET
-
-  const mw = BARCODE_SVG_H / totalMods
-  const cx = (BARCODE_COL_W - BARCODE_BAR_W) / 2
-  const mat = `matrix(0,${mw.toFixed(5)},${BARCODE_BAR_W},0,${cx.toFixed(2)},0)`
+  const uw = BAR_AREA_W / totalMods  // ancho por módulo (pt)
 
   return (
-    <View style={{ flex: 1, flexDirection: 'column', backgroundColor: C.white }}>
+    <View style={s.card}>
 
-      {/* ── Cabecera ── */}
+      {/* ── Cabecera: logos + institución + sello «DOCENTE» ── */}
       <View style={s.header}>
-        <View>
-          <Text style={s.headerInst}>Centro Preuniversitario · UNASAM</Text>
-          <Text style={s.headerSub}>Sistema de Gestión Académica · Ciclo {cicloLabel}</Text>
+        {logoUnasamUrl
+          ? <Image src={logoUnasamUrl} style={s.headerLogo} />
+          : <View style={s.headerLogoBox}><EmblemMini /></View>}
+        {logoUrl && (
+          <>
+            <View style={s.headerLogoSep} />
+            <Image src={logoUrl} style={s.headerLogo2} />
+          </>
+        )}
+        <View style={s.headerTextWrap}>
+          <Text style={s.headerInst}>Centro Preuniversitario</Text>
+          <Text style={s.headerSub}>UNASAM · Ciclo {cicloLabel}</Text>
         </View>
         <View style={s.headerBadge}>
-          <Text style={s.headerBadgeText}>CARNET DOCENTE</Text>
+          <Text style={s.headerBadgeText}>DOCENTE</Text>
         </View>
       </View>
 
-      {/* ── Cuerpo: info izquierda + barcode vertical derecha ── */}
+      {/* ── Cuerpo central: datos (izq) + foto (der) ── */}
       <View style={s.body}>
 
-        {/* ─ Sección izquierda ─ */}
-        <View style={s.infoSection}>
+        {/* Marca de agua tras la información */}
+        <View style={s.watermark}>
+          {logoUrl
+            ? <Image src={logoUrl} style={s.watermarkImg} />
+            : <SealMark />}
+        </View>
 
-          {/* Avatar */}
-          {fotoUrl ? (
-            <Image src={fotoUrl} style={s.avatarImg} />
-          ) : (
-            <View style={s.avatar}>
-              <Text style={s.avatarText}>{initials(fullName)}</Text>
-            </View>
+        {/* Datos */}
+        <View style={s.info}>
+          <Text style={s.name}>
+            {apellidos ? `${apellidos}, ${nombre}` : nombre}
+          </Text>
+
+          {/* Acento bronce bajo el nombre */}
+          <View style={s.nameRule} />
+
+          {/* DNI (= código de asistencia) */}
+          <Text style={s.dniField}>DNI: {dni}</Text>
+
+          {/* Especialidad */}
+          {docente.especialidad && (
+            <Text style={s.espLine}>{docente.especialidad}</Text>
           )}
 
-          <View style={s.vline} />
+          {/* Cursos que dicta */}
+          {cursos.length > 0 && (
+            <Text style={s.cursosLine}>{cursos.join('  ·  ')}</Text>
+          )}
 
-          {/* Datos */}
-          <View style={s.info}>
-            <Text style={s.name}>
-              {apellidos ? `${apellidos}, ${nombre}` : nombre}
-            </Text>
-
-            {/* DNI (= código de asistencia) */}
-            <Text style={s.dniField}>DNI: {dni}</Text>
-
-            {/* Especialidad */}
-            {docente.especialidad && (
-              <Text style={s.espLine}>{docente.especialidad}</Text>
-            )}
-
-            {/* Cursos que dicta */}
-            {cursos.length > 0 && (
-              <Text style={s.cursosLine}>{cursos.join('  ·  ')}</Text>
-            )}
-
-            {/* Rol */}
-            <View style={s.pillRow}>
-              <View style={[s.pill, s.pillInfo]}>
-                <Text style={[s.pillText, { color: C.info }]}>Docente</Text>
-              </View>
+          {/* Rol */}
+          <View style={s.pillRow}>
+            <View style={s.pill}>
+              <Text style={s.pillText}>DOCENTE</Text>
             </View>
           </View>
+
+          {/* Pie institucional */}
+          <Text style={s.footNote}>Personal docente · CEPRE-UNASAM</Text>
         </View>
 
-        {/* ─ Columna derecha: código de barras Code128B vertical (DNI) ─ */}
-        <View style={s.barcodeCol}>
-          <Svg width={BARCODE_COL_W} height={BARCODE_SVG_H}>
-            <Rect x={0} y={0} width={BARCODE_COL_W} height={BARCODE_SVG_H} fill={C.white} />
-            <G transform={mat}>
-              {bars.map(({ x, w }, i) => (
-                <Rect key={i} x={x} y={0} width={w} height={1} fill={C.text} />
-              ))}
-            </G>
+        {/* Foto tipo credencial (derecha) */}
+        <View style={s.photoFrame}>
+          {fotoUrl ? (
+            <Image src={fotoUrl} style={s.photoImg} />
+          ) : (
+            <View style={s.photoPlaceholder}>
+              <Text style={s.photoInitials}>{initials(fullName)}</Text>
+            </View>
+          )}
+        </View>
+      </View>
+
+      {/* ── Franja inferior: código de barras HORIZONTAL (DNI) ── */}
+      <View style={s.barcodeStrip}>
+        <View style={s.barcodeInfo}>
+          <Text style={s.barcodeInfoLbl}>CÓDIGO DE ASISTENCIA</Text>
+          <Text style={s.barcodeInfoSub}>Escanee el DNI del docente</Text>
+        </View>
+        <View style={s.barcodeRight}>
+          <Svg width={BAR_AREA_W} height={BAR_HEIGHT}>
+            <Rect x={0} y={0} width={BAR_AREA_W} height={BAR_HEIGHT} fill={C.white} />
+            {hbars.map(({ x, w }, i) => (
+              <Rect key={i} x={x * uw} y={0} width={w * uw} height={BAR_HEIGHT} fill={C.text} />
+            ))}
           </Svg>
-
-          {/* Número (DNI) debajo del barcode */}
-          <Text style={s.barcodeColCode}>{dni}</Text>
+          <Text style={s.barcodeCode}>{dni}</Text>
         </View>
-
       </View>
     </View>
   )
 }
 
 /* ─── Página individual de carnet ────────────────────────────── */
-function CarnetPage({ docente, cicloLabel }: { docente: DocenteCarnet; cicloLabel: string }) {
+function CarnetPage({
+  docente, cicloLabel, logoUrl, logoUnasamUrl,
+}: {
+  docente: DocenteCarnet; cicloLabel: string; logoUrl?: string; logoUnasamUrl?: string
+}) {
   return (
     <Page size={[CARD_W, CARD_H]} style={s.page}>
-      <CarnetCardContent docente={docente} cicloLabel={cicloLabel} />
+      <CarnetCardContent docente={docente} cicloLabel={cicloLabel} logoUrl={logoUrl} logoUnasamUrl={logoUnasamUrl} />
     </Page>
   )
 }
@@ -363,7 +404,7 @@ function CarnetPage({ docente, cicloLabel }: { docente: DocenteCarnet; cicloLabe
 /* ─── Exportaciones públicas ──────────────────────────────────── */
 
 /** Carnet de un solo docente (9.3 cm × 5.6 cm). */
-export function CarnetDocentePDF({ docente, cicloLabel = '2026-I' }: CarnetDocentePDFProps) {
+export function CarnetDocentePDF({ docente, cicloLabel = '2026-I', logoUrl, logoUnasamUrl }: CarnetDocentePDFProps) {
   const nombre    = docente.nombre ?? docente.nombres ?? ''
   const apellidos = docente.apellidos ?? ''
   const fullName  = `${nombre} ${apellidos}`.trim()
@@ -373,7 +414,7 @@ export function CarnetDocentePDF({ docente, cicloLabel = '2026-I' }: CarnetDocen
       author="Sistema de Gestión Académica"
       subject="Carnet de docente"
     >
-      <CarnetPage docente={docente} cicloLabel={cicloLabel} />
+      <CarnetPage docente={docente} cicloLabel={cicloLabel} logoUrl={logoUrl} logoUnasamUrl={logoUnasamUrl} />
     </Document>
   )
 }
@@ -382,7 +423,7 @@ export function CarnetDocentePDF({ docente, cicloLabel = '2026-I' }: CarnetDocen
  * Carnets de múltiples docentes — una página por docente.
  * Ideal para imprimir en lote y cortar individualmente.
  */
-export function CarnetDocenteBatchPDF({ docentes, cicloLabel = '2026-I' }: CarnetDocenteBatchPDFProps) {
+export function CarnetDocenteBatchPDF({ docentes, cicloLabel = '2026-I', logoUrl, logoUnasamUrl }: CarnetDocenteBatchPDFProps) {
   return (
     <Document
       title={`Carnets docentes — ${docentes.length} docente${docentes.length !== 1 ? 's' : ''}`}
@@ -390,7 +431,7 @@ export function CarnetDocenteBatchPDF({ docentes, cicloLabel = '2026-I' }: Carne
       subject="Carnets de docentes"
     >
       {docentes.map((docente, i) => (
-        <CarnetPage key={i} docente={docente} cicloLabel={cicloLabel} />
+        <CarnetPage key={i} docente={docente} cicloLabel={cicloLabel} logoUrl={logoUrl} logoUnasamUrl={logoUnasamUrl} />
       ))}
     </Document>
   )
@@ -400,7 +441,7 @@ export function CarnetDocenteBatchPDF({ docentes, cicloLabel = '2026-I' }: Carne
  * Hoja A4 vertical con 10 carnets por página (2 columnas × 5 filas),
  * guías de corte incluidas.
  */
-export function CarnetDocenteSheetPDF({ docentes, cicloLabel = '2026-I' }: CarnetDocenteSheetPDFProps) {
+export function CarnetDocenteSheetPDF({ docentes, cicloLabel = '2026-I', logoUrl, logoUnasamUrl }: CarnetDocenteSheetPDFProps) {
   const PER_SHEET = SHEET_COLS * SHEET_ROWS
 
   const pages: DocenteCarnet[][] = []
@@ -430,7 +471,7 @@ export function CarnetDocenteSheetPDF({ docentes, cicloLabel = '2026-I' }: Carne
                 height:   CARD_H,
                 overflow: 'hidden',
               }}>
-                <CarnetCardContent docente={docente} cicloLabel={cicloLabel} />
+                <CarnetCardContent docente={docente} cicloLabel={cicloLabel} logoUrl={logoUrl} logoUnasamUrl={logoUnasamUrl} />
               </View>
             )
           })}

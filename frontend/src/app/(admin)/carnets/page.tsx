@@ -237,8 +237,8 @@ export default function CarnetsPage() {
       const cicloLabel = cicloActivo?.nombre ?? '2026-I'
       const mod = await import('@/components/reportes/carnet-docente-pdf')
       const comp = modo === 'sheet'
-        ? mod.CarnetDocenteSheetPDF({ docentes, cicloLabel })
-        : mod.CarnetDocenteBatchPDF({ docentes, cicloLabel })
+        ? mod.CarnetDocenteSheetPDF({ docentes, cicloLabel, ...institutionalLogos() })
+        : mod.CarnetDocenteBatchPDF({ docentes, cicloLabel, ...institutionalLogos() })
       await downloadPDF(
         comp,
         `carnets-docentes-${modo === 'sheet' ? 'hoja-A4' : 'tarjeton'}-${docentes.length}.pdf`,
@@ -255,7 +255,7 @@ export default function CarnetsPage() {
       if (!docentes.length) { alert('No hay docentes para generar carnets.'); return }
       const { CarnetDocenteSheetPDF } = await import('@/components/reportes/carnet-docente-pdf')
       await downloadPDF(
-        CarnetDocenteSheetPDF({ docentes, cicloLabel: cicloActivo?.nombre ?? '2026-I' }),
+        CarnetDocenteSheetPDF({ docentes, cicloLabel: cicloActivo?.nombre ?? '2026-I', ...institutionalLogos() }),
         `carnets-docentes-hoja-A4-todos.pdf`,
       )
     } catch { alert('No se pudo generar los carnets.') }

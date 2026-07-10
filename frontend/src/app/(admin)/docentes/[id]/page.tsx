@@ -18,7 +18,14 @@ import { useAuth } from '@/contexts/auth-context'
 async function descargarCarnetDocente(docente: Docente) {
   const { CarnetDocentePDF } = await import('@/components/reportes/carnet-docente-pdf')
   const { pdf } = await import('@react-pdf/renderer')
-  const blob = await pdf(CarnetDocentePDF({ docente }) as React.ReactElement<any>).toBlob()
+  const origin = typeof window !== 'undefined' ? window.location.origin : ''
+  const blob = await pdf(
+    CarnetDocentePDF({
+      docente,
+      logoUrl:       `${origin}/logo.png`,
+      logoUnasamUrl: `${origin}/logo-unasam.png`,
+    }) as React.ReactElement<any>,
+  ).toBlob()
   const url  = URL.createObjectURL(blob)
   const link = Object.assign(document.createElement('a'), {
     href: url,
