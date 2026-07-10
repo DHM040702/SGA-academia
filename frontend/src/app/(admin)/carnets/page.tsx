@@ -258,18 +258,25 @@ export default function CarnetsPage() {
      RENDER
   ══════════════════════════════════════════════════════════════ */
   return (
-    <div className="px-7 pt-[22px] pb-7 flex flex-col gap-5 max-w-[820px]">
+    <div className="px-6 md:px-8 pt-6 pb-12 flex flex-col gap-6 max-w-[1060px] mx-auto w-full">
       <PageHeader
         title="Carnets estudiantiles"
         crumbs={[{ label: 'Carnets' }]}
       />
 
+      {/* ─── Sección: Alumnos ─── */}
+      <div className="flex items-center gap-3 mt-1">
+        <h2 className="text-[11px] font-semibold uppercase tracking-[0.09em] text-text-mute">Alumnos</h2>
+        <div className="flex-1 h-px bg-border-s" />
+      </div>
+
       {/* ══ 1. CARNET INDIVIDUAL ══════════════════════════════════ */}
       <Card
+        pad={20}
         title="Carnet individual"
         subtitle="Busca un alumno y descarga su carnet en tamaño tarjetón (9.3 × 5.6 cm)"
       >
-        <div className="p-4 flex flex-col gap-4">
+        <div className="flex flex-col gap-4">
 
           {/* Buscador */}
           {!indivAlumno && (
@@ -337,43 +344,49 @@ export default function CarnetsPage() {
         </div>
       </Card>
 
+      {/* ══ 2 · 3 — LOTE POR AULA / CICLO COMPLETO (2 columnas) ═════ */}
+      <div className="grid gap-6 lg:grid-cols-2 items-start">
+
       {/* ══ 2. LOTE POR AULA ══════════════════════════════════════ */}
       <Card
+        pad={20}
         title="Carnets por aula"
-        subtitle="Todos los alumnos de un aula — tarjetón individual (9.3 × 5.6 cm) o hoja A4 con 10 carnets"
+        subtitle="Todos los alumnos de un aula — tarjetón individual o hoja A4 (10 carnets)"
       >
-        <div className="p-4 flex flex-wrap gap-3 items-end">
-          {/* Ciclo */}
-          <div className="flex flex-col gap-1">
-            <label className="text-[10.5px] text-text-mute uppercase tracking-[0.05em] font-medium">Ciclo</label>
-            <select
-              value={aulaCicloId}
-              onChange={(e) => { setAulaCicloId(e.target.value); setAulaId('') }}
-              className={SELECT_CLS}
-            >
-              <option value="">Seleccionar ciclo…</option>
-              {ciclos.map((c) => (
-                <option key={c.id} value={c.id}>{c.nombre}{c.activo ? ' ★' : ''}</option>
-              ))}
-            </select>
-          </div>
-          {/* Aula */}
-          <div className="flex flex-col gap-1">
-            <label className="text-[10.5px] text-text-mute uppercase tracking-[0.05em] font-medium">Aula</label>
-            <select
-              value={aulaId}
-              onChange={(e) => setAulaId(e.target.value)}
-              disabled={!aulaCicloId}
-              className={SELECT_CLS}
-            >
-              <option value="">Seleccionar aula…</option>
-              {aulasList.map((a) => (
-                <option key={a.id} value={a.id}>{a.nombre}</option>
-              ))}
-            </select>
+        <div className="flex flex-col gap-4">
+          <div className="grid grid-cols-2 gap-3">
+            {/* Ciclo */}
+            <div className="flex flex-col gap-1">
+              <label className="text-[10.5px] text-text-mute uppercase tracking-[0.05em] font-medium">Ciclo</label>
+              <select
+                value={aulaCicloId}
+                onChange={(e) => { setAulaCicloId(e.target.value); setAulaId('') }}
+                className={SELECT_CLS}
+              >
+                <option value="">Seleccionar ciclo…</option>
+                {ciclos.map((c) => (
+                  <option key={c.id} value={c.id}>{c.nombre}{c.activo ? ' ★' : ''}</option>
+                ))}
+              </select>
+            </div>
+            {/* Aula */}
+            <div className="flex flex-col gap-1">
+              <label className="text-[10.5px] text-text-mute uppercase tracking-[0.05em] font-medium">Aula</label>
+              <select
+                value={aulaId}
+                onChange={(e) => setAulaId(e.target.value)}
+                disabled={!aulaCicloId}
+                className={SELECT_CLS}
+              >
+                <option value="">Seleccionar aula…</option>
+                {aulasList.map((a) => (
+                  <option key={a.id} value={a.id}>{a.nombre}</option>
+                ))}
+              </select>
+            </div>
           </div>
           {/* Botones */}
-          <div className="flex gap-2">
+          <div className="flex flex-wrap gap-2">
             <Btn
               variant="secondary"
               size="sm"
@@ -393,82 +406,83 @@ export default function CarnetsPage() {
             </Btn>
           </div>
           {/* Hint */}
-          {aulaId && (
-            <div className="self-center text-[11px] text-text-mute flex flex-col gap-0.5 leading-snug">
-              <span>Tarjetón: 1 alumno por página (9.3 × 5.6 cm)</span>
-              <span>Hoja A4: 10 carnets por página · guías de corte</span>
-            </div>
-          )}
+          <p className="text-[11px] text-text-mute leading-snug">
+            Tarjetón: 1 alumno por página (9.3 × 5.6 cm) · Hoja A4: 10 carnets por página con guías de corte.
+          </p>
         </div>
       </Card>
 
       {/* ══ 3. CICLO COMPLETO ══════════════════════════════════════ */}
       <Card
+        pad={20}
         title="Ciclo completo — Hoja A4"
-        subtitle="Genera los carnets de un ciclo entero en hojas A4 verticales (10 carnets por página, guías de corte para guillotina)"
+        subtitle="Carnets de un ciclo entero en hojas A4 (10 por página, guías de corte)"
       >
-        <div className="p-4 flex flex-wrap gap-3 items-end">
-          {/* Ciclo */}
-          <div className="flex flex-col gap-1">
-            <label className="text-[10.5px] text-text-mute uppercase tracking-[0.05em] font-medium">
-              Ciclo <span className="text-danger">*</span>
-            </label>
-            <select
-              value={cicloCicloId}
-              onChange={(e) => { setCicloCicloId(e.target.value); setCicloAulaId('') }}
-              className={SELECT_CLS}
-            >
-              <option value="">Seleccionar ciclo…</option>
-              {ciclos.map((c) => (
-                <option key={c.id} value={c.id}>{c.nombre}{c.activo ? ' ★' : ''}</option>
-              ))}
-            </select>
+        <div className="flex flex-col gap-4">
+          <div className="grid grid-cols-2 gap-3">
+            {/* Ciclo */}
+            <div className="flex flex-col gap-1">
+              <label className="text-[10.5px] text-text-mute uppercase tracking-[0.05em] font-medium">
+                Ciclo <span className="text-danger">*</span>
+              </label>
+              <select
+                value={cicloCicloId}
+                onChange={(e) => { setCicloCicloId(e.target.value); setCicloAulaId('') }}
+                className={SELECT_CLS}
+              >
+                <option value="">Seleccionar ciclo…</option>
+                {ciclos.map((c) => (
+                  <option key={c.id} value={c.id}>{c.nombre}{c.activo ? ' ★' : ''}</option>
+                ))}
+              </select>
+            </div>
+            {/* Aula (opcional) */}
+            <div className="flex flex-col gap-1">
+              <label className="text-[10.5px] text-text-mute uppercase tracking-[0.05em] font-medium">
+                Aula <span className="font-normal normal-case text-text-mute">(opcional)</span>
+              </label>
+              <select
+                value={cicloAulaId}
+                onChange={(e) => setCicloAulaId(e.target.value)}
+                disabled={!cicloCicloId}
+                className={SELECT_CLS}
+              >
+                <option value="">Todas las aulas del ciclo</option>
+                {cicloAulas.map((a) => (
+                  <option key={a.id} value={a.id}>{a.nombre}</option>
+                ))}
+              </select>
+            </div>
           </div>
-          {/* Aula (opcional) */}
-          <div className="flex flex-col gap-1">
-            <label className="text-[10.5px] text-text-mute uppercase tracking-[0.05em] font-medium">
-              Aula <span className="font-normal normal-case text-text-mute">(opcional)</span>
-            </label>
-            <select
-              value={cicloAulaId}
-              onChange={(e) => setCicloAulaId(e.target.value)}
-              disabled={!cicloCicloId}
-              className={SELECT_CLS}
+          <div className="flex flex-wrap items-center gap-3">
+            <Btn
+              size="sm"
+              icon={<Download size={14} />}
+              disabled={!cicloCicloId || cicloLoading}
+              onClick={descargarCicloSheet}
             >
-              <option value="">Todas las aulas del ciclo</option>
-              {cicloAulas.map((a) => (
-                <option key={a.id} value={a.id}>{a.nombre}</option>
-              ))}
-            </select>
-          </div>
-          <Btn
-            size="sm"
-            icon={<Download size={14} />}
-            disabled={!cicloCicloId || cicloLoading}
-            onClick={descargarCicloSheet}
-          >
-            {cicloLoading ? 'Generando…' : 'Generar hoja A4'}
-          </Btn>
-          {/* Hint */}
-          {cicloCicloId && (
-            <div className="self-center text-[11px] text-text-mute flex flex-col gap-0.5 leading-snug">
-              <span className="font-medium text-text">10 carnets por página A4 vertical</span>
-              <span>
+              {cicloLoading ? 'Generando…' : 'Generar hoja A4'}
+            </Btn>
+            {cicloCicloId && (
+              <p className="text-[11px] text-text-mute leading-snug">
                 {cicloAulaId
                   ? `Solo aula ${cicloAulas.find((a) => a.id === cicloAulaId)?.nombre ?? ''}`
                   : `Ciclo completo: ${ciclos.find((c) => c.id === cicloCicloId)?.nombre ?? ''}`}
-              </span>
-            </div>
-          )}
+              </p>
+            )}
+          </div>
         </div>
       </Card>
 
+      </div>{/* /grid 2 cols */}
+
       {/* ══ 4. SELECCIÓN LIBRE ════════════════════════════════════ */}
       <Card
+        pad={20}
         title="Selección libre de alumnos"
         subtitle="Elige alumnos de distintas aulas o ciclos — genera hoja A4 solo con los seleccionados"
       >
-        <div className="p-4 flex flex-col gap-4">
+        <div className="flex flex-col gap-4">
           {/* Buscador */}
           <div className="relative max-w-[520px]">
             <Search size={13} className="absolute left-2.5 top-1/2 -translate-y-1/2 text-text-mute pointer-events-none" />
@@ -567,12 +581,19 @@ export default function CarnetsPage() {
         </div>
       </Card>
 
+      {/* ─── Sección: Docentes ─── */}
+      <div className="flex items-center gap-3 mt-2">
+        <h2 className="text-[11px] font-semibold uppercase tracking-[0.09em] text-text-mute">Docentes</h2>
+        <div className="flex-1 h-px bg-border-s" />
+      </div>
+
       {/* ══ 5. CARNETS DE DOCENTES ════════════════════════════════ */}
       <Card
+        pad={20}
         title="Carnets de docentes"
         subtitle="El código de barras del carnet es el DNI del docente (igual al que marca el kiosco)"
       >
-        <div className="p-4 flex flex-col gap-4">
+        <div className="flex flex-col gap-4">
 
           {/* Todos los docentes */}
           <div className="flex flex-wrap items-center gap-3 pb-4 border-b border-border-s">
