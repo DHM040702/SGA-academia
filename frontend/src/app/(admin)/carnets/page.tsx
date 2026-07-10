@@ -38,6 +38,9 @@ export default function CarnetsPage() {
   const { data: ciclos = [] } = useCiclos()
   const cicloActivo = ciclos.find((c) => c.activo)
 
+  /* Grupo activo: separa Alumnos / Docentes para no amontonar la vista */
+  const [grupo, setGrupo] = useState<'alumnos' | 'docentes'>('alumnos')
+
   /* ── 1. Individual ─────────────────────────────────────────── */
   const [indivSearch,  setIndivSearch]  = useState('')
   const [indivAlumno,  setIndivAlumno]  = useState<any>(null)
@@ -260,15 +263,28 @@ export default function CarnetsPage() {
   return (
     <div className="px-6 md:px-8 pt-6 pb-12 flex flex-col gap-6 max-w-[1060px] mx-auto w-full">
       <PageHeader
-        title="Carnets estudiantiles"
+        title="Carnets"
         crumbs={[{ label: 'Carnets' }]}
       />
 
-      {/* ─── Sección: Alumnos ─── */}
-      <div className="flex items-center gap-3 mt-1">
-        <h2 className="text-[11px] font-semibold uppercase tracking-[0.09em] text-text-mute">Alumnos</h2>
-        <div className="flex-1 h-px bg-border-s" />
+      {/* ─── Selector de grupo (Alumnos / Docentes) ─── */}
+      <div className="flex items-center gap-1 p-1 bg-surface-2/60 border border-border rounded-2 w-fit">
+        {([['alumnos', 'Alumnos'], ['docentes', 'Docentes']] as const).map(([key, label]) => (
+          <button
+            key={key}
+            onClick={() => setGrupo(key)}
+            className={`px-5 py-1.5 text-[13px] font-medium rounded-2 transition-colors ${
+              grupo === key ? 'bg-surface text-primary shadow-1' : 'text-text-mute hover:text-text'
+            }`}
+          >
+            {label}
+          </button>
+        ))}
       </div>
+
+      {/* ══════════════════════ GRUPO: ALUMNOS ══════════════════════ */}
+      {grupo === 'alumnos' && (
+      <div className="flex flex-col gap-6">
 
       {/* ══ 1. CARNET INDIVIDUAL ══════════════════════════════════ */}
       <Card
@@ -581,11 +597,12 @@ export default function CarnetsPage() {
         </div>
       </Card>
 
-      {/* ─── Sección: Docentes ─── */}
-      <div className="flex items-center gap-3 mt-2">
-        <h2 className="text-[11px] font-semibold uppercase tracking-[0.09em] text-text-mute">Docentes</h2>
-        <div className="flex-1 h-px bg-border-s" />
       </div>
+      )}
+
+      {/* ══════════════════════ GRUPO: DOCENTES ══════════════════════ */}
+      {grupo === 'docentes' && (
+      <div className="flex flex-col gap-6">
 
       {/* ══ 5. CARNETS DE DOCENTES ════════════════════════════════ */}
       <Card
@@ -701,6 +718,9 @@ export default function CarnetsPage() {
           </div>
         </div>
       </Card>
+
+      </div>
+      )}
     </div>
   )
 }
