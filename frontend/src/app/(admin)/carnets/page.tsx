@@ -25,6 +25,12 @@ async function downloadPDF(component: React.ReactElement, filename: string) {
   URL.revokeObjectURL(url)
 }
 
+/* ─── Helper: logos institucionales (mismo origen) ───────────── */
+function institutionalLogos() {
+  const origin = typeof window !== 'undefined' ? window.location.origin : ''
+  return { logoUrl: `${origin}/logo.png`, logoUnasamUrl: `${origin}/logo-unasam.png` }
+}
+
 /* ─── Helper: iniciales de un nombre ─────────────────────────── */
 function initials(a: any) {
   return `${a.nombres ?? a.nombre ?? ''} ${a.apellidos ?? ''}`
@@ -65,6 +71,7 @@ export default function CarnetsPage() {
         CarnetPDF({
           alumno:     indivAlumno,
           cicloLabel: indivAlumno.aula?.ciclo?.nombre ?? cicloActivo?.nombre ?? '2026-I',
+          ...institutionalLogos(),
         }),
         `carnet-${indivAlumno.apellidos ?? 'alumno'}-${indivAlumno.codigo_barra ?? ''}.pdf`,
       )
@@ -97,7 +104,7 @@ export default function CarnetsPage() {
       const alumnos    = turno ? raw.map((a: any) => ({ ...a, turno })) : raw
       const { CarnetBatchPDF } = await import('@/components/reportes/carnet-pdf')
       await downloadPDF(
-        CarnetBatchPDF({ alumnos, cicloLabel }),
+        CarnetBatchPDF({ alumnos, cicloLabel, ...institutionalLogos() }),
         `carnets-tarjeton-${aulaLabel}.pdf`,
       )
     } catch { alert('No se pudo generar los carnets.') }
@@ -118,7 +125,7 @@ export default function CarnetsPage() {
       const alumnos    = turno ? raw.map((a: any) => ({ ...a, turno })) : raw
       const { CarnetSheetPDF } = await import('@/components/reportes/carnet-pdf')
       await downloadPDF(
-        CarnetSheetPDF({ alumnos, cicloLabel }),
+        CarnetSheetPDF({ alumnos, cicloLabel, ...institutionalLogos() }),
         `carnets-hoja-A4-${aulaLabel}.pdf`,
       )
     } catch { alert('No se pudo generar los carnets.') }
@@ -151,7 +158,7 @@ export default function CarnetsPage() {
       const alumnos      = turno ? raw.map((a: any) => ({ ...a, turno })) : raw
 
       await downloadPDF(
-        CarnetSheetPDF({ alumnos, cicloLabel }),
+        CarnetSheetPDF({ alumnos, cicloLabel, ...institutionalLogos() }),
         `carnets-hoja-A4-${fileLabel}.pdf`,
       )
     } catch { alert('No se pudo generar los carnets.') }
@@ -187,7 +194,7 @@ export default function CarnetsPage() {
     try {
       const { CarnetSheetPDF } = await import('@/components/reportes/carnet-pdf')
       await downloadPDF(
-        CarnetSheetPDF({ alumnos, cicloLabel: cicloActivo?.nombre ?? '2026-I' }),
+        CarnetSheetPDF({ alumnos, cicloLabel: cicloActivo?.nombre ?? '2026-I', ...institutionalLogos() }),
         `carnets-seleccion-${alumnos.length}.pdf`,
       )
     } catch { alert('No se pudo generar los carnets.') }

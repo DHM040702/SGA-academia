@@ -9,15 +9,15 @@
  *   const { CarnetBatchPDF } = await import('@/components/reportes/carnet-pdf')
  */
 
-import { Document, Page, Text, View, StyleSheet, Image, Svg, G, Rect } from '@react-pdf/renderer'
+import { Document, Page, Text, View, StyleSheet, Image, Svg, G, Rect, Path, Circle } from '@react-pdf/renderer'
 
 /* ─── Dimensiones en puntos (pt) ─────────────────────────────── */
 const CARD_W        = 263.62   // 9.3 cm × 28.3465 pt/cm
 const CARD_H        = 158.74   // 5.6 cm × 28.3465 pt/cm
-const HEADER_H      = 26
+const HEADER_H      = 33       // cabecera (aloja el logo institucional)
 const BARCODE_COL_W = 50       // columna derecha (código de barras vertical)
 const BARCODE_BAR_W = 40       // ancho visual de la barra dentro del SVG
-const BARCODE_SVG_H = 112      // alto del SVG (≈ alto del cuerpo menos texto inferior)
+const BARCODE_SVG_H = 94       // alto del SVG (≈ alto del cuerpo menos etiquetas)
 
 /* ─── Hoja A4 vertical — 2 × 5 = 10 carnets por página ────────── */
 const SHEET_COLS     = 2
@@ -83,18 +83,23 @@ function code128bSegs(text: string): BarSeg[] {
 
 /* ─── Paleta ──────────────────────────────────────────────────── */
 const C = {
-  primary:   '#1e3a5f',
-  secondary: '#4a6fa5',
-  success:   '#166534',
-  successBg: '#dcfce7',
-  warning:   '#92400e',
-  warningBg: '#fef3c7',
-  danger:    '#991b1b',
-  dangerBg:  '#fee2e2',
-  text:      '#111827',
-  muted:     '#6b7280',
-  border:    '#e5e7eb',
-  white:     '#ffffff',
+  primary:     '#1e3a5f',
+  primaryDark: '#132639',
+  secondary:   '#4a6fa5',
+  gold:        '#c9a24b',   // filo/acento institucional
+  goldSoft:    '#e6d3a3',
+  seal:        '#c7d3e4',   // azul claro para la marca de agua vectorial
+  success:     '#166534',
+  successBg:   '#dcfce7',
+  warning:     '#92400e',
+  warningBg:   '#fef3c7',
+  danger:      '#991b1b',
+  dangerBg:    '#fee2e2',
+  text:        '#111827',
+  muted:       '#6b7280',
+  border:      '#e5e7eb',
+  bgSoft:      '#f6f8fb',
+  white:       '#ffffff',
 }
 
 /* ─── Estilos ─────────────────────────────────────────────────── */
@@ -105,85 +110,129 @@ const s = StyleSheet.create({
     flexDirection:   'column',
   },
 
-  /* ── Cabecera azul ── */
+  /* Marco exterior con filo dorado sutil */
+  card: {
+    flex:            1,
+    flexDirection:   'column',
+    backgroundColor: C.white,
+    borderWidth:     0.75,
+    borderColor:     C.gold,
+  },
+
+  /* ── Cabecera ── */
   header: {
-    backgroundColor:   C.primary,
     height:            HEADER_H,
-    paddingHorizontal: 10,
-    paddingVertical:   5,
+    backgroundColor:   C.primaryDark,
     flexDirection:     'row',
     alignItems:        'center',
-    justifyContent:    'space-between',
+    paddingHorizontal: 8,
+    position:          'relative',
   },
-  headerInst: { color: C.white, fontSize: 7.5, fontWeight: 'bold' },
-  headerSub:  { color: 'rgba(255,255,255,0.72)', fontSize: 5.5, marginTop: 1.5 },
+  headerTexture: { position: 'absolute', top: 0, left: 0 },
+  headerLogo: {
+    width:      21,
+    height:     21,
+    objectFit:  'contain' as const,
+    marginRight: 6,
+  },
+  headerLogoBox: {
+    width:          21,
+    height:         21,
+    marginRight:    6,
+    alignItems:     'center',
+    justifyContent: 'center',
+  },
+  headerTextWrap: { flex: 1, justifyContent: 'center' },
+  headerInst: { color: C.white, fontSize: 8, fontWeight: 'bold', letterSpacing: 0.2 },
+  headerSub:  { color: C.goldSoft, fontSize: 5.2, marginTop: 1, letterSpacing: 0.2 },
   headerBadge: {
-    backgroundColor:   'rgba(255,255,255,0.15)',
-    borderRadius:      8,
-    paddingHorizontal: 6,
-    paddingVertical:   3,
+    borderWidth:       0.6,
+    borderColor:       'rgba(230,211,163,0.55)',
+    backgroundColor:   'rgba(255,255,255,0.08)',
+    borderRadius:      2.5,
+    paddingHorizontal: 5,
+    paddingVertical:   2.5,
   },
   headerBadgeText: {
-    color:         C.white,
-    fontSize:      6,
+    color:         C.goldSoft,
+    fontSize:      5.5,
     fontWeight:    'bold',
-    letterSpacing: 0.5,
+    letterSpacing: 0.7,
   },
 
   /* ── Cuerpo (flex row, ocupa el resto del carnet) ── */
   body: {
     flex:          1,
     flexDirection: 'row',
+    position:      'relative',
   },
 
-  /* Sección izquierda: avatar + datos */
+  /* Marca de agua centrada tras la información */
+  watermark: {
+    position:       'absolute',
+    top:            0,
+    left:           0,
+    right:          BARCODE_COL_W,
+    bottom:         0,
+    alignItems:     'center',
+    justifyContent: 'center',
+  },
+  watermarkImg: { width: 86, height: 86, objectFit: 'contain' as const, opacity: 0.05 },
+
+  /* Sección izquierda: foto + datos */
   infoSection: {
     flex:              1,
     flexDirection:     'row',
     alignItems:        'center',
     paddingHorizontal: 9,
-    paddingVertical:   8,
-    gap:               7,
+    paddingVertical:   7,
+    gap:               8,
   },
 
-  /* Avatar circular */
-  avatar: {
-    width:           52,
-    height:          52,
-    borderRadius:    26,
+  /* Foto tipo credencial (marco) */
+  photoFrame: {
+    width:           49,
+    height:          60,
+    borderRadius:    3.5,
+    borderWidth:     1.4,
+    borderColor:     C.primary,
+    backgroundColor: C.white,
+    padding:         1.5,
+    flexShrink:      0,
+  },
+  photoImg:  { width: '100%', height: '100%', borderRadius: 2, objectFit: 'cover' as const },
+  photoPlaceholder: {
+    width:           '100%',
+    height:          '100%',
+    borderRadius:    2,
     backgroundColor: C.secondary,
     alignItems:      'center',
     justifyContent:  'center',
-    flexShrink:      0,
   },
-  avatarText: { color: C.white, fontSize: 17, fontWeight: 'bold' },
-  avatarImg: {
-    width:        52,
-    height:       52,
-    borderRadius: 26,
-    objectFit:    'cover' as const,
-  },
+  photoInitials: { color: C.white, fontSize: 17, fontWeight: 'bold' },
 
-  /* Divisor vertical */
+  /* Divisor vertical con acento */
   vline: {
     width:            1,
     alignSelf:        'stretch',
     backgroundColor:  C.border,
-    marginHorizontal: 2,
+    marginHorizontal: 1,
     flexShrink:       0,
   },
 
   /* Bloque de datos del alumno */
-  info: { flex: 1, justifyContent: 'center', gap: 2 },
+  info: { flex: 1, justifyContent: 'center', gap: 1.5 },
 
-  name:        { fontSize: 10.5, fontWeight: 'bold', color: C.primary },
+  name:        { fontSize: 10.5, fontWeight: 'bold', color: C.primaryDark },
+  nameRule:    { width: 24, height: 1.6, backgroundColor: C.gold, borderRadius: 1, marginTop: 1.5, marginBottom: 1.5 },
   codeField:   { fontSize: 7.5,  fontFamily: 'Courier', color: C.text },
   dniField:    { fontSize: 7.5,  fontFamily: 'Courier', color: C.muted },
   aulaLine:    { fontSize: 7.5,  color: C.text },
   carreraLine: { fontSize: 7,    color: C.muted },
+  footNote:    { fontSize: 5,    color: C.muted, marginTop: 2.5, letterSpacing: 0.3 },
 
   /* Pill estado */
-  pillRow:     { flexDirection: 'row', alignItems: 'center', marginTop: 1 },
+  pillRow:     { flexDirection: 'row', alignItems: 'center', marginTop: 2 },
   pill:        { paddingHorizontal: 6, paddingVertical: 2, borderRadius: 8 },
   pillText:    { fontSize: 7.5, fontWeight: 'bold' },
   pillSuccess: { backgroundColor: C.successBg },
@@ -195,10 +244,17 @@ const s = StyleSheet.create({
     width:           BARCODE_COL_W,
     borderLeftWidth: 1,
     borderLeftColor: C.border,
-    backgroundColor: '#f9fafb',
+    backgroundColor: C.bgSoft,
     alignItems:      'center',
-    paddingBottom:   4,
-    paddingTop:      0,
+    justifyContent:  'center',
+    paddingVertical: 4,
+  },
+  barcodeScanLbl: {
+    fontSize:      4.6,
+    color:         C.muted,
+    fontWeight:    'bold',
+    letterSpacing: 1.2,
+    marginBottom:  2,
   },
   barcodeColCode: {
     fontFamily:    'Courier',
@@ -253,8 +309,49 @@ export interface CarnetBatchPDFProps {
   logoUnasamUrl?: string
 }
 
+/* ─── Adornos vectoriales ─────────────────────────────────────── */
+
+/** Textura sutil + filo dorado de la cabecera (sin ids → sin colisiones). */
+function HeaderTexture() {
+  return (
+    <Svg style={s.headerTexture} width={CARD_W} height={HEADER_H}>
+      <Path d={`M0 0 L44 0 L22 ${HEADER_H} L-22 ${HEADER_H} Z`} fill="rgba(255,255,255,0.05)" />
+      <Path d={`M64 0 L90 0 L68 ${HEADER_H} L42 ${HEADER_H} Z`} fill="rgba(255,255,255,0.035)" />
+      <Rect x={0} y={HEADER_H - 1.6} width={CARD_W} height={1.6} fill={C.gold} />
+    </Svg>
+  )
+}
+
+/** Emblema mini vectorial para la cabecera (fallback si no hay logo UNASAM). */
+function EmblemMini() {
+  return (
+    <Svg width={21} height={21}>
+      <Circle cx={10.5} cy={10.5} r={9.5} fill="rgba(255,255,255,0.10)" stroke={C.goldSoft} strokeWidth={1} />
+      <Path d="M10.5 3.5 L16.5 8 L14 16.5 L7 16.5 L4.5 8 Z" fill="none" stroke={C.goldSoft} strokeWidth={1} />
+      <Circle cx={10.5} cy={10.5} r={2} fill={C.goldSoft} />
+    </Svg>
+  )
+}
+
+/** Sello vectorial para la marca de agua (fallback si no hay logo CEPRE). */
+function SealMark() {
+  const c = 43
+  return (
+    <Svg width={86} height={86}>
+      <Circle cx={c} cy={c} r={c - 2} fill="none" stroke={C.seal} strokeWidth={2} />
+      <Circle cx={c} cy={c} r={c - 9} fill="none" stroke={C.seal} strokeWidth={0.8} />
+      <Path d={`M ${c} ${c - 16} L ${c + 16} ${c} L ${c} ${c + 16} L ${c - 16} ${c} Z`} fill="none" stroke={C.seal} strokeWidth={1.4} />
+      <Circle cx={c} cy={c} r={5} fill={C.seal} />
+    </Svg>
+  )
+}
+
 /* ─── Contenido del carnet (reutilizable en hoja A4) ─────────── */
-function CarnetCardContent({ alumno, cicloLabel }: { alumno: AlumnoCarnet; cicloLabel: string }) {
+function CarnetCardContent({
+  alumno, cicloLabel, logoUrl, logoUnasamUrl,
+}: {
+  alumno: AlumnoCarnet; cicloLabel: string; logoUrl?: string; logoUnasamUrl?: string
+}) {
   const nombre    = alumno.nombres ?? alumno.nombre ?? ''
   const apellidos = alumno.apellidos ?? ''
   const fullName  = `${nombre} ${apellidos}`.trim()
@@ -292,13 +389,17 @@ function CarnetCardContent({ alumno, cicloLabel }: { alumno: AlumnoCarnet; ciclo
   if (ciclo)                aulaParts.push(`Ciclo: ${ciclo}`)
 
   return (
-    <View style={{ flex: 1, flexDirection: 'column', backgroundColor: C.white }}>
+    <View style={s.card}>
 
-      {/* ── Cabecera ── */}
+      {/* ── Cabecera: logo + institución + sello «oficial» ── */}
       <View style={s.header}>
-        <View>
-          <Text style={s.headerInst}>Centro Preuniversitario · UNASAM</Text>
-          <Text style={s.headerSub}>Sistema de Gestión Académica · Ciclo {ciclo}</Text>
+        <HeaderTexture />
+        {logoUnasamUrl
+          ? <Image src={logoUnasamUrl} style={s.headerLogo} />
+          : <View style={s.headerLogoBox}><EmblemMini /></View>}
+        <View style={s.headerTextWrap}>
+          <Text style={s.headerInst}>Centro Preuniversitario</Text>
+          <Text style={s.headerSub}>UNASAM · Ciclo {ciclo}</Text>
         </View>
         <View style={s.headerBadge}>
           <Text style={s.headerBadgeText}>CARNET OFICIAL</Text>
@@ -308,15 +409,26 @@ function CarnetCardContent({ alumno, cicloLabel }: { alumno: AlumnoCarnet; ciclo
       {/* ── Cuerpo: info izquierda + barcode vertical derecha ── */}
       <View style={s.body}>
 
+        {/* Marca de agua (escudo CEPRE) tras la información */}
+        <View style={s.watermark}>
+          {logoUrl
+            ? <Image src={logoUrl} style={s.watermarkImg} />
+            : <SealMark />}
+        </View>
+
         {/* ─ Sección izquierda ─ */}
         <View style={s.infoSection}>
 
-          {/* Avatar */}
-          {alumno.foto_url ? (
-            <Image src={alumno.foto_url} style={s.avatarImg} />
-          ) : (
-            <View style={[s.avatar, { backgroundColor: '#000000' }]} />
-          )}
+          {/* Foto tipo credencial */}
+          <View style={s.photoFrame}>
+            {alumno.foto_url ? (
+              <Image src={alumno.foto_url} style={s.photoImg} />
+            ) : (
+              <View style={s.photoPlaceholder}>
+                <Text style={s.photoInitials}>{initials(fullName)}</Text>
+              </View>
+            )}
+          </View>
 
           <View style={s.vline} />
 
@@ -325,6 +437,9 @@ function CarnetCardContent({ alumno, cicloLabel }: { alumno: AlumnoCarnet; ciclo
             <Text style={s.name}>
               {apellidos ? `${apellidos}, ${nombre}` : nombre}
             </Text>
+
+            {/* Acento dorado bajo el nombre */}
+            <View style={s.nameRule} />
 
             {/* Código en su propia línea */}
             <Text style={s.codeField}>Cód: {codigo}</Text>
@@ -354,11 +469,16 @@ function CarnetCardContent({ alumno, cicloLabel }: { alumno: AlumnoCarnet; ciclo
                 <Text style={[s.pillText, { color: estadoColor }]}>{estadoLabel}</Text>
               </View>
             </View>
+
+            {/* Pie institucional */}
+            <Text style={s.footNote}>Documento de identificación estudiantil</Text>
           </View>
         </View>
 
         {/* ─ Columna derecha: código de barras Code128B vertical ─ */}
         <View style={s.barcodeCol}>
+          <Text style={s.barcodeScanLbl}>ESCANEAR</Text>
+
           {/* SVG con barras verticales via transformación matricial */}
           <Svg width={BARCODE_COL_W} height={BARCODE_SVG_H}>
             {/* Fondo blanco (zona de silencio incluida) */}
@@ -381,10 +501,14 @@ function CarnetCardContent({ alumno, cicloLabel }: { alumno: AlumnoCarnet; ciclo
 }
 
 /* ─── Página individual de carnet ────────────────────────────── */
-function CarnetPage({ alumno, cicloLabel }: { alumno: AlumnoCarnet; cicloLabel: string }) {
+function CarnetPage({
+  alumno, cicloLabel, logoUrl, logoUnasamUrl,
+}: {
+  alumno: AlumnoCarnet; cicloLabel: string; logoUrl?: string; logoUnasamUrl?: string
+}) {
   return (
     <Page size={[CARD_W, CARD_H]} style={s.page}>
-      <CarnetCardContent alumno={alumno} cicloLabel={cicloLabel} />
+      <CarnetCardContent alumno={alumno} cicloLabel={cicloLabel} logoUrl={logoUrl} logoUnasamUrl={logoUnasamUrl} />
     </Page>
   )
 }
@@ -392,7 +516,7 @@ function CarnetPage({ alumno, cicloLabel }: { alumno: AlumnoCarnet; cicloLabel: 
 /* ─── Exportaciones públicas ──────────────────────────────────── */
 
 /** Carnet de un solo alumno (9.3 cm × 5.6 cm). */
-export function CarnetPDF({ alumno, cicloLabel = '2026-I' }: CarnetPDFProps) {
+export function CarnetPDF({ alumno, cicloLabel = '2026-I', logoUrl, logoUnasamUrl }: CarnetPDFProps) {
   const nombre    = alumno.nombres ?? alumno.nombre ?? ''
   const apellidos = alumno.apellidos ?? ''
   const fullName  = `${nombre} ${apellidos}`.trim()
@@ -402,7 +526,7 @@ export function CarnetPDF({ alumno, cicloLabel = '2026-I' }: CarnetPDFProps) {
       author="Sistema de Gestión Académica"
       subject="Carnet estudiantil"
     >
-      <CarnetPage alumno={alumno} cicloLabel={cicloLabel} />
+      <CarnetPage alumno={alumno} cicloLabel={cicloLabel} logoUrl={logoUrl} logoUnasamUrl={logoUnasamUrl} />
     </Document>
   )
 }
@@ -411,7 +535,7 @@ export function CarnetPDF({ alumno, cicloLabel = '2026-I' }: CarnetPDFProps) {
  * Carnets de múltiples alumnos — una página por alumno.
  * Ideal para imprimir en lote y cortar individualmente.
  */
-export function CarnetBatchPDF({ alumnos, cicloLabel = '2026-I' }: CarnetBatchPDFProps) {
+export function CarnetBatchPDF({ alumnos, cicloLabel = '2026-I', logoUrl, logoUnasamUrl }: CarnetBatchPDFProps) {
   return (
     <Document
       title={`Carnets estudiantiles — ${alumnos.length} alumno${alumnos.length !== 1 ? 's' : ''}`}
@@ -419,7 +543,7 @@ export function CarnetBatchPDF({ alumnos, cicloLabel = '2026-I' }: CarnetBatchPD
       subject="Carnets estudiantiles"
     >
       {alumnos.map((alumno, i) => (
-        <CarnetPage key={i} alumno={alumno} cicloLabel={cicloLabel} />
+        <CarnetPage key={i} alumno={alumno} cicloLabel={cicloLabel} logoUrl={logoUrl} logoUnasamUrl={logoUnasamUrl} />
       ))}
     </Document>
   )
@@ -428,15 +552,17 @@ export function CarnetBatchPDF({ alumnos, cicloLabel = '2026-I' }: CarnetBatchPD
 /* ─── Hoja A4 ─────────────────────────────────────────────────── */
 
 export interface CarnetSheetPDFProps {
-  alumnos:     AlumnoCarnet[]
-  cicloLabel?: string
+  alumnos:        AlumnoCarnet[]
+  cicloLabel?:    string
+  logoUrl?:       string
+  logoUnasamUrl?: string
 }
 
 /**
  * Hoja A4 apaisada con 9 carnets por página (3 columnas × 3 filas).
  * Margen lateral ≈ 0.9 cm · Margen vertical ≈ 2.1 cm · guías de corte incluidas.
  */
-export function CarnetSheetPDF({ alumnos, cicloLabel = '2026-I' }: CarnetSheetPDFProps) {
+export function CarnetSheetPDF({ alumnos, cicloLabel = '2026-I', logoUrl, logoUnasamUrl }: CarnetSheetPDFProps) {
   const PER_SHEET = SHEET_COLS * SHEET_ROWS
 
   const pages: AlumnoCarnet[][] = []
@@ -466,7 +592,7 @@ export function CarnetSheetPDF({ alumnos, cicloLabel = '2026-I' }: CarnetSheetPD
                 height:   CARD_H,
                 overflow: 'hidden',
               }}>
-                <CarnetCardContent alumno={alumno} cicloLabel={cicloLabel} />
+                <CarnetCardContent alumno={alumno} cicloLabel={cicloLabel} logoUrl={logoUrl} logoUnasamUrl={logoUnasamUrl} />
               </View>
             )
           })}
