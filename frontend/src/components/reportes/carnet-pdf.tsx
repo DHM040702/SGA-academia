@@ -126,14 +126,26 @@ const s = StyleSheet.create({
     flexDirection:     'row',
     alignItems:        'center',
     paddingHorizontal: 8,
-    position:          'relative',
+    borderBottomWidth: 1.8,
+    borderBottomColor: C.gold,
   },
-  headerTexture: { position: 'absolute', top: 0, left: 0 },
   headerLogo: {
-    width:      21,
-    height:     21,
+    width:      22,
+    height:     22,
+    objectFit:  'contain' as const,
+    marginRight: 5,
+  },
+  headerLogo2: {
+    width:      22,
+    height:     22,
     objectFit:  'contain' as const,
     marginRight: 6,
+  },
+  headerLogoSep: {
+    width:           0.7,
+    height:          18,
+    backgroundColor: 'rgba(230,211,163,0.5)',
+    marginRight:     6,
   },
   headerLogoBox: {
     width:          21,
@@ -273,7 +285,8 @@ function initials(name: string) {
 }
 
 function estadoPill(pct?: number | null, estado?: string | null) {
-  const label  = estado ?? (pct == null ? 'Activo' : pct >= 90 ? 'Activo' : pct >= 75 ? 'Observado' : 'En riesgo')
+  const raw    = estado ?? (pct == null ? 'Activo' : pct >= 90 ? 'Activo' : pct >= 75 ? 'Observado' : 'En riesgo')
+  const label  = raw ? raw.charAt(0).toUpperCase() + raw.slice(1) : raw
   const style  = (pct == null || pct >= 90) ? s.pillSuccess : pct >= 75 ? s.pillWarning : s.pillDanger
   const color  = (pct == null || pct >= 90) ? C.success     : pct >= 75 ? C.warning     : C.danger
   return { label, style, color }
@@ -310,17 +323,6 @@ export interface CarnetBatchPDFProps {
 }
 
 /* ─── Adornos vectoriales ─────────────────────────────────────── */
-
-/** Textura sutil + filo dorado de la cabecera (sin ids → sin colisiones). */
-function HeaderTexture() {
-  return (
-    <Svg style={s.headerTexture} width={CARD_W} height={HEADER_H}>
-      <Path d={`M0 0 L44 0 L22 ${HEADER_H} L-22 ${HEADER_H} Z`} fill="rgba(255,255,255,0.05)" />
-      <Path d={`M64 0 L90 0 L68 ${HEADER_H} L42 ${HEADER_H} Z`} fill="rgba(255,255,255,0.035)" />
-      <Rect x={0} y={HEADER_H - 1.6} width={CARD_W} height={1.6} fill={C.gold} />
-    </Svg>
-  )
-}
 
 /** Emblema mini vectorial para la cabecera (fallback si no hay logo UNASAM). */
 function EmblemMini() {
@@ -391,12 +393,19 @@ function CarnetCardContent({
   return (
     <View style={s.card}>
 
-      {/* ── Cabecera: logo + institución + sello «oficial» ── */}
+      {/* ── Cabecera: logos + institución + sello «oficial» ── */}
       <View style={s.header}>
-        <HeaderTexture />
+        {/* Logo UNASAM (o emblema vectorial de respaldo) */}
         {logoUnasamUrl
           ? <Image src={logoUnasamUrl} style={s.headerLogo} />
           : <View style={s.headerLogoBox}><EmblemMini /></View>}
+        {/* Logo de la academia (CEPRE), a la derecha del de UNASAM */}
+        {logoUrl && (
+          <>
+            <View style={s.headerLogoSep} />
+            <Image src={logoUrl} style={s.headerLogo2} />
+          </>
+        )}
         <View style={s.headerTextWrap}>
           <Text style={s.headerInst}>Centro Preuniversitario</Text>
           <Text style={s.headerSub}>UNASAM · Ciclo {ciclo}</Text>
