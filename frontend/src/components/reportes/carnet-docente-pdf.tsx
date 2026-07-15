@@ -144,7 +144,7 @@ const s = StyleSheet.create({
     position: 'absolute', top: 0, left: 0, right: 0, bottom: 0,
     alignItems: 'center', justifyContent: 'center',
   },
-  watermarkImg: { width: 78, height: 78, objectFit: 'contain' as const, opacity: 0.06 },
+  watermarkImg: { width: 84, height: 84, objectFit: 'contain' as const, opacity: 0.16 },
 
   /* Bloque de datos del docente */
   info: { flex: 1, justifyContent: 'center', gap: 1.5 },

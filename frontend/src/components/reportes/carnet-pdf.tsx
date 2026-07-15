@@ -175,7 +175,7 @@ const s = StyleSheet.create({
     alignItems:     'center',
     justifyContent: 'center',
   },
-  watermarkImg: { width: 86, height: 86, objectFit: 'contain' as const, opacity: 0.05 },
+  watermarkImg: { width: 104, height: 104, objectFit: 'contain' as const, opacity: 0.16 },
 
   /* Sección izquierda: foto + datos */
   infoSection: {
