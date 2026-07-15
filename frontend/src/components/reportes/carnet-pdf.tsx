@@ -133,18 +133,6 @@ const s = StyleSheet.create({
     objectFit:  'contain' as const,
     marginRight: 5,
   },
-  headerLogo2: {
-    width:      22,
-    height:     22,
-    objectFit:  'contain' as const,
-    marginRight: 6,
-  },
-  headerLogoSep: {
-    width:           0.7,
-    height:          18,
-    backgroundColor: C.border,
-    marginRight:     6,
-  },
   headerLogoBox: {
     width:          21,
     height:         21,
@@ -298,6 +286,9 @@ export interface AlumnoCarnet {
   dni?:            string | null
   codigo_barra?:   string | null
   codigoBarras?:   string | null
+  // La API devuelve `fotoUrl` (ya prefirmada); `foto_url` se acepta por si
+  // llega la forma snake_case desde otra fuente.
+  fotoUrl?:        string | null
   foto_url?:       string | null
   estado?:         string | null
   turno?:          string | null
@@ -356,6 +347,7 @@ function CarnetCardContent({
   const apellidos = alumno.apellidos ?? ''
   const fullName  = `${nombre} ${apellidos}`.trim()
   const codigo    = alumno.codigo_barra ?? alumno.codigoBarras ?? '——'
+  const fotoUrl   = alumno.fotoUrl ?? alumno.foto_url ?? null
   const ciclo     = alumno.aula?.ciclo?.nombre ?? cicloLabel
   const { label: estadoLabel, style: estadoStyle, color: estadoColor } = estadoPill(alumno.asistencia_pct, alumno.estado)
 
@@ -391,15 +383,12 @@ function CarnetCardContent({
   return (
     <View style={s.card}>
 
-      {/* ── Cabecera: logos + institución + sello «oficial» ── */}
+      {/* ── Cabecera: logo de la academia + institución + sello «oficial» ── */}
       <View style={s.header}>
-        {/* Logo UNASAM (o emblema vectorial de respaldo) */}
-        {logoUnasamUrl
-          ? <Image src={logoUnasamUrl} style={s.headerLogo} />
+        {/* Solo el logo de la academia: el de la UNASAM va de marca de agua */}
+        {logoUrl
+          ? <Image src={logoUrl} style={s.headerLogo} />
           : <View style={s.headerLogoBox}><EmblemMini /></View>}
-        {/* Logo de la academia (CEPRE), a la derecha del de UNASAM */}
-        {logoUrl && <View style={s.headerLogoSep} />}
-        {logoUrl && <Image src={logoUrl} style={s.headerLogo2} />}
         <View style={s.headerTextWrap}>
           <Text style={s.headerInst}>Centro Preuniversitario</Text>
           <Text style={s.headerSub}>UNASAM · Ciclo {ciclo}</Text>
@@ -412,10 +401,10 @@ function CarnetCardContent({
       {/* ── Cuerpo: info izquierda + barcode vertical derecha ── */}
       <View style={s.body}>
 
-        {/* Marca de agua (escudo CEPRE) tras la información */}
+        {/* Marca de agua: escudo de la UNASAM tras la información */}
         <View style={s.watermark}>
-          {logoUrl
-            ? <Image src={logoUrl} style={s.watermarkImg} />
+          {logoUnasamUrl
+            ? <Image src={logoUnasamUrl} style={s.watermarkImg} />
             : <SealMark />}
         </View>
 
@@ -424,8 +413,8 @@ function CarnetCardContent({
 
           {/* Foto tipo credencial */}
           <View style={s.photoFrame}>
-            {alumno.foto_url ? (
-              <Image src={alumno.foto_url} style={s.photoImg} />
+            {fotoUrl ? (
+              <Image src={fotoUrl} style={s.photoImg} />
             ) : (
               <View style={s.photoPlaceholder}>
                 <Text style={s.photoInitials}>{initials(fullName)}</Text>

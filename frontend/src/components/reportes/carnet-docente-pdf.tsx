@@ -115,9 +115,7 @@ const s = StyleSheet.create({
     borderBottomWidth: 1.2,
     borderBottomColor: C.teal,
   },
-  headerLogo:    { width: 22, height: 22, objectFit: 'contain' as const, marginRight: 5 },
-  headerLogo2:   { width: 22, height: 22, objectFit: 'contain' as const, marginRight: 6 },
-  headerLogoSep: { width: 0.7, height: 18, backgroundColor: C.border, marginRight: 6 },
+  headerLogo:    { width: 22, height: 22, objectFit: 'contain' as const, marginRight: 6 },
   headerLogoBox: { width: 22, height: 22, marginRight: 6, alignItems: 'center', justifyContent: 'center' },
   headerTextWrap: { flex: 1, justifyContent: 'center' },
   headerInst: { color: C.tealDeep, fontSize: 8, fontWeight: 'bold', letterSpacing: 0.2 },
@@ -146,6 +144,7 @@ const s = StyleSheet.create({
     position: 'absolute', top: 0, left: 0, right: 0, bottom: 0,
     alignItems: 'center', justifyContent: 'center',
   },
+  watermarkImg: { width: 78, height: 78, objectFit: 'contain' as const, opacity: 0.06 },
 
   /* Bloque de datos del docente */
   info: { flex: 1, justifyContent: 'center', gap: 1.5 },
@@ -287,13 +286,12 @@ function CarnetCardContent({
   return (
     <View style={s.card}>
 
-      {/* ── Cabecera: logos + institución + sello «DOCENTE» ── */}
+      {/* ── Cabecera: logo de la academia + institución + sello «DOCENTE» ── */}
       <View style={s.header}>
-        {logoUnasamUrl
-          ? <Image src={logoUnasamUrl} style={s.headerLogo} />
+        {/* Solo el logo de la academia: el de la UNASAM va de marca de agua */}
+        {logoUrl
+          ? <Image src={logoUrl} style={s.headerLogo} />
           : <View style={s.headerLogoBox}><EmblemMini /></View>}
-        {logoUrl && <View style={s.headerLogoSep} />}
-        {logoUrl && <Image src={logoUrl} style={s.headerLogo2} />}
         <View style={s.headerTextWrap}>
           <Text style={s.headerInst}>Centro Preuniversitario</Text>
           <Text style={s.headerSub}>UNASAM · Ciclo {cicloLabel}</Text>
@@ -306,9 +304,11 @@ function CarnetCardContent({
       {/* ── Cuerpo central: datos (izq) + foto (der) ── */}
       <View style={s.body}>
 
-        {/* Marca de agua: sello vectorial claro (poca tinta) */}
+        {/* Marca de agua: escudo de la UNASAM (vectorial de respaldo si no carga) */}
         <View style={s.watermark}>
-          <SealMark />
+          {logoUnasamUrl
+            ? <Image src={logoUnasamUrl} style={s.watermarkImg} />
+            : <SealMark />}
         </View>
 
         {/* Datos */}
