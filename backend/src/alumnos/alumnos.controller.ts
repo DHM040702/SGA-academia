@@ -1,4 +1,5 @@
 import {
+  BadRequestException,
   Body, Controller, Delete, Get, HttpCode, HttpStatus,
   Param, ParseUUIDPipe, Patch, Post, Query, UploadedFile,
   UseGuards, UseInterceptors,
@@ -7,16 +8,122 @@ import { FileInterceptor } from '@nestjs/platform-express';
 import {
   ApiBearerAuth, ApiConsumes, ApiOperation, ApiTags,
 } from '@nestjs/swagger';
-import { Rol } from '@prisma/client';
+import { Rol, Area, Turno } from '@prisma/client';
 import * as XLSX from 'xlsx';
 import { JwtAuthGuard } from '../common/guards/jwt-auth.guard';
 import { RolesGuard } from '../common/guards/roles.guard';
 import { Roles } from '../common/decorators/roles.decorator';
 import { AlumnosService } from './alumnos.service';
+import type { SemestreImportRow } from './alumnos.service';
 import { CreateAlumnoDto } from './dto/create-alumno.dto';
 import { UpdateAlumnoDto } from './dto/update-alumno.dto';
 import { FilterAlumnosDto } from './dto/filter-alumnos.dto';
 import { VincularApoderadoDto } from './dto/vincular-apoderado.dto';
+
+/* ─── Parseo del CSV oficial de matrícula (formato semestre) ─────── */
+
+const NUM_A_AREA: Record<string, Area> = {
+  '1': Area.ciencias,
+  '2': Area.letras,
+  '3': Area.medicas,
+};
+
+/** Divide una línea CSV respetando comillas y escapes `""`. */
+function parseCsvLine(line: string): string[] {
+  const out: string[] = [];
+  let cur = '';
+  let inQ = false;
+  for (let i = 0; i < line.length; i++) {
+    const c = line[i];
+    if (inQ) {
+      if (c === '"') {
+        if (line[i + 1] === '"') { cur += '"'; i++; }
+        else inQ = false;
+      } else cur += c;
+    } else if (c === '"') {
+      inQ = true;
+    } else if (c === ',') {
+      out.push(cur); cur = '';
+    } else {
+      cur += c;
+    }
+  }
+  out.push(cur);
+  return out;
+}
+
+/** Normaliza un encabezado (sin acentos, minúsculas) para casar columnas. */
+function normHeader(s: string): string {
+  return s.normalize('NFD').replace(/\p{Diacritic}/gu, '').trim().toLowerCase();
+}
+
+/**
+ * Parsea el CSV oficial. El archivo viene DOBLE-codificado: cada fila es un
+ * único campo CSV entrecomillado con las comillas internas duplicadas. Se
+ * des-envuelve (parse → si da 1 sola columna con comas, se re-parsea) y luego
+ * se mapea por nombre de columna (tolerante a orden/acentos).
+ */
+function parseSemestreCsv(buffer: Buffer): SemestreImportRow[] {
+  let text = buffer.toString('utf8');
+  if (text.charCodeAt(0) === 0xfeff) text = text.slice(1); // BOM
+  const rawLines = text.split(/\r?\n/).filter((l) => l.trim() !== '');
+  if (rawLines.length < 2) return [];
+
+  const fields = (raw: string): string[] => {
+    let f = parseCsvLine(raw);
+    if (f.length === 1 && f[0].includes(',')) f = parseCsvLine(f[0]);
+    return f;
+  };
+
+  const header = fields(rawLines[0]).map(normHeader);
+  const idx: Record<string, number> = {};
+  header.forEach((h, i) => { if (!(h in idx)) idx[h] = i; });
+  const at = (cols: string[], name: string): string => {
+    const i = idx[name];
+    return i == null ? '' : (cols[i] ?? '').trim();
+  };
+
+  const rows: SemestreImportRow[] = [];
+  for (let r = 1; r < rawLines.length; r++) {
+    const cols = fields(rawLines[r]);
+    const dni = at(cols, 'dni').replace(/\D/g, '');
+    if (!dni) continue; // fila vacía o sin DNI
+
+    const apNombre  = at(cols, 'nombre apoderado');
+    const montoRaw  = at(cols, 'monto de cuota').replace(/[^\d.]/g, '');
+    const monto     = montoRaw ? parseFloat(montoRaw) : undefined;
+    const vm        = parseInt(at(cols, 'veces matriculado'), 10);
+    const q         = at(cols, 'quinto');
+
+    rows.push({
+      fila:              r + 1,
+      dni,
+      nombres:           at(cols, 'nombre'),
+      apellidos:         `${at(cols, 'apellido paterno')} ${at(cols, 'apellido materno')}`.trim(),
+      codigoInscripcion: at(cols, 'codigo de inscripcion') || undefined,
+      telefono:          at(cols, 'numero de celular') || undefined,
+      email:             at(cols, 'email') || undefined,
+      area:              NUM_A_AREA[at(cols, 'area de carrera')],
+      carrera:           at(cols, 'carrera') || undefined,
+      turno:             at(cols, 'nombre de turno').toUpperCase().includes('TARDE') ? Turno.tarde : Turno.manana,
+      colegio:           at(cols, 'colegio') || undefined,
+      quinto:            q === '' ? undefined : (q === '1' || /^(s[ií]|true)$/i.test(q)),
+      vecesMatriculado:  Number.isNaN(vm) ? undefined : vm,
+      fechaMatricula:    at(cols, 'created_at') || undefined,
+      apoderado:         apNombre
+        ? { nombre: apNombre, apellidos: `${at(cols, 'apellido paterno apoderado')} ${at(cols, 'apellido materno apoderado')}`.trim() }
+        : undefined,
+      pago: {
+        tipoPago:    at(cols, 'tipo de pago') || undefined,
+        banco:       at(cols, 'banco o tesoreria') || undefined,
+        codigoCuota: at(cols, 'codigo de cuota') || undefined,
+        fechaCuota:  at(cols, 'fecha de cuota') || undefined,
+        monto:       Number.isNaN(monto as number) ? undefined : monto,
+      },
+    });
+  }
+  return rows;
+}
 
 @ApiTags('Alumnos')
 @ApiBearerAuth('access-token')
@@ -181,5 +288,40 @@ export class AlumnosController {
     });
 
     return this.service.importar(dtos);
+  }
+
+  // ── Importación por SEMESTRE (CSV oficial de matrícula) ────────
+  @Post('import-semestre')
+  @Roles(Rol.admin)
+  @ApiOperation({
+    summary:
+      'Importar alumnos desde el CSV oficial de matrícula (formato semestre): ' +
+      'crea/actualiza alumnos por DNI, auto-distribuye el aula por área+turno, ' +
+      'usa el Código de Inscripción como código de barras, upserta la carrera, ' +
+      'crea el apoderado (cuenta derivada del DNI del alumno) y registra la cuota.',
+  })
+  @ApiConsumes('multipart/form-data')
+  @UseInterceptors(FileInterceptor('file'))
+  async importarSemestre(@UploadedFile() file: Express.Multer.File) {
+    if (!file) throw new BadRequestException('No se proporcionó archivo');
+    const rows = parseSemestreCsv(file.buffer);
+    if (!rows.length) {
+      throw new BadRequestException('El CSV no contiene filas válidas (revisa el formato/columnas).');
+    }
+    return this.service.importarSemestre(rows);
+  }
+
+  // ── Carga masiva de fotos (ZIP) ────────────────────────────────
+  @Post('import-fotos')
+  @Roles(Rol.admin)
+  @ApiOperation({
+    summary:
+      'Cargar fotos de alumnos desde un ZIP. Cada imagen se asocia por el DNI ' +
+      'embebido en el nombre del archivo y se guarda en MinIO.',
+  })
+  @ApiConsumes('multipart/form-data')
+  @UseInterceptors(FileInterceptor('file', { limits: { fileSize: 300 * 1024 * 1024 } }))
+  async importarFotos(@UploadedFile() file: Express.Multer.File) {
+    return this.service.importarFotos(file);
   }
 }

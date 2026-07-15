@@ -2,7 +2,8 @@ import {
   BadRequestException, Injectable, NotFoundException,
 } from '@nestjs/common';
 import * as bcrypt from 'bcrypt';
-import { Rol } from '@prisma/client';
+import AdmZip from 'adm-zip';
+import { Rol, Area, Turno, Prisma } from '@prisma/client';
 import { PrismaService } from '../prisma/prisma.service';
 import { MinioService } from '../minio/minio.service';
 import { paginate } from '../common/dto/pagination.dto';
@@ -26,6 +27,68 @@ async function nextCodigo(prisma: PrismaService): Promise<string> {
   });
   const next = last ? parseInt(last.codigoBarras) + 1 : 100001;
   return String(next).padStart(6, '0');
+}
+
+/* ─── Import de semestre (CSV oficial de matrícula) ──────────────── */
+
+/** "Área de Carrera" del CSV (número) → enum del sistema. */
+const AREA_POR_NUMERO: Record<string, Area> = {
+  '1': Area.ciencias,
+  '2': Area.letras,
+  '3': Area.medicas,
+};
+
+/** Prefijo de sección por área: ciencias=C, letras=L, medicas=M. */
+const PREFIJO_AREA: Record<Area, string> = {
+  ciencias: 'C',
+  letras:   'L',
+  medicas:  'M',
+};
+
+/**
+ * Busca qué DNI(s) conocidos aparecen dentro del nombre de archivo de una foto.
+ * El nombre oficial embebe el DNI entre otros dígitos (p. ej.
+ * "030960522696432026-I29.jpg" contiene 60522696), así que se prueban todas las
+ * ventanas de 8–12 dígitos de cada tramo numérico contra el padrón de DNIs.
+ * Devolver más de uno significa que el archivo es ambiguo.
+ */
+function dnisEnNombre(nombre: string, dnis: Set<string>): string[] {
+  const encontrados = new Set<string>();
+  for (const tramo of nombre.match(/\d+/g) ?? []) {
+    for (let len = 8; len <= 12; len++) {
+      for (let i = 0; i + len <= tramo.length; i++) {
+        const cand = tramo.slice(i, i + len);
+        if (dnis.has(cand)) encontrados.add(cand);
+      }
+    }
+  }
+  return [...encontrados];
+}
+
+/** Fila ya normalizada del CSV oficial (el controller hace el parseo/limpieza). */
+export interface SemestreImportRow {
+  fila:               number;
+  dni:                string;
+  nombres:            string;
+  apellidos:          string;
+  codigoInscripcion?: string;
+  telefono?:          string;
+  email?:             string;
+  area?:              Area;
+  carrera?:           string;
+  turno:              Turno;
+  colegio?:           string;
+  quinto?:            boolean;
+  vecesMatriculado?:  number;
+  fechaMatricula?:    string;
+  apoderado?:         { nombre: string; apellidos: string };
+  pago?: {
+    tipoPago?:    string;
+    banco?:       string;
+    codigoCuota?: string;
+    fechaCuota?:  string;
+    monto?:       number;
+  };
 }
 
 @Injectable()
@@ -553,6 +616,275 @@ export class AlumnosService {
     return map;
   }
 
+  /**
+   * Importa alumnos desde el CSV oficial de matrícula de un semestre.
+   * - Upsert por DNI (re-matricula a los que regresan; reactiva su cuenta).
+   * - codigoBarras = "Código de Inscripción" (6 díg.); reporta colisiones.
+   * - Upsert de carrera (nombre + área) y auto-distribución de aula por
+   *   área+turno respetando el cupo (C-001, L-001, M-001…).
+   * - Apoderado parcial con cuenta derivada del DNI del alumno (login "9"+DNI).
+   * - Registra la cuota (tabla `pagos`).
+   */
+  async importarSemestre(rows: SemestreImportRow[]) {
+    const activo = await this.prisma.ciclo.findFirst({
+      where: { activo: true },
+      select: { id: true },
+    });
+    if (!activo) {
+      throw new BadRequestException('No hay un ciclo activo: activa el ciclo antes de importar.');
+    }
+    const cicloId = activo.id;
+
+    const results = {
+      ok: 0,
+      creados: 0,
+      actualizados: 0,
+      apoderados: 0,
+      pagos: 0,
+      errores: [] as { fila: number; msg: string }[],
+    };
+
+    for (const row of rows) {
+      try {
+        if (!row.dni || !/^\d{8,12}$/.test(row.dni)) {
+          throw new BadRequestException('DNI inválido (se esperan 8–12 dígitos)');
+        }
+        if (!row.area) {
+          throw new BadRequestException('Área desconocida (se espera 1=ciencias, 2=letras, 3=medicas)');
+        }
+
+        // Código de barras = Código de Inscripción normalizado a 6 dígitos;
+        // si no viene, se autogenera de forma secuencial.
+        const codigo = row.codigoInscripcion
+          ? String(row.codigoInscripcion).replace(/\D/g, '').padStart(6, '0').slice(-6)
+          : await nextCodigo(this.prisma);
+
+        // Contraseña temporal = DNI del alumno (misma para su cuenta y la del
+        // apoderado). Se hashea fuera de la transacción para no alargarla.
+        const hash = await bcrypt.hash(row.dni, 12);
+        const email = row.email && /^\S+@\S+\.\S+$/.test(row.email)
+          ? row.email
+          : `${codigo}@academia.edu`;
+
+        await this.prisma.$transaction(async (tx) => {
+          // El código de inscripción debe ser único; si ya lo tiene OTRO alumno,
+          // es un error de datos que se reporta por fila.
+          const choque = await tx.alumno.findFirst({
+            where: { codigoBarras: codigo, dni: { not: row.dni } },
+            select: { dni: true },
+          });
+          if (choque) {
+            throw new BadRequestException(`Código de inscripción ${codigo} ya usado por el DNI ${choque.dni}`);
+          }
+
+          const carreraId = await this.upsertCarreraTx(tx, row.carrera, row.area!);
+          const existente = await tx.alumno.findFirst({ where: { dni: row.dni } });
+
+          // Aula: si el alumno ya está en un aula del ciclo activo con la misma
+          // área+turno, se conserva; si no, se auto-distribuye.
+          const aulaId = await this.resolverAulaTx(tx, cicloId, row.area!, row.turno, existente?.aulaId ?? null);
+
+          const fechaMat = row.fechaMatricula ? new Date(row.fechaMatricula) : undefined;
+
+          let alumnoId: string;
+          if (existente) {
+            await tx.alumno.update({
+              where: { id: existente.id },
+              data: {
+                nombre:            row.nombres || existente.nombre,
+                apellidos:         row.apellidos || existente.apellidos,
+                codigoBarras:      codigo,
+                telefono:          row.telefono ?? existente.telefono,
+                aulaId,
+                carreraId:         carreraId ?? existente.carreraId,
+                colegio:           row.colegio ?? existente.colegio,
+                quinto:            row.quinto ?? existente.quinto,
+                vecesMatriculado:  row.vecesMatriculado ?? existente.vecesMatriculado,
+                codigoInscripcion: row.codigoInscripcion ?? existente.codigoInscripcion,
+                ...(fechaMat ? { fechaMatricula: fechaMat } : {}),
+                deletedAt:         null,
+              },
+            });
+            await tx.usuario.update({
+              where: { id: existente.usuarioId },
+              data:  { activo: true, deletedAt: null },
+            });
+            alumnoId = existente.id;
+            results.actualizados++;
+          } else {
+            const usuario = await tx.usuario.create({
+              data: { email, passwordHash: hash, rol: Rol.alumno, dni: row.dni },
+            });
+            const creado = await tx.alumno.create({
+              data: {
+                usuarioId:         usuario.id,
+                dni:               row.dni,
+                nombre:            row.nombres,
+                apellidos:         row.apellidos,
+                codigoBarras:      codigo,
+                telefono:          row.telefono,
+                aulaId,
+                carreraId:         carreraId ?? undefined,
+                colegio:           row.colegio,
+                quinto:            row.quinto,
+                vecesMatriculado:  row.vecesMatriculado,
+                codigoInscripcion: row.codigoInscripcion,
+                fechaMatricula:    fechaMat,
+              },
+              select: { id: true },
+            });
+            alumnoId = creado.id;
+            results.creados++;
+          }
+
+          if (row.apoderado?.nombre) {
+            const creado = await this.crearApoderadoParcialTx(tx, alumnoId, row.dni, hash, row.apoderado);
+            if (creado) results.apoderados++;
+          }
+
+          if (row.pago && (row.pago.codigoCuota || row.pago.monto != null)) {
+            const yaExiste = row.pago.codigoCuota
+              ? await tx.pago.findFirst({ where: { alumnoId, codigoCuota: row.pago.codigoCuota } })
+              : null;
+            if (!yaExiste) {
+              await tx.pago.create({
+                data: {
+                  alumnoId,
+                  tipoPago:       row.pago.tipoPago,
+                  bancoTesoreria: row.pago.banco,
+                  codigoCuota:    row.pago.codigoCuota,
+                  fechaCuota:     row.pago.fechaCuota ? new Date(row.pago.fechaCuota) : null,
+                  monto:          row.pago.monto != null ? row.pago.monto : null,
+                },
+              });
+              results.pagos++;
+            }
+          }
+        });
+
+        results.ok++;
+      } catch (e: any) {
+        results.errores.push({ fila: row.fila, msg: e?.message ?? 'Error desconocido' });
+      }
+    }
+
+    return results;
+  }
+
+  /** Upsert de carrera por (nombre, área). Devuelve su id (o null si sin nombre). */
+  private async upsertCarreraTx(
+    tx: Prisma.TransactionClient, nombre: string | undefined, area: Area,
+  ): Promise<string | null> {
+    const n = (nombre ?? '').trim();
+    if (!n) return null;
+    const existe = await tx.carrera.findFirst({
+      where: { nombre: { equals: n, mode: 'insensitive' }, area },
+      select: { id: true },
+    });
+    if (existe) return existe.id;
+    const nueva = await tx.carrera.create({ data: { nombre: n, area }, select: { id: true } });
+    return nueva.id;
+  }
+
+  /**
+   * Resuelve el aula del alumno: conserva la actual si ya es del ciclo activo y
+   * coincide en área+turno; si no, auto-distribuye en la primera sección con
+   * cupo (C-001, C-002…) creando la siguiente si todas están llenas.
+   */
+  private async resolverAulaTx(
+    tx: Prisma.TransactionClient, cicloId: string, area: Area, turno: Turno, aulaActualId: string | null,
+  ): Promise<string> {
+    if (aulaActualId) {
+      const actual = await tx.aula.findUnique({
+        where: { id: aulaActualId },
+        select: { cicloId: true, area: true, turno: true },
+      });
+      if (actual && actual.cicloId === cicloId && actual.area === area && actual.turno === turno) {
+        return aulaActualId;
+      }
+    }
+
+    const prefijo = PREFIJO_AREA[area];
+    const aulas = await tx.aula.findMany({
+      where: { cicloId, area, turno, nombre: { startsWith: `${prefijo}-` } },
+      select: { id: true, nombre: true, cupoMaximo: true },
+      orderBy: { nombre: 'asc' },
+    });
+
+    for (const a of aulas) {
+      const ocupados = await tx.alumno.count({ where: { aulaId: a.id, deletedAt: null } });
+      if (ocupados < a.cupoMaximo) return a.id;
+    }
+
+    // Todas llenas (o no existen): crear la siguiente sección con cupo 40.
+    let maxNum = 0;
+    for (const a of aulas) {
+      const m = a.nombre.match(/-(\d+)$/);
+      if (m) maxNum = Math.max(maxNum, parseInt(m[1], 10));
+    }
+    const nombre = `${prefijo}-${String(maxNum + 1).padStart(3, '0')}`;
+    const nueva = await tx.aula.create({
+      data: { cicloId, nombre, area, turno, cupoMaximo: 40 },
+      select: { id: true },
+    });
+    return nueva.id;
+  }
+
+  /**
+   * Crea (o reutiliza) el apoderado parcial y lo vincula al alumno. La cuenta se
+   * genera con login derivado del DNI del alumno ("9"+DNI) y contraseña = DNI del
+   * alumno. Idempotente: en re-imports reutiliza usuario/apoderado/vínculo.
+   * Devuelve true si creó un apoderado nuevo.
+   */
+  private async crearApoderadoParcialTx(
+    tx: Prisma.TransactionClient,
+    alumnoId: string,
+    alumnoDni: string,
+    hash: string,
+    ap: { nombre: string; apellidos: string },
+  ): Promise<boolean> {
+    const loginDni = ('9' + alumnoDni).slice(0, 12); // login propio, numérico
+    let usuarioAp = await tx.usuario.findFirst({ where: { dni: loginDni } });
+    if (!usuarioAp) {
+      usuarioAp = await tx.usuario.create({
+        data: {
+          email:        `apo.${alumnoDni}@academia.edu`,
+          passwordHash: hash,
+          rol:          Rol.apoderado,
+          dni:          loginDni,
+          nombre:       ap.nombre,
+          apellidos:    ap.apellidos,
+        },
+      });
+    }
+
+    let apoderado = await tx.apoderado.findFirst({ where: { usuarioId: usuarioAp.id } });
+    let creadoNuevo = false;
+    if (!apoderado) {
+      apoderado = await tx.apoderado.create({
+        data: {
+          usuarioId:        usuarioAp.id,
+          nombre:           ap.nombre,
+          apellidos:        ap.apellidos,
+          dni:              null,
+          telefonoWhatsapp: null,
+        },
+      });
+      creadoNuevo = true;
+    }
+
+    const vinculo = await tx.alumnoApoderado.findUnique({
+      where: { alumnoId_apoderadoId: { alumnoId, apoderadoId: apoderado.id } },
+    });
+    if (!vinculo) {
+      await tx.alumnoApoderado.create({
+        data: { alumnoId, apoderadoId: apoderado.id, parentesco: 'Apoderado', esPrincipal: true },
+      });
+    }
+
+    return creadoNuevo;
+  }
+
   /* ── Foto de perfil ──────────────────────────────────────── */
 
   /**
@@ -576,6 +908,65 @@ export class AlumnosService {
     });
 
     return { foto_url: (await this.minio.presign(url)) ?? url };
+  }
+
+  /**
+   * Carga masiva de fotos desde un ZIP. Cada imagen se asocia a su alumno por el
+   * DNI embebido en el nombre del archivo (el nombre oficial lo incluye), se sube
+   * a MinIO y se guarda en `fotoUrl`. Reporta las que no casan o son ambiguas.
+   */
+  async importarFotos(file: Express.Multer.File) {
+    if (!file) throw new BadRequestException('No se proporcionó archivo');
+
+    let zip: AdmZip;
+    try {
+      zip = new AdmZip(file.buffer);
+    } catch {
+      throw new BadRequestException('El archivo no es un ZIP válido');
+    }
+
+    const entradas = zip.getEntries().filter(
+      (e) => !e.isDirectory
+        && !e.entryName.startsWith('__MACOSX/')
+        && /\.(jpe?g|png)$/i.test(e.entryName),
+    );
+    if (!entradas.length) {
+      throw new BadRequestException('El ZIP no contiene imágenes (.jpg, .jpeg o .png)');
+    }
+
+    const alumnos = await this.prisma.alumno.findMany({
+      where:  { deletedAt: null },
+      select: { id: true, dni: true },
+    });
+    const porDni = new Map(alumnos.map((a) => [a.dni, a.id]));
+    const dnis   = new Set(porDni.keys());
+
+    const res = {
+      procesados:      entradas.length,
+      actualizados:    0,
+      sinCoincidencia: [] as string[],
+      ambiguos:        [] as string[],
+      errores:         [] as { archivo: string; msg: string }[],
+    };
+
+    for (const e of entradas) {
+      const archivo = e.entryName.split('/').pop() ?? e.entryName;
+      try {
+        const coincidencias = dnisEnNombre(archivo, dnis);
+        if (coincidencias.length === 0) { res.sinCoincidencia.push(archivo); continue; }
+        if (coincidencias.length > 1)   { res.ambiguos.push(archivo); continue; }
+
+        const alumnoId = porDni.get(coincidencias[0])!;
+        const mimetype = /\.png$/i.test(archivo) ? 'image/png' : 'image/jpeg';
+        const url = await this.minio.subirFoto('alumnos', alumnoId, e.getData(), mimetype);
+        await this.prisma.alumno.update({ where: { id: alumnoId }, data: { fotoUrl: url } });
+        res.actualizados++;
+      } catch (err: any) {
+        res.errores.push({ archivo, msg: err?.message ?? 'Error al procesar la imagen' });
+      }
+    }
+
+    return res;
   }
 
   /** Elimina la foto del alumno (pone fotoUrl en null) */

@@ -54,6 +54,12 @@ model Alumno {
   fotoUrl         String?           @map("foto_url") @db.VarChar(500)
   aulaId          String?           @map("aula_id") @db.Uuid
   carreraId       String?           @map("carrera_id") @db.Uuid
+  // Datos del formato oficial de matrícula (import por semestre)
+  colegio           String?         @db.VarChar(150)
+  quinto            Boolean?
+  vecesMatriculado  Int?            @map("veces_matriculado")
+  codigoInscripcion String?         @map("codigo_inscripcion") @db.VarChar(20)
+  fechaMatricula    DateTime?       @map("fecha_matricula") @db.Timestamptz(6)
   createdAt       DateTime          @default(now()) @map("created_at") @db.Timestamptz(6)
   updatedAt       DateTime          @default(now()) @updatedAt @map("updated_at") @db.Timestamptz(6)
   deletedAt       DateTime?         @map("deleted_at") @db.Timestamptz(6)
@@ -62,6 +68,7 @@ model Alumno {
   usuario         Usuario           @relation(fields: [usuarioId], references: [id])
   apoderados      AlumnoApoderado[]
   asistencias     Asistencia[]
+  pagos           Pago[]
 
   @@map("alumnos")
 }
@@ -71,14 +78,34 @@ model Apoderado {
   usuarioId        String            @unique @map("usuario_id") @db.Uuid
   nombre           String            @db.VarChar(100)
   apellidos        String            @db.VarChar(150)
-  dni              String            @unique @db.VarChar(12)
-  telefonoWhatsapp String            @map("telefono_whatsapp") @db.VarChar(20)
+  // El import por semestre crea apoderados con datos parciales: el CSV oficial
+  // no trae DNI ni teléfono del apoderado, así que ambos son opcionales.
+  dni              String?           @unique @db.VarChar(12)
+  telefonoWhatsapp String?           @map("telefono_whatsapp") @db.VarChar(20)
   createdAt        DateTime          @default(now()) @map("created_at") @db.Timestamptz(6)
   deletedAt        DateTime?         @map("deleted_at") @db.Timestamptz(6)
   alumnos          AlumnoApoderado[]
   usuario          Usuario           @relation(fields: [usuarioId], references: [id])
 
   @@map("apoderados")
+}
+
+// Pagos / cuotas del alumno (del CSV oficial de matrícula). Gestionada por SQL
+// manual (backend/prisma/manual/2026-07-import-semestre.sql); aquí solo para
+// que Prisma Client genere los tipos.
+model Pago {
+  id             String    @id @default(dbgenerated("gen_random_uuid()")) @db.Uuid
+  alumnoId       String    @map("alumno_id") @db.Uuid
+  tipoPago       String?   @map("tipo_pago") @db.VarChar(20)
+  bancoTesoreria String?   @map("banco_tesoreria") @db.VarChar(20)
+  codigoCuota    String?   @map("codigo_cuota") @db.VarChar(30)
+  fechaCuota     DateTime? @map("fecha_cuota") @db.Date
+  monto          Decimal?  @db.Decimal(10, 2)
+  createdAt      DateTime  @default(now()) @map("created_at") @db.Timestamptz(6)
+  alumno         Alumno    @relation(fields: [alumnoId], references: [id], onDelete: Cascade)
+
+  @@index([alumnoId])
+  @@map("pagos")
 }
 
 model AlumnoApoderado {

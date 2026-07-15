@@ -137,3 +137,71 @@ export function useImportarAlumnos() {
     onSuccess: () => qc.invalidateQueries({ queryKey: ['alumnos'] }),
   })
 }
+
+/** Resultado del import del CSV oficial de matrícula (formato semestre). */
+export interface SemestreImportResult {
+  ok: number
+  /** Altas nuevas */
+  creados: number
+  /** Alumnos existentes re-matriculados al ciclo activo */
+  actualizados: number
+  /** Apoderados creados (cuenta generada) */
+  apoderados: number
+  /** Cuotas registradas */
+  pagos: number
+  errores: { fila: number; msg: string }[]
+}
+
+/**
+ * Importa el CSV oficial de matrícula. El backend parsea, auto-distribuye el
+ * aula por área+turno, upserta carrera, crea el apoderado y registra la cuota.
+ */
+export function useImportarSemestre() {
+  const qc = useQueryClient()
+  return useMutation({
+    mutationFn: (file: File): Promise<SemestreImportResult> => {
+      const form = new FormData()
+      form.append('file', file)
+      return api.post('/alumnos/import-semestre', form, {
+        headers: { 'Content-Type': 'multipart/form-data' },
+      }).then((r) => r.data)
+    },
+    onSuccess: () => {
+      // El import puede crear aulas y apoderados además de alumnos.
+      qc.invalidateQueries({ queryKey: ['alumnos'] })
+      qc.invalidateQueries({ queryKey: ['aulas'] })
+      qc.invalidateQueries({ queryKey: ['apoderados'] })
+    },
+  })
+}
+
+/** Resultado de la carga masiva de fotos (ZIP). */
+export interface FotosImportResult {
+  /** Imágenes encontradas en el ZIP */
+  procesados: number
+  /** Fotos asignadas a su alumno */
+  actualizados: number
+  /** Archivos cuyo nombre no casó con ningún DNI */
+  sinCoincidencia: string[]
+  /** Archivos cuyo nombre casó con más de un DNI */
+  ambiguos: string[]
+  errores: { archivo: string; msg: string }[]
+}
+
+/**
+ * Sube un ZIP de fotos. El backend asocia cada imagen a su alumno por el DNI
+ * embebido en el nombre del archivo.
+ */
+export function useImportarFotos() {
+  const qc = useQueryClient()
+  return useMutation({
+    mutationFn: (file: File): Promise<FotosImportResult> => {
+      const form = new FormData()
+      form.append('file', file)
+      return api.post('/alumnos/import-fotos', form, {
+        headers: { 'Content-Type': 'multipart/form-data' },
+      }).then((r) => r.data)
+    },
+    onSuccess: () => qc.invalidateQueries({ queryKey: ['alumnos'] }),
+  })
+}
