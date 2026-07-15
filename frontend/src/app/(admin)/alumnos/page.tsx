@@ -8,11 +8,13 @@ import { Dot } from '@/components/ui/dot'
 import { Avatar } from '@/components/ui/avatar'
 import { Input } from '@/components/ui/input'
 import { ImportExcelModal } from '@/components/alumnos/import-excel-modal'
+import { ImportSemestreModal } from '@/components/alumnos/import-semestre-modal'
+import { ImportFotosModal } from '@/components/alumnos/import-fotos-modal'
 import { useAlumnos, useDeleteAlumno, useRestoreAlumno, type EstadoAlumno, type FilterAlumnos } from '@/hooks/use-alumnos'
 import { useCiclos, useAulas } from '@/hooks/use-ciclos'
 import { useAuth } from '@/contexts/auth-context'
 import { cn } from '@/lib/utils'
-import { Search, Plus, Upload, Scan, Filter, ChevR, ChevL, More, Eye, Edit, Trash, RefreshCw } from '@/components/icons'
+import { Search, Plus, Upload, Scan, Filter, ChevR, ChevL, ChevD, More, Eye, Edit, Trash, RefreshCw, FileText, Grid, Users } from '@/components/icons'
 
 /* ── Constantes ────────────────────────────────────────────────── */
 const ESTADO_TONE: Record<EstadoAlumno, 'success' | 'warning' | 'danger' | 'neutral'> = {
@@ -162,6 +164,9 @@ export default function AlumnosPage() {
   const [turno, setTurno] = React.useState('')
   const [openMenu, setOpenMenu] = React.useState<string | null>(null)
   const [showImport, setShowImport] = React.useState(false)
+  const [showImportSemestre, setShowImportSemestre] = React.useState(false)
+  const [showImportFotos, setShowImportFotos] = React.useState(false)
+  const [importMenu, setImportMenu] = React.useState(false)
 
   /* ── Cerrar menú al click fuera ── */
   React.useEffect(() => {
@@ -172,6 +177,16 @@ export default function AlumnosPage() {
     document.addEventListener('mousedown', handler)
     return () => document.removeEventListener('mousedown', handler)
   }, [openMenu])
+
+  /* ── Cerrar menú "Importar" al click fuera ── */
+  React.useEffect(() => {
+    if (!importMenu) return
+    const handler = (e: MouseEvent) => {
+      if (!(e.target as HTMLElement).closest('[data-import-menu]')) setImportMenu(false)
+    }
+    document.addEventListener('mousedown', handler)
+    return () => document.removeEventListener('mousedown', handler)
+  }, [importMenu])
 
   /* ── Debounce búsqueda ── */
   React.useEffect(() => {
@@ -225,10 +240,36 @@ export default function AlumnosPage() {
         crumbs={['Administración', 'Alumnos']}
         action={!readOnly ? (
           <>
-            <Btn variant="secondary" size="sm" onClick={() => setShowImport(true)}>
-              <Upload size={14} />Importar Excel
-            </Btn>
-            <Btn variant="secondary" size="sm" onClick={() => alert('Generación de carnets: próximamente')}>
+            {/* Menú de importaciones */}
+            <div className="relative inline-block" data-import-menu>
+              <Btn variant="secondary" size="sm" onClick={() => setImportMenu((v) => !v)}>
+                <Upload size={14} />Importar<ChevD size={13} />
+              </Btn>
+              {importMenu && (
+                <div className="absolute right-0 top-9 z-50 bg-surface border border-border rounded-2 shadow-2 py-1 min-w-[230px]">
+                  <button
+                    onClick={() => { setImportMenu(false); setShowImportSemestre(true) }}
+                    className="w-full text-left flex items-center gap-2 px-3 py-2 text-[12.5px] hover:bg-surface2 transition-colors border-none bg-transparent cursor-pointer font-sans"
+                  >
+                    <FileText size={13} className="text-text-mute" />Matrícula del semestre (CSV)
+                  </button>
+                  <button
+                    onClick={() => { setImportMenu(false); setShowImportFotos(true) }}
+                    className="w-full text-left flex items-center gap-2 px-3 py-2 text-[12.5px] hover:bg-surface2 transition-colors border-none bg-transparent cursor-pointer font-sans"
+                  >
+                    <Users size={13} className="text-text-mute" />Fotos de alumnos (ZIP)
+                  </button>
+                  <div className="border-t border-border-s my-1" />
+                  <button
+                    onClick={() => { setImportMenu(false); setShowImport(true) }}
+                    className="w-full text-left flex items-center gap-2 px-3 py-2 text-[12.5px] hover:bg-surface2 transition-colors border-none bg-transparent cursor-pointer font-sans"
+                  >
+                    <Grid size={13} className="text-text-mute" />Alumnos desde Excel
+                  </button>
+                </div>
+              )}
+            </div>
+            <Btn variant="secondary" size="sm" onClick={() => router.push('/carnets')}>
               <Scan size={14} />Generar carnets
             </Btn>
             <Btn size="sm" onClick={() => router.push('/alumnos/nuevo')}>
@@ -417,6 +458,14 @@ export default function AlumnosPage() {
 
       {showImport && (
         <ImportExcelModal onClose={() => setShowImport(false)} />
+      )}
+
+      {showImportSemestre && (
+        <ImportSemestreModal onClose={() => setShowImportSemestre(false)} />
+      )}
+
+      {showImportFotos && (
+        <ImportFotosModal onClose={() => setShowImportFotos(false)} />
       )}
     </div>
   )
