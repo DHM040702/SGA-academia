@@ -81,25 +81,23 @@ function code128bSegs(text: string): BarSeg[] {
   return segs
 }
 
-/* ─── Paleta ──────────────────────────────────────────────────── */
+/* ─── Paleta (CLARA — mínima tinta; azul + dorado, identidad del alumno) ── */
 const C = {
-  primary:     '#1e3a5f',
-  primaryDark: '#132639',
-  secondary:   '#4a6fa5',
-  gold:        '#c9a24b',   // filo/acento institucional
-  goldSoft:    '#e6d3a3',
-  seal:        '#c7d3e4',   // azul claro para la marca de agua vectorial
-  success:     '#166534',
-  successBg:   '#dcfce7',
-  warning:     '#92400e',
-  warningBg:   '#fef3c7',
-  danger:      '#991b1b',
-  dangerBg:    '#fee2e2',
-  text:        '#111827',
-  muted:       '#6b7280',
-  border:      '#e5e7eb',
-  bgSoft:      '#f6f8fb',
-  white:       '#ffffff',
+  blue:      '#2f5c8f',   // acento medio (bordes, marco de foto)
+  blueDeep:  '#1e3a5f',   // títulos / nombre / código
+  blueSoft:  '#eaf0f7',   // fondos muy claros (placeholder de foto)
+  gold:      '#c9a24b',   // filo/acento institucional
+  seal:      '#dbe4ef',   // marca de agua vectorial (líneas claras)
+  success:   '#166534',
+  successBg: '#dcfce7',
+  warning:   '#92400e',
+  warningBg: '#fef3c7',
+  danger:    '#991b1b',
+  dangerBg:  '#fee2e2',
+  text:      '#1f2937',
+  muted:     '#6b7280',
+  border:    '#e5e7eb',
+  white:     '#ffffff',
 }
 
 /* ─── Estilos ─────────────────────────────────────────────────── */
@@ -119,10 +117,10 @@ const s = StyleSheet.create({
     borderColor:     C.gold,
   },
 
-  /* ── Cabecera ── */
+  /* ── Cabecera BLANCA con filo dorado (sin relleno oscuro → poca tinta) ── */
   header: {
     height:            HEADER_H,
-    backgroundColor:   C.primaryDark,
+    backgroundColor:   C.white,
     flexDirection:     'row',
     alignItems:        'center',
     paddingHorizontal: 8,
@@ -144,7 +142,7 @@ const s = StyleSheet.create({
   headerLogoSep: {
     width:           0.7,
     height:          18,
-    backgroundColor: 'rgba(230,211,163,0.5)',
+    backgroundColor: C.border,
     marginRight:     6,
   },
   headerLogoBox: {
@@ -155,18 +153,18 @@ const s = StyleSheet.create({
     justifyContent: 'center',
   },
   headerTextWrap: { flex: 1, justifyContent: 'center' },
-  headerInst: { color: C.white, fontSize: 8, fontWeight: 'bold', letterSpacing: 0.2 },
-  headerSub:  { color: C.goldSoft, fontSize: 5.2, marginTop: 1, letterSpacing: 0.2 },
+  headerInst: { color: C.blueDeep, fontSize: 8, fontWeight: 'bold', letterSpacing: 0.2 },
+  headerSub:  { color: C.muted, fontSize: 5.2, marginTop: 1, letterSpacing: 0.2 },
   headerBadge: {
-    borderWidth:       0.6,
-    borderColor:       'rgba(230,211,163,0.55)',
-    backgroundColor:   'rgba(255,255,255,0.08)',
+    borderWidth:       0.8,
+    borderColor:       C.gold,
+    backgroundColor:   C.white,
     borderRadius:      2.5,
     paddingHorizontal: 5,
     paddingVertical:   2.5,
   },
   headerBadgeText: {
-    color:         C.goldSoft,
+    color:         C.blueDeep,
     fontSize:      5.5,
     fontWeight:    'bold',
     letterSpacing: 0.7,
@@ -206,8 +204,8 @@ const s = StyleSheet.create({
     width:           49,
     height:          60,
     borderRadius:    3.5,
-    borderWidth:     1.4,
-    borderColor:     C.primary,
+    borderWidth:     1.2,
+    borderColor:     C.blue,
     backgroundColor: C.white,
     padding:         1.5,
     flexShrink:      0,
@@ -217,11 +215,11 @@ const s = StyleSheet.create({
     width:           '100%',
     height:          '100%',
     borderRadius:    2,
-    backgroundColor: C.secondary,
+    backgroundColor: C.blueSoft,
     alignItems:      'center',
     justifyContent:  'center',
   },
-  photoInitials: { color: C.white, fontSize: 17, fontWeight: 'bold' },
+  photoInitials: { color: C.blueDeep, fontSize: 17, fontWeight: 'bold' },
 
   /* Divisor vertical con acento */
   vline: {
@@ -235,7 +233,7 @@ const s = StyleSheet.create({
   /* Bloque de datos del alumno */
   info: { flex: 1, justifyContent: 'center', gap: 1.5 },
 
-  name:        { fontSize: 10.5, fontWeight: 'bold', color: C.primaryDark },
+  name:        { fontSize: 10.5, fontWeight: 'bold', color: C.blueDeep },
   nameRule:    { width: 24, height: 1.6, backgroundColor: C.gold, borderRadius: 1, marginTop: 1.5, marginBottom: 1.5 },
   codeField:   { fontSize: 7.5,  fontFamily: 'Courier', color: C.text },
   dniField:    { fontSize: 7.5,  fontFamily: 'Courier', color: C.muted },
@@ -256,7 +254,7 @@ const s = StyleSheet.create({
     width:           BARCODE_COL_W,
     borderLeftWidth: 1,
     borderLeftColor: C.border,
-    backgroundColor: C.bgSoft,
+    backgroundColor: C.white,
     alignItems:      'center',
     justifyContent:  'center',
     paddingVertical: 4,
@@ -271,7 +269,7 @@ const s = StyleSheet.create({
   barcodeColCode: {
     fontFamily:    'Courier',
     fontSize:      6.5,
-    color:         C.primary,
+    color:         C.blueDeep,
     fontWeight:    'bold',
     letterSpacing: 1,
     marginTop:     2,
@@ -328,9 +326,9 @@ export interface CarnetBatchPDFProps {
 function EmblemMini() {
   return (
     <Svg width={21} height={21}>
-      <Circle cx={10.5} cy={10.5} r={9.5} fill="rgba(255,255,255,0.10)" stroke={C.goldSoft} strokeWidth={1} />
-      <Path d="M10.5 3.5 L16.5 8 L14 16.5 L7 16.5 L4.5 8 Z" fill="none" stroke={C.goldSoft} strokeWidth={1} />
-      <Circle cx={10.5} cy={10.5} r={2} fill={C.goldSoft} />
+      <Circle cx={10.5} cy={10.5} r={9.5} fill={C.white} stroke={C.blue} strokeWidth={1} />
+      <Path d="M10.5 3.5 L16.5 8 L14 16.5 L7 16.5 L4.5 8 Z" fill="none" stroke={C.blue} strokeWidth={1} />
+      <Circle cx={10.5} cy={10.5} r={2} fill={C.blue} />
     </Svg>
   )
 }
