@@ -25,6 +25,26 @@ async function downloadPDF(component: React.ReactElement, filename: string) {
   URL.revokeObjectURL(url)
 }
 
+/* ─── Helper: mensaje de error legible ───────────────────────── */
+/**
+ * Extrae la causa real de un fallo. El try/catch envuelve el fetch de alumnos,
+ * el import() dinámico y el render del PDF, así que sin esto cualquier problema
+ * se veía igual ("No se pudo generar los carnets").
+ */
+function errMsg(e: unknown): string {
+  const err = e as any
+  const apiMsg = err?.response?.data?.message
+  if (typeof apiMsg === 'string') return apiMsg
+  if (Array.isArray(apiMsg)) return apiMsg.join(' · ')
+  if (err?.response?.status) return `HTTP ${err.response.status} al pedir los datos`
+  return err?.message ?? String(e)
+}
+
+function fallo(contexto: string, e: unknown) {
+  console.error(`[carnets] ${contexto}:`, e)
+  alert(`No se pudo generar los carnets.\n\nCausa: ${errMsg(e)}\n\n(Detalle completo en la consola del navegador — F12)`)
+}
+
 /* ─── Helper: logos institucionales (mismo origen) ───────────── */
 function institutionalLogos() {
   const origin = typeof window !== 'undefined' ? window.location.origin : ''
@@ -75,7 +95,7 @@ export default function CarnetsPage() {
         }),
         `carnet-${indivAlumno.apellidos ?? 'alumno'}-${indivAlumno.codigo_barra ?? ''}.pdf`,
       )
-    } catch { alert('No se pudo generar el carnet.') }
+    } catch (e) { fallo('carnet individual (alumno)', e) }
     finally { setIndivLoading(false) }
   }
 
@@ -107,7 +127,7 @@ export default function CarnetsPage() {
         CarnetBatchPDF({ alumnos, cicloLabel, ...institutionalLogos() }),
         `carnets-tarjeton-${aulaLabel}.pdf`,
       )
-    } catch { alert('No se pudo generar los carnets.') }
+    } catch (e) { fallo('aula · tarjetón', e) }
     finally { setAulaLoadBatch(false) }
   }
 
@@ -128,7 +148,7 @@ export default function CarnetsPage() {
         CarnetSheetPDF({ alumnos, cicloLabel, ...institutionalLogos() }),
         `carnets-hoja-A4-${aulaLabel}.pdf`,
       )
-    } catch { alert('No se pudo generar los carnets.') }
+    } catch (e) { fallo('aula · hoja A4', e) }
     finally { setAulaLoadSheet(false) }
   }
 
@@ -161,7 +181,7 @@ export default function CarnetsPage() {
         CarnetSheetPDF({ alumnos, cicloLabel, ...institutionalLogos() }),
         `carnets-hoja-A4-${fileLabel}.pdf`,
       )
-    } catch { alert('No se pudo generar los carnets.') }
+    } catch (e) { fallo('ciclo completo · hoja A4', e) }
     finally { setCicloLoading(false) }
   }
 
@@ -197,7 +217,7 @@ export default function CarnetsPage() {
         CarnetSheetPDF({ alumnos, cicloLabel: cicloActivo?.nombre ?? '2026-I', ...institutionalLogos() }),
         `carnets-seleccion-${alumnos.length}.pdf`,
       )
-    } catch { alert('No se pudo generar los carnets.') }
+    } catch (e) { fallo('selección de alumnos', e) }
     finally { setSelLoading(false) }
   }
 
@@ -243,7 +263,7 @@ export default function CarnetsPage() {
         comp,
         `carnets-docentes-${modo === 'sheet' ? 'hoja-A4' : 'tarjeton'}-${docentes.length}.pdf`,
       )
-    } catch { alert('No se pudo generar los carnets.') }
+    } catch (e) { fallo('docentes · selección', e) }
     finally { setLoad(false) }
   }
 
@@ -258,7 +278,7 @@ export default function CarnetsPage() {
         CarnetDocenteSheetPDF({ docentes, cicloLabel: cicloActivo?.nombre ?? '2026-I', ...institutionalLogos() }),
         `carnets-docentes-hoja-A4-todos.pdf`,
       )
-    } catch { alert('No se pudo generar los carnets.') }
+    } catch (e) { fallo('docentes · todos', e) }
     finally { setDocLoadTodos(false) }
   }
 
