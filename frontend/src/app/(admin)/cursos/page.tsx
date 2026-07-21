@@ -9,6 +9,7 @@ import {
   useDeleteCurso,
   type Curso,
 } from '@/hooks/use-cursos'
+import { useCicloCtx } from '@/contexts/ciclo-context'
 import { PageHeader } from '@/components/layout/page-header'
 import { Card } from '@/components/ui/card'
 import { Btn } from '@/components/ui/btn'
@@ -188,7 +189,8 @@ export default function CursosPage() {
   const [editTarget, setEditTarget]     = useState<Curso | null>(null)
   const [deleteTarget, setDeleteTarget] = useState<Curso | null>(null)
 
-  const { data: cursos = [], isLoading } = useCursos()
+  const { selectedCiclo } = useCicloCtx()
+  const { data: cursos = [], isLoading } = useCursos(selectedCiclo?.id)
   const deleteMut = useDeleteCurso()
 
   const filtered = useMemo(() => {
@@ -233,7 +235,7 @@ export default function CursosPage() {
           <KPI
             label="Horarios asignados"
             value={isLoading ? '—' : totalHorarios}
-            sub="en ciclo activo"
+            sub={`en ${selectedCiclo?.nombre ?? 'el ciclo'}`}
             accent="var(--color-success)"
           />
           <KPI

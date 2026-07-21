@@ -49,6 +49,7 @@ export interface FilterBiblioteca {
   curso_id?: string
   area?: 'ciencias' | 'letras' | 'medicas'
   solo_generales?: boolean
+  ciclo_id?: string
 }
 
 export function useBiblioteca(filters: FilterBiblioteca = {}) {

@@ -8,6 +8,7 @@ import { Avatar } from '@/components/ui/avatar'
 import { Search, X, Plus, LogOut } from '@/components/icons'
 import { useAuth } from '@/contexts/auth-context'
 import { useSalidas, useCreateSalida, type Salida } from '@/hooks/use-salidas'
+import { useCicloCtx } from '@/contexts/ciclo-context'
 import api from '@/lib/api'
 
 function fmtInstante(iso: string) {
@@ -127,7 +128,8 @@ export default function SalidasPage() {
   const [hasta, setHasta] = useState(todayStr())
   const [q, setQ] = useState('')
 
-  const { data: page, isLoading } = useSalidas({ desde: desde || undefined, hasta: hasta || undefined, limit: 200 })
+  const { selectedCiclo } = useCicloCtx()
+  const { data: page, isLoading } = useSalidas({ ciclo_id: selectedCiclo?.id, desde: desde || undefined, hasta: hasta || undefined, limit: 200 })
   const salidas = page?.data ?? []
 
   const filtradas = useMemo(() => {

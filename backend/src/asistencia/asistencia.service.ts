@@ -81,8 +81,15 @@ export class AsistenciaService {
     } else {
       const docente = await this.prisma.docente.findFirst({
         where: { dni: dto.codigo, deletedAt: null },
+        include: { usuario: { select: { activo: true } } },
       });
       if (!docente) throw new NotFoundException(`Docente con DNI ${dto.codigo} no encontrado`);
+      // Un docente desactivado (p. ej. por ~6 meses sin enseñar) no puede marcar.
+      if (!docente.usuario.activo) {
+        throw new BadRequestException(
+          `${docente.nombre} ${docente.apellidos} está desactivado y no puede marcar asistencia.`,
+        );
+      }
       docenteId = docente.id;
     }
 

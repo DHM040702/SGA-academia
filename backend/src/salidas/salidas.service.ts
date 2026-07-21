@@ -31,11 +31,27 @@ export class SalidasService {
   }
 
   async findAll(dto: FilterSalidasDto) {
-    const { page = 1, limit = 20, alumno_id, desde, hasta } = dto as any;
+    const { page = 1, limit = 20, alumno_id, desde, hasta, ciclo_id } = dto as any;
     const skip = (page - 1) * limit;
 
     const conds: Prisma.Sql[] = [];
     if (alumno_id) conds.push(Prisma.sql`s.alumno_id = ${alumno_id}::uuid`);
+
+    // Acotar al rango de fechas del ciclo seleccionado (así el selector superior
+    // de ciclo filtra las salidas de ese semestre).
+    if (ciclo_id) {
+      const ciclo = await this.prisma.ciclo.findUnique({
+        where: { id: ciclo_id },
+        select: { fechaInicio: true, fechaFin: true },
+      });
+      if (ciclo) {
+        const fin = new Date(ciclo.fechaFin);
+        fin.setUTCDate(fin.getUTCDate() + 1); // incluir el último día del ciclo
+        conds.push(Prisma.sql`s.fecha >= ${ciclo.fechaInicio.toISOString()}::timestamptz`);
+        conds.push(Prisma.sql`s.fecha <  ${fin.toISOString()}::timestamptz`);
+      }
+    }
+
     if (desde)     conds.push(Prisma.sql`s.fecha >= ${`${desde}T00:00:00`}::timestamptz`);
     if (hasta)     conds.push(Prisma.sql`s.fecha <= ${`${hasta}T23:59:59`}::timestamptz`);
     const where = conds.length ? Prisma.sql`WHERE ${Prisma.join(conds, ' AND ')}` : Prisma.empty;

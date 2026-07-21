@@ -30,4 +30,9 @@ export class FilterBibliotecaDto extends PaginationDto {
   @IsOptional()
   @IsUUID()
   aula_id?: string;
+
+  @ApiPropertyOptional({ description: 'Acotar por rango de fechas del ciclo (por fecha de subida)', format: 'uuid' })
+  @IsOptional()
+  @IsUUID()
+  ciclo_id?: string;
 }

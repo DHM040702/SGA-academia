@@ -11,6 +11,7 @@ import {
   type CreateComunicadoDto,
 } from '@/hooks/use-comunicados'
 import { useAulas } from '@/hooks/use-ciclos'
+import { useCicloCtx } from '@/contexts/ciclo-context'
 import { useAuth } from '@/contexts/auth-context'
 import { Pill } from '@/components/ui/pill'
 import { Dot } from '@/components/ui/dot'
@@ -511,7 +512,8 @@ export default function ComunicadosPage() {
   const [editTarget, setEditTarget] = useState<Comunicado | null>(null)
   const [deleteTarget, setDeleteTarget] = useState<Comunicado | null>(null)
 
-  const { data: page } = useComunicados({ limit: 50 })
+  const { selectedCiclo } = useCicloCtx()
+  const { data: page } = useComunicados({ limit: 50, ciclo_id: selectedCiclo?.id })
   const { data: detail } = useComunicado(selectedId ?? '')
   const updateMut = useUpdateComunicado()
   const deleteMut = useDeleteComunicado()

@@ -68,7 +68,7 @@ export class BibliotecaService {
   /* ── Listar ───────────────────────────────────────────────────── */
 
   async findAll(dto: FilterBibliotecaDto, user?: { id: string; rol: string }) {
-    const { page = 1, limit = 20, q, tipo, curso_id, area, solo_generales } = dto;
+    const { page = 1, limit = 20, q, tipo, curso_id, area, solo_generales, ciclo_id } = dto;
     const skip = (page - 1) * limit;
 
     const allowed = await this.allowedAreas(user);
@@ -76,6 +76,20 @@ export class BibliotecaService {
     const where: any = { activo: true };
     if (tipo)     where.tipo    = tipo;
     if (curso_id) where.cursoId = curso_id;
+
+    // Los recursos de biblioteca no tienen ciclo propio; cuando el selector de
+    // ciclo está activo, se acotan por su fecha de subida al rango del ciclo.
+    if (ciclo_id) {
+      const ciclo = await this.prisma.ciclo.findUnique({
+        where: { id: ciclo_id },
+        select: { fechaInicio: true, fechaFin: true },
+      });
+      if (ciclo) {
+        const fin = new Date(ciclo.fechaFin);
+        fin.setUTCDate(fin.getUTCDate() + 1);
+        where.createdAt = { gte: ciclo.fechaInicio, lt: fin };
+      }
+    }
 
     // Se combinan con AND para no pisar el OR del buscador con el del área
     const and: any[] = [];

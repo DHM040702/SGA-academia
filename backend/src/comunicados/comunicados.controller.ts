@@ -33,8 +33,12 @@ export class ComunicadosController {
   @Get()
   @Roles(Rol.admin, Rol.director, Rol.docente, Rol.alumno, Rol.apoderado, Rol.auxiliar)
   @ApiOperation({ summary: 'Listar comunicados paginados' })
-  findAll(@Query() dto: PaginationDto, @CurrentUser() user: { id: string; rol: string }) {
-    return this.service.findAll(dto, user.rol);
+  findAll(
+    @Query() dto: PaginationDto,
+    @Query('ciclo_id') cicloId: string | undefined,
+    @CurrentUser() user: { id: string; rol: string },
+  ) {
+    return this.service.findAll(dto, user.rol, cicloId);
   }
 
   @Get('leidos')

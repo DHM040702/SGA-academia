@@ -39,11 +39,11 @@ export interface UpdateCursoDto {
 }
 
 /* ─── hooks ──────────────────────────────────────────────────────── */
-export function useCursos() {
+export function useCursos(cicloId?: string) {
   return useQuery<Curso[]>({
-    queryKey: ['cursos'],
+    queryKey: ['cursos', cicloId ?? 'all'],
     queryFn: async () => {
-      const { data } = await api.get('/cursos')
+      const { data } = await api.get('/cursos', { params: cicloId ? { ciclo_id: cicloId } : {} })
       return data?.data ?? data ?? []
     },
     staleTime: 60_000,

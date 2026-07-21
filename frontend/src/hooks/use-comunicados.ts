@@ -38,6 +38,7 @@ export interface PaginatedComunicados {
 export interface FilterComunicados {
   page?: number
   limit?: number
+  ciclo_id?: string
 }
 
 export interface CreateComunicadoDto {

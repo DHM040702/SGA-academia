@@ -11,7 +11,7 @@ import { UpdateCursoDto } from './dto/update-curso.dto';
 export class CursosService {
   constructor(private prisma: PrismaService) {}
 
-  async findAll(q?: string) {
+  async findAll(q?: string, cicloId?: string) {
     const searchWhere = q
       ? {
           OR: [
@@ -21,11 +21,18 @@ export class CursosService {
         }
       : {};
 
+    // El catálogo de cursos es global; lo que cambia por ciclo es cuántos
+    // horarios tiene asignados. Si viene ciclo_id, se cuentan solo los horarios
+    // de aulas de ese ciclo (así el selector superior de ciclo afecta la vista).
     return this.prisma.curso.findMany({
       where: { activo: true, ...searchWhere },
       orderBy: { nombre: 'asc' },
       include: {
-        _count: { select: { horarios: true } },
+        _count: {
+          select: {
+            horarios: cicloId ? { where: { aula: { cicloId } } } : true,
+          },
+        },
       },
     });
   }

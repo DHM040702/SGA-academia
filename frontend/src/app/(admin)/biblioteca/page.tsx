@@ -6,6 +6,7 @@ import {
   type TipoRecurso, type RecursoBiblioteca,
 } from '@/hooks/use-biblioteca'
 import { useAuth } from '@/contexts/auth-context'
+import { useCicloCtx } from '@/contexts/ciclo-context'
 import { CreateRecursoModal } from '@/components/biblioteca/create-recurso-modal'
 import { EditRecursoModal }   from '@/components/biblioteca/edit-recurso-modal'
 import { Pill }       from '@/components/ui/pill'
@@ -45,11 +46,13 @@ export default function BibliotecaPage() {
   const [showCreate,  setShowCreate]  = useState(false)
   const [editTarget,  setEditTarget]  = useState<RecursoBiblioteca | null>(null)
 
+  const { selectedCiclo } = useCicloCtx()
   const { data: result, isLoading } = useBiblioteca({
-    q:     q || undefined,
-    tipo:  tipoFilter || undefined,
+    q:        q || undefined,
+    tipo:     tipoFilter || undefined,
+    ciclo_id: selectedCiclo?.id,
     page,
-    limit: 20,
+    limit:    20,
   })
   const { data: stats } = useBibliotecaStats()
   const deleteMut = useDeleteRecurso()

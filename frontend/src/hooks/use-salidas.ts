@@ -24,6 +24,7 @@ export interface SalidasFiltros {
   page?: number
   limit?: number
   alumno_id?: string
+  ciclo_id?: string
   desde?: string
   hasta?: string
 }

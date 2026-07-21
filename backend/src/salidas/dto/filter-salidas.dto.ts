@@ -8,6 +8,11 @@ export class FilterSalidasDto extends PaginationDto {
   @IsUUID()
   alumno_id?: string;
 
+  @ApiPropertyOptional({ description: 'Acotar al rango de fechas de un ciclo' })
+  @IsOptional()
+  @IsUUID()
+  ciclo_id?: string;
+
   @ApiPropertyOptional({ description: 'Desde (YYYY-MM-DD)' })
   @IsOptional()
   @IsISO8601({ strict: false })

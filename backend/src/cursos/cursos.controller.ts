@@ -31,8 +31,8 @@ export class CursosController {
   @Get()
   @Roles(Rol.admin, Rol.director)
   @ApiOperation({ summary: 'Listar todos los cursos con conteo de horarios' })
-  findAll(@Query('q') q?: string) {
-    return this.service.findAll(q);
+  findAll(@Query('q') q?: string, @Query('ciclo_id') cicloId?: string) {
+    return this.service.findAll(q, cicloId);
   }
 
   @Get(':id')

@@ -30,11 +30,27 @@ export class ComunicadosService {
     return { esGestion, where };
   }
 
-  async findAll(dto: PaginationDto, rolUsuario?: string) {
+  async findAll(dto: PaginationDto, rolUsuario?: string, cicloId?: string) {
     const { page = 1, limit = 20 } = dto;
     const skip = (page - 1) * limit;
 
-    const { where } = this.scopeFor(rolUsuario);
+    const { where: scopeWhere } = this.scopeFor(rolUsuario);
+
+    // Acotar a los comunicados publicados dentro del rango de fechas del ciclo
+    // seleccionado (el selector superior de ciclo filtra la vista).
+    let cicloWhere = {};
+    if (cicloId) {
+      const ciclo = await this.prisma.ciclo.findUnique({
+        where: { id: cicloId },
+        select: { fechaInicio: true, fechaFin: true },
+      });
+      if (ciclo) {
+        const fin = new Date(ciclo.fechaFin);
+        fin.setUTCDate(fin.getUTCDate() + 1); // incluir el último día del ciclo
+        cicloWhere = { createdAt: { gte: ciclo.fechaInicio, lt: fin } };
+      }
+    }
+    const where = { ...scopeWhere, ...cicloWhere };
 
     const [items, total] = await Promise.all([
       this.prisma.comunicado.findMany({
