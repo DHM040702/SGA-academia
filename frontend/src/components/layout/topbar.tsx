@@ -1,6 +1,6 @@
 'use client'
 import * as React from 'react'
-import { useRouter } from 'next/navigation'
+import { useRouter, usePathname } from 'next/navigation'
 import { useQuery } from '@tanstack/react-query'
 import { cn } from '@/lib/utils'
 import { Search, Bell, Users, Teacher, Layers, ChevD } from '@/components/icons'
@@ -291,8 +291,19 @@ function SearchBox() {
 }
 
 /* ─── CicloSelector ──────────────────────────────────────────────── */
+// Módulos de operación en vivo / por fecha: trabajan sobre el ciclo activo o el
+// rango de fechas, no sobre el ciclo seleccionado. Se oculta el selector ahí
+// para no dar la falsa impresión de que filtra la vista.
+const CICLO_SELECTOR_OCULTO = ['/inicio', '/asistencia', '/inasistencias']
+
 function CicloSelector() {
   const { ciclos, selectedCiclo, setSelectedId, loading } = useCicloCtx()
+  const pathname = usePathname()
+
+  const oculto = CICLO_SELECTOR_OCULTO.some(
+    (r) => pathname === r || pathname.startsWith(`${r}/`),
+  )
+  if (oculto) return null
 
   if (loading) {
     return (

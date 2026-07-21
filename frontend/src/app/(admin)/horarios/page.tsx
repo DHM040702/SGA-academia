@@ -16,6 +16,7 @@ import { Btn } from '@/components/ui/btn'
 import { PageHeader } from '@/components/layout/page-header'
 import { Plus, Download, AlertTriangle, Edit, Trash, X, Eye, Search } from '@/components/icons'
 import { useAuth } from '@/contexts/auth-context'
+import { useCicloCtx } from '@/contexts/ciclo-context'
 import { SearchableSelect } from '@/components/ui/searchable-select'
 import type { SelectOption } from '@/components/ui/searchable-select'
 import { useRecesos, useUpsertReceso, useDeleteReceso, type Receso } from '@/hooks/use-recesos'
@@ -660,11 +661,13 @@ function buildPrintHtml(
 }
 
 function ExportModal({ onClose }: { onClose: () => void }) {
-  // El export carga SIEMPRE todos los horarios y aulas del ciclo activo, sin
-  // importar qué aula esté seleccionada en la vista. Así nunca sale vacío ni
+  // El export carga SIEMPRE todos los horarios y aulas del ciclo SELECCIONADO,
+  // sin importar qué aula esté seleccionada en la vista. Así nunca sale vacío ni
   // faltan clases por el filtro de la pantalla o por la paginación.
-  const { data: horariosPage } = useHorarios({ limit: 3000 })
-  const { data: aulas = [] }   = useAulas()
+  const { selectedCiclo } = useCicloCtx()
+  const cicloId = selectedCiclo?.id
+  const { data: horariosPage } = useHorarios({ ciclo_id: cicloId, limit: 3000 })
+  const { data: aulas = [] }   = useAulas(cicloId)
   const { data: recesos = [] } = useRecesos({})
   const horarios: Horario[] = (horariosPage as any)?.data ?? horariosPage ?? []
 
@@ -1042,15 +1045,17 @@ export default function HorariosPage() {
   const [showExport, setShowExport] = useState(false)
   const [showRecesos, setShowRecesos] = useState(false)
 
-  const { data: aulas = [] }           = useAulas()
+  const { selectedCiclo } = useCicloCtx()
+  const cicloId = selectedCiclo?.id
+  const { data: aulas = [] }           = useAulas(cicloId)
   const { data: docentesPage }         = useDocentes({ limit: 100 })
   // Si es docente, filtrar siempre por su docente_id (ignora filtro aulaId)
   const { data: horariosPage, isLoading } = useHorarios(
     isDocente
-      ? { docente_id: docenteId, limit: 500 }
+      ? { docente_id: docenteId, ciclo_id: cicloId, limit: 500 }
       // Vista general: TODAS las aulas del ciclo → se necesita un límite alto para
       // no cortar los últimos días (los horarios se ordenan por día ascendente).
-      : { aula_id: aulaId || undefined, limit: 3000 }
+      : { ciclo_id: cicloId, aula_id: aulaId || undefined, limit: 3000 }
   )
   const { data: conflictos = [] }      = useConflictosHorario()
   // Recesos: si hay aula seleccionada, los de esa aula; si no, los del ciclo activo.

@@ -21,6 +21,7 @@ export interface Horario {
 }
 
 export interface FilterHorarios {
+  ciclo_id?: string
   aula_id?: string
   docente_id?: string
   dia_semana?: number

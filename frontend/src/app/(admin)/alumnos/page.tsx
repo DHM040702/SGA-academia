@@ -12,6 +12,7 @@ import { ImportSemestreModal } from '@/components/alumnos/import-semestre-modal'
 import { ImportFotosModal } from '@/components/alumnos/import-fotos-modal'
 import { useAlumnos, useDeleteAlumno, useRestoreAlumno, type EstadoAlumno, type FilterAlumnos } from '@/hooks/use-alumnos'
 import { useCiclos, useAulas } from '@/hooks/use-ciclos'
+import { useCicloCtx } from '@/contexts/ciclo-context'
 import { useAuth } from '@/contexts/auth-context'
 import { cn } from '@/lib/utils'
 import { Search, Plus, Upload, Scan, Filter, ChevR, ChevL, ChevD, More, Eye, Edit, Trash, RefreshCw, FileText, Grid, Users } from '@/components/icons'
@@ -214,13 +215,12 @@ export default function AlumnosPage() {
   const { data, isLoading, isFetching } = useAlumnos(filters)
   const { data: ciclos = [] } = useCiclos()
   const { data: secciones = [] } = useAulas(cicloId || undefined)
+  const { selectedCiclo } = useCicloCtx()
 
-  /* ── Por defecto, mostrar el semestre ACTIVO (no todos los ciclos) ── */
+  /* ── Seguir al ciclo del selector global (el dropdown local puede afinar) ── */
   React.useEffect(() => {
-    if (cicloId) return
-    const activo = ciclos.find((c) => c.activo)
-    if (activo) setCicloId(activo.id)
-  }, [ciclos, cicloId])
+    if (selectedCiclo?.id) setCicloId(selectedCiclo.id)
+  }, [selectedCiclo?.id])
 
   const total = data?.total ?? 0
   const totalPages = data?.totalPages ?? 1

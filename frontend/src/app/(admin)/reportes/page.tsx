@@ -1,7 +1,8 @@
 'use client'
 
-import { useState, useMemo } from 'react'
+import { useState, useMemo, useEffect } from 'react'
 import { useCiclos, useAulas } from '@/hooks/use-ciclos'
+import { useCicloCtx } from '@/contexts/ciclo-context'
 import { useDocentes } from '@/hooks/use-docentes'
 import { KPI } from '@/components/ui/kpi'
 import { Card } from '@/components/ui/card'
@@ -534,12 +535,18 @@ export default function ReportesPage() {
 
   /* ── Datos comunes ── */
   const { data: ciclos = [] }  = useCiclos()
+  const { selectedCiclo }      = useCicloCtx()
   const [cicloId, setCicloId]  = useState('')
   const { data: aulas  = [] }  = useAulas(cicloId || undefined)
   const [aulaId, setAulaId]    = useState('')
   const { data: docentesPage } = useDocentes({ limit: 200 })
   const docentes = (docentesPage as any)?.data ?? []
   const cicloActivo = ciclos.find((c) => c.activo)
+
+  /* ── Seguir al ciclo del selector global (el dropdown local puede afinar) ── */
+  useEffect(() => {
+    if (selectedCiclo?.id) { setCicloId(selectedCiclo.id); setAulaId('') }
+  }, [selectedCiclo?.id])
   const [pdfLoading, setPdfLoading] = useState(false)
 
   /* ── Individual / lote carnets ── */
