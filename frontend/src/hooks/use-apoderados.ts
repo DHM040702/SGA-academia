@@ -90,7 +90,7 @@ export interface PaginatedApoderados {
   totalPages: number
 }
 
-export function useApoderados(params: { page?: number; limit?: number; search?: string } = {}) {
+export function useApoderados(params: { page?: number; limit?: number; search?: string; ciclo_id?: string } = {}) {
   return useQuery<PaginatedApoderados>({
     queryKey: ['apoderados', params],
     queryFn: async () => {

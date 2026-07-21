@@ -46,6 +46,7 @@ export interface PaginatedDocentes {
 export interface FilterDocentes {
   q?: string
   curso_id?: string
+  ciclo_id?: string
   page?: number
   limit?: number
 }

@@ -9,6 +9,7 @@ import {
   useVincularEstudiante, useDesvincularEstudiante, useResetPasswordApoderado, PARENTESCO_OPTS,
   type Apoderado,
 } from '@/hooks/use-apoderados'
+import { useCicloCtx } from '@/contexts/ciclo-context'
 import { PageHeader } from '@/components/layout/page-header'
 import { Card } from '@/components/ui/card'
 import { Btn } from '@/components/ui/btn'
@@ -357,7 +358,8 @@ export default function ApoderadosPage() {
     return () => clearTimeout(t)
   }, [q])
 
-  const { data, isLoading, isFetching } = useApoderados({ page, limit: 20, search: search || undefined })
+  const { selectedCiclo } = useCicloCtx()
+  const { data, isLoading, isFetching } = useApoderados({ page, limit: 20, search: search || undefined, ciclo_id: selectedCiclo?.id })
   const items: Apoderado[] = data?.data ?? []
   const total = data?.total ?? 0
   const totalPages = data?.totalPages ?? 1

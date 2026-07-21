@@ -1,5 +1,5 @@
 import { ApiPropertyOptional } from '@nestjs/swagger';
-import { IsInt, IsOptional, IsString, Max, Min } from 'class-validator';
+import { IsInt, IsOptional, IsString, IsUUID, Max, Min } from 'class-validator';
 import { Type } from 'class-transformer';
 
 export class FilterApoderadosDto {
@@ -22,4 +22,9 @@ export class FilterApoderadosDto {
   @IsOptional()
   @IsString()
   search?: string;
+
+  @ApiPropertyOptional({ description: 'Solo apoderados con pupilos en aulas de este ciclo' })
+  @IsOptional()
+  @IsUUID()
+  ciclo_id?: string;
 }

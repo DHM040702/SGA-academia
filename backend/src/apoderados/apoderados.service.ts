@@ -49,10 +49,14 @@ export class ApoderadosService {
   }
 
   async findAll(dto: FilterApoderadosDto) {
-    const { page = 1, limit = 20, search } = dto;
+    const { page = 1, limit = 20, search, ciclo_id } = dto as any;
     const skip = (page - 1) * limit;
 
     const where: any = { deletedAt: null };
+    // Scope por ciclo: apoderados con al menos un pupilo en un aula de ese ciclo.
+    if (ciclo_id) {
+      where.alumnos = { some: { alumno: { deletedAt: null, aula: { cicloId: ciclo_id } } } };
+    }
     if (search) {
       where.OR = [
         { nombre:           { contains: search, mode: 'insensitive' } },

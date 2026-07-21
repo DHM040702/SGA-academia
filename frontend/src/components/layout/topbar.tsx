@@ -291,10 +291,14 @@ function SearchBox() {
 }
 
 /* ─── CicloSelector ──────────────────────────────────────────────── */
-// Módulos de operación en vivo / por fecha: trabajan sobre el ciclo activo o el
-// rango de fechas, no sobre el ciclo seleccionado. Se oculta el selector ahí
-// para no dar la falsa impresión de que filtra la vista.
-const CICLO_SELECTOR_OCULTO = ['/inicio', '/asistencia', '/inasistencias']
+// Módulos donde el selector de ciclo no aplica y se oculta para no confundir:
+//  - Operación en vivo / por fecha (trabajan sobre el ciclo activo o la fecha).
+//  - Ciclos y aulas: es donde se administran los ciclos (no se "filtra" por uno).
+//  - Carreras: catálogo global. Carnets: elige el ciclo por trabajo de impresión.
+const CICLO_SELECTOR_OCULTO = [
+  '/inicio', '/asistencia', '/inasistencias',
+  '/ciclos', '/carreras', '/carnets',
+]
 
 function CicloSelector() {
   const { ciclos, selectedCiclo, setSelectedId, loading } = useCicloCtx()

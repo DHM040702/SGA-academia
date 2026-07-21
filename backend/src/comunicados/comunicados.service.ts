@@ -36,9 +36,10 @@ export class ComunicadosService {
 
     const { where: scopeWhere } = this.scopeFor(rolUsuario);
 
-    // Acotar a los comunicados publicados dentro del rango de fechas del ciclo
-    // seleccionado (el selector superior de ciclo filtra la vista).
-    let cicloWhere = {};
+    // Scope por el ciclo seleccionado: un comunicado pertenece al ciclo si va
+    // DIRIGIDO a un aula de ese ciclo, o si es GENERAL (sin aula) publicado
+    // dentro del rango de fechas del semestre.
+    let cicloWhere: any = {};
     if (cicloId) {
       const ciclo = await this.prisma.ciclo.findUnique({
         where: { id: cicloId },
@@ -47,7 +48,12 @@ export class ComunicadosService {
       if (ciclo) {
         const fin = new Date(ciclo.fechaFin);
         fin.setUTCDate(fin.getUTCDate() + 1); // incluir el último día del ciclo
-        cicloWhere = { createdAt: { gte: ciclo.fechaInicio, lt: fin } };
+        cicloWhere = {
+          OR: [
+            { aula: { cicloId } },
+            { aulaId: null, createdAt: { gte: ciclo.fechaInicio, lt: fin } },
+          ],
+        };
       }
     }
     const where = { ...scopeWhere, ...cicloWhere };

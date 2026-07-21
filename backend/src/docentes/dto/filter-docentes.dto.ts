@@ -9,6 +9,11 @@ export class FilterDocentesDto extends PaginationDto {
   @IsUUID()
   curso_id?: string;
 
+  @ApiPropertyOptional({ description: 'Solo docentes con horario en aulas de este ciclo' })
+  @IsOptional()
+  @IsUUID()
+  ciclo_id?: string;
+
   @ApiPropertyOptional({ description: 'Filtrar por estado activo/inactivo' })
   @IsOptional()
   @Transform(({ value }) => {

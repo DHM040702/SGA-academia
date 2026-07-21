@@ -3,6 +3,7 @@
 import * as React from 'react'
 import { useRouter } from 'next/navigation'
 import { useDocentes, useDeleteDocente, type Docente } from '@/hooks/use-docentes'
+import { useCicloCtx } from '@/contexts/ciclo-context'
 import { Avatar } from '@/components/ui/avatar'
 import { Pill } from '@/components/ui/pill'
 import { KPI } from '@/components/ui/kpi'
@@ -154,7 +155,8 @@ export default function DocentesPage() {
     return () => document.removeEventListener('mousedown', handler)
   }, [openMenu])
 
-  const { data: docentesResult, isLoading, isFetching } = useDocentes({ q: debouncedQ || undefined, page, limit: 20 })
+  const { selectedCiclo } = useCicloCtx()
+  const { data: docentesResult, isLoading, isFetching } = useDocentes({ q: debouncedQ || undefined, ciclo_id: selectedCiclo?.id, page, limit: 20 })
   const docentes = docentesResult?.data ?? []
   const total = docentesResult?.total ?? 0
   const totalPages = docentesResult?.totalPages ?? 1

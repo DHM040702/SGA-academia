@@ -18,7 +18,7 @@ export class DocentesService {
   ) {}
 
   async findAll(dto: FilterDocentesDto) {
-    const { page = 1, limit = 20, q, curso_id, activo } = dto;
+    const { page = 1, limit = 20, q, curso_id, activo, ciclo_id } = dto as any;
     const skip = (page - 1) * limit;
 
     const searchWhere = q
@@ -31,6 +31,9 @@ export class DocentesService {
         }
       : {};
 
+    // NO se filtra la LISTA por ciclo (los docentes siguen visibles aunque no
+    // tengan horario ese semestre); lo que cambia por ciclo son sus cursos y
+    // secciones mostrados (ver el `where` del include de horarios más abajo).
     const cursoWhere  = curso_id ? { horarios: { some: { cursoId: curso_id } } } : {};
     const activoWhere = activo !== undefined ? { usuario: { activo } } : {};
 
@@ -50,6 +53,8 @@ export class DocentesService {
         include: {
           usuario: { select: { id: true, email: true, activo: true, rol: true } },
           horarios: {
+            // Los cursos/secciones mostrados son los del ciclo seleccionado.
+            where: ciclo_id ? { aula: { cicloId: ciclo_id } } : undefined,
             include: {
               curso:   { select: { id: true, nombre: true, codigo: true } },
               aula: { select: { id: true, nombre: true } },
