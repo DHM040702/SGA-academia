@@ -380,7 +380,15 @@ export default function CiclosPage() {
 
   async function handleActivarCiclo(id: string) {
     if (!confirm('¿Activar este ciclo? El ciclo actualmente activo quedará cerrado.')) return
-    await updateCicloMut.mutateAsync({ id, activo: true })
+    const res: any = await updateCicloMut.mutateAsync({ id, activo: true })
+    // Informe del ajuste automático de docentes (no se borra a nadie).
+    const aj = res?.docentes_ajuste
+    if (aj && (aj.desactivados || aj.reactivados)) {
+      const partes: string[] = []
+      if (aj.desactivados) partes.push(`${aj.desactivados} docente(s) desactivado(s) por ~6 meses sin enseñar`)
+      if (aj.reactivados)  partes.push(`${aj.reactivados} reactivado(s) por volver a tener horario`)
+      alert(`Ciclo activado.\n\n${partes.join('\n')}\n\nLos docentes siguen en la lista; solo cambió el estado de su cuenta.`)
+    }
   }
 
   async function handleDeleteCiclo(c: Ciclo) {
