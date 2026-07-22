@@ -65,6 +65,53 @@ function dnisEnNombre(nombre: string, dnis: Set<string>): string[] {
   return [...encontrados];
 }
 
+interface ImagenExtraida { nombre: string; data: Buffer }
+
+// Import dinámico REAL (no transpilado a require por TS): funciona tanto si
+// node-unrar-js es CommonJS como ESM-only, en un backend compilado a CJS.
+const importESM = new Function('m', 'return import(m)') as (m: string) => Promise<any>;
+
+/**
+ * Extrae las imágenes (.jpg/.jpeg/.png) de un archivo comprimido en memoria.
+ * Soporta ZIP (adm-zip) y RAR (node-unrar-js, WASM). Ignora carpetas y basura
+ * de macOS. El formato se detecta por la firma de bytes (RAR = "Rar!").
+ */
+async function extraerImagenes(buffer: Buffer): Promise<ImagenExtraida[]> {
+  const esImagen = (n: string) =>
+    /\.(jpe?g|png)$/i.test(n) && !n.split(/[\\/]/).some((p) => p === '__MACOSX');
+
+  const esRar =
+    buffer.length >= 4 &&
+    buffer[0] === 0x52 && buffer[1] === 0x61 && buffer[2] === 0x72 && buffer[3] === 0x21;
+
+  if (esRar) {
+    const { createExtractorFromData } = await importESM('node-unrar-js');
+    // Copia el ArrayBuffer exacto (evita offsets del pool de Buffer de Node).
+    const ab = buffer.buffer.slice(buffer.byteOffset, buffer.byteOffset + buffer.byteLength);
+    const extractor = await createExtractorFromData({ data: ab });
+    const extracted = extractor.extract();
+    const out: ImagenExtraida[] = [];
+    for (const f of extracted.files) {
+      if (f.fileHeader.flags.directory || !f.extraction) continue;
+      if (!esImagen(f.fileHeader.name)) continue;
+      out.push({ nombre: f.fileHeader.name, data: Buffer.from(f.extraction) });
+    }
+    return out;
+  }
+
+  // ZIP por defecto.
+  let zip: AdmZip;
+  try {
+    zip = new AdmZip(buffer);
+  } catch {
+    throw new BadRequestException('El archivo no es un ZIP ni un RAR válido');
+  }
+  return zip
+    .getEntries()
+    .filter((e) => !e.isDirectory && esImagen(e.entryName))
+    .map((e) => ({ nombre: e.entryName, data: e.getData() }));
+}
+
 /** Fila ya normalizada del CSV oficial (el controller hace el parseo/limpieza). */
 export interface SemestreImportRow {
   fila:               number;
@@ -918,20 +965,9 @@ export class AlumnosService {
   async importarFotos(file: Express.Multer.File) {
     if (!file) throw new BadRequestException('No se proporcionó archivo');
 
-    let zip: AdmZip;
-    try {
-      zip = new AdmZip(file.buffer);
-    } catch {
-      throw new BadRequestException('El archivo no es un ZIP válido');
-    }
-
-    const entradas = zip.getEntries().filter(
-      (e) => !e.isDirectory
-        && !e.entryName.startsWith('__MACOSX/')
-        && /\.(jpe?g|png)$/i.test(e.entryName),
-    );
+    const entradas = await extraerImagenes(file.buffer);
     if (!entradas.length) {
-      throw new BadRequestException('El ZIP no contiene imágenes (.jpg, .jpeg o .png)');
+      throw new BadRequestException('El archivo no contiene imágenes (.jpg, .jpeg o .png)');
     }
 
     const alumnos = await this.prisma.alumno.findMany({
@@ -950,7 +986,7 @@ export class AlumnosService {
     };
 
     for (const e of entradas) {
-      const archivo = e.entryName.split('/').pop() ?? e.entryName;
+      const archivo = e.nombre.split(/[\\/]/).pop() ?? e.nombre;
       try {
         const coincidencias = dnisEnNombre(archivo, dnis);
         if (coincidencias.length === 0) { res.sinCoincidencia.push(archivo); continue; }
@@ -958,7 +994,7 @@ export class AlumnosService {
 
         const alumnoId = porDni.get(coincidencias[0])!;
         const mimetype = /\.png$/i.test(archivo) ? 'image/png' : 'image/jpeg';
-        const url = await this.minio.subirFoto('alumnos', alumnoId, e.getData(), mimetype);
+        const url = await this.minio.subirFoto('alumnos', alumnoId, e.data, mimetype);
         await this.prisma.alumno.update({ where: { id: alumnoId }, data: { fotoUrl: url } });
         res.actualizados++;
       } catch (err: any) {

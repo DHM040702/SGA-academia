@@ -12,7 +12,7 @@ function StepUpload({ onFile, error }: { onFile: (f: File) => void; error?: stri
   const inputRef = React.useRef<HTMLInputElement>(null)
 
   function handle(f: File) {
-    if (!f.name.match(/\.zip$/i)) { alert('Solo se acepta un archivo .zip'); return }
+    if (!f.name.match(/\.(zip|rar)$/i)) { alert('Solo se acepta un archivo .zip o .rar'); return }
     onFile(f)
   }
 
@@ -38,11 +38,11 @@ function StepUpload({ onFile, error }: { onFile: (f: File) => void; error?: stri
         </div>
         <div className="text-center">
           <div className="text-[14px] font-semibold text-text">
-            {dragging ? 'Suelta el archivo aquí' : 'Arrastra el ZIP de fotos aquí'}
+            {dragging ? 'Suelta el archivo aquí' : 'Arrastra el ZIP o RAR de fotos aquí'}
           </div>
-          <div className="text-[12.5px] text-text-mute mt-1">o haz clic para seleccionar  ·  .zip</div>
+          <div className="text-[12.5px] text-text-mute mt-1">o haz clic para seleccionar  ·  .zip / .rar</div>
         </div>
-        <input ref={inputRef} type="file" accept=".zip" className="hidden"
+        <input ref={inputRef} type="file" accept=".zip,.rar" className="hidden"
           onChange={(e) => { const f = e.target.files?.[0]; if (f) handle(f) }} />
       </div>
 
@@ -59,7 +59,7 @@ function StepUpload({ onFile, error }: { onFile: (f: File) => void; error?: stri
         </span>
         <ul className="text-[12.5px] text-text list-disc pl-4 flex flex-col gap-1">
           <li>Cada imagen se asigna a su alumno por el <strong>DNI que aparece en el nombre del archivo</strong> (ej. <code className="font-mono text-[11.5px]">0309<strong>60522696</strong>432026-I29.jpg</code>).</li>
-          <li>Formatos aceptados dentro del ZIP: <strong>.jpg</strong>, <strong>.jpeg</strong> y <strong>.png</strong>.</li>
+          <li>El comprimido puede ser <strong>.zip</strong> o <strong>.rar</strong>; las imágenes dentro: <strong>.jpg</strong>, <strong>.jpeg</strong> o <strong>.png</strong> (las subcarpetas se ignoran).</li>
           <li>Si una foto ya existía, se <strong>reemplaza</strong>.</li>
           <li>Los archivos que no casen con ningún DNI (o casen con varios) se listan al final sin aplicarse.</li>
         </ul>
@@ -226,7 +226,7 @@ export function ImportFotosModal({ onClose }: { onClose: () => void }) {
               Cargar fotos de alumnos
             </h2>
             <p className="text-[12px] text-text-mute mt-0.5">
-              Sube un ZIP con las fotos; se asignan por el DNI del nombre de archivo
+              Sube un ZIP o RAR con las fotos; se asignan por el DNI del nombre de archivo
             </p>
           </div>
           <button

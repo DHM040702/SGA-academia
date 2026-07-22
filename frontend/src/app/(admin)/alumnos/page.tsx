@@ -257,7 +257,7 @@ export default function AlumnosPage() {
                     onClick={() => { setImportMenu(false); setShowImportFotos(true) }}
                     className="w-full text-left flex items-center gap-2 px-3 py-2 text-[12.5px] hover:bg-surface2 transition-colors border-none bg-transparent cursor-pointer font-sans"
                   >
-                    <Users size={13} className="text-text-mute" />Fotos de alumnos (ZIP)
+                    <Users size={13} className="text-text-mute" />Fotos de alumnos (ZIP o RAR)
                   </button>
                   <div className="border-t border-border-s my-1" />
                   <button
