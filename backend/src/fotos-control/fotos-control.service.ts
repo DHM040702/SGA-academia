@@ -5,7 +5,7 @@ import { MinioService } from '../minio/minio.service';
 export type TipoPersona = 'alumnos' | 'docentes';
 
 /** Persona (alumno o docente) en el reporte de fotos. */
-interface Persona {
+export interface Persona {
   id:        string;
   nombre:    string;
   apellidos: string;
@@ -14,12 +14,12 @@ interface Persona {
   fotoUrl:   string | null; // URL cruda en BD (se presigna en duplicados)
 }
 
-interface Integrante extends Omit<Persona, 'fotoUrl'> {
+export interface Integrante extends Omit<Persona, 'fotoUrl'> {
   fotoUrl: string | null;   // presignada para mostrar miniatura
   size:    number;
 }
 
-interface Reporte {
+export interface Reporte {
   total:        number;
   conFoto:      number;
   sinFotoTotal: number;
