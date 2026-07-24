@@ -1,4 +1,4 @@
-import { useQuery } from '@tanstack/react-query'
+import { useQuery, useMutation, useQueryClient } from '@tanstack/react-query'
 import api from '@/lib/api'
 
 export interface PersonaFoto {
@@ -36,5 +36,18 @@ export function useFotosControl() {
       return data
     },
     staleTime: 60_000,
+  })
+}
+
+/** Quita la foto de un alumno o docente (deshacer una duplicada mal asignada). */
+export function useEliminarFotoControl() {
+  const qc = useQueryClient()
+  return useMutation({
+    mutationFn: ({ tipo, id }: { tipo: 'alumnos' | 'docentes'; id: string }) =>
+      api.delete(`/fotos-control/${tipo}/${id}/foto`).then((r) => r.data),
+    onSuccess: (_data, { tipo }) => {
+      qc.invalidateQueries({ queryKey: ['fotos-control'] })
+      qc.invalidateQueries({ queryKey: [tipo] }) // refresca listas de alumnos/docentes
+    },
   })
 }

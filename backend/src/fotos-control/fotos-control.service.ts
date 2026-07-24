@@ -1,6 +1,8 @@
-import { Injectable } from '@nestjs/common';
+import { BadRequestException, Injectable, NotFoundException } from '@nestjs/common';
 import { PrismaService } from '../prisma/prisma.service';
 import { MinioService } from '../minio/minio.service';
+
+export type TipoPersona = 'alumnos' | 'docentes';
 
 /** Persona (alumno o docente) en el reporte de fotos. */
 interface Persona {
@@ -34,6 +36,35 @@ export class FotosControlService {
     private readonly prisma: PrismaService,
     private readonly minio:  MinioService,
   ) {}
+
+  /**
+   * Quita la foto de un alumno o docente: la borra de MinIO y pone `fotoUrl` en
+   * null. Sirve para deshacer una foto duplicada mal asignada desde el módulo de
+   * control (luego se vuelve a cargar la correcta). Idempotente.
+   */
+  async eliminarFoto(tipo: TipoPersona, id: string) {
+    if (tipo !== 'alumnos' && tipo !== 'docentes') {
+      throw new BadRequestException('Tipo inválido (se espera "alumnos" o "docentes")');
+    }
+
+    if (tipo === 'alumnos') {
+      const a = await this.prisma.alumno.findFirst({ where: { id }, select: { id: true, fotoUrl: true } });
+      if (!a) throw new NotFoundException('Alumno no encontrado');
+      if (a.fotoUrl) {
+        await this.minio.eliminarFotoPorUrl(a.fotoUrl);
+        await this.prisma.alumno.update({ where: { id }, data: { fotoUrl: null } });
+      }
+      return { ok: true };
+    }
+
+    const d = await this.prisma.docente.findFirst({ where: { id }, select: { id: true, fotoUrl: true } });
+    if (!d) throw new NotFoundException('Docente no encontrado');
+    if (d.fotoUrl) {
+      await this.minio.eliminarFotoPorUrl(d.fotoUrl);
+      await this.prisma.docente.update({ where: { id }, data: { fotoUrl: null } });
+    }
+    return { ok: true };
+  }
 
   /** Reporte de control de fotos de alumnos y docentes. */
   async control() {

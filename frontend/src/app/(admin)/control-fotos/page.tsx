@@ -5,8 +5,8 @@ import { PageHeader } from '@/components/layout/page-header'
 import { Card } from '@/components/ui/card'
 import { Btn } from '@/components/ui/btn'
 import { Avatar } from '@/components/ui/avatar'
-import { RefreshCw, AlertTriangle, Check, Users, Teacher, ChevD, ChevR } from '@/components/icons'
-import { useFotosControl, type ReporteFotos, type PersonaFoto } from '@/hooks/use-fotos-control'
+import { RefreshCw, AlertTriangle, Check, Users, Teacher, ChevD, ChevR, Trash } from '@/components/icons'
+import { useFotosControl, useEliminarFotoControl, type ReporteFotos, type PersonaFoto } from '@/hooks/use-fotos-control'
 import { cn } from '@/lib/utils'
 
 type Tab = 'alumnos' | 'docentes'
@@ -45,7 +45,17 @@ function PersonaRow({ p, tab }: { p: PersonaFoto; tab: Tab }) {
 /* ─── Reporte de una pestaña ─────────────────────────────────────── */
 function ReporteTab({ r, tab }: { r: ReporteFotos; tab: Tab }) {
   const [verSinFoto, setVerSinFoto] = React.useState(false)
+  const eliminar = useEliminarFotoControl()
   const pct = r.total > 0 ? Math.round((r.conFoto / r.total) * 100) : 0
+
+  async function quitarFoto(p: PersonaFoto) {
+    if (!confirm(`¿Quitar la foto de ${p.nombre} ${p.apellidos}?\n\nLa foto se elimina del almacenamiento; podrás volver a cargar la correcta desde su perfil.`)) return
+    try {
+      await eliminar.mutateAsync({ tipo: tab, id: p.id })
+    } catch (err: any) {
+      alert(err?.response?.data?.message ?? 'No se pudo quitar la foto.')
+    }
+  }
 
   return (
     <div className="flex flex-col gap-4">
@@ -93,19 +103,29 @@ function ReporteTab({ r, tab }: { r: ReporteFotos; tab: Tab }) {
                   <AlertTriangle size={12} /> Misma imagen · {g.integrantes.length} personas
                 </div>
                 <div className="grid grid-cols-1 sm:grid-cols-2 gap-2">
-                  {g.integrantes.map((p) => (
-                    <Link
-                      key={p.id}
-                      href={`/${tab}/${p.id}`}
-                      className="flex items-center gap-3 rounded-2 border border-border bg-surface px-3 py-2 hover:bg-surface2 transition-colors no-underline"
-                    >
-                      <Avatar name={`${p.nombre} ${p.apellidos}`} src={p.fotoUrl ?? undefined} size={40} />
-                      <div className="min-w-0 flex-1">
-                        <div className="text-[13px] font-medium text-text truncate">{p.apellidos}, {p.nombre}</div>
-                        <div className="text-[11.5px] text-text-mute">DNI {p.dni}{p.codigo ? ` · Cód. ${p.codigo}` : ''}</div>
+                  {g.integrantes.map((p) => {
+                    const quitando = eliminar.isPending && eliminar.variables?.id === p.id
+                    return (
+                      <div
+                        key={p.id}
+                        className="flex items-center gap-3 rounded-2 border border-border bg-surface px-3 py-2"
+                      >
+                        <Avatar name={`${p.nombre} ${p.apellidos}`} src={p.fotoUrl ?? undefined} size={40} />
+                        <Link href={`/${tab}/${p.id}`} className="min-w-0 flex-1 no-underline group">
+                          <div className="text-[13px] font-medium text-text truncate group-hover:text-primary transition-colors">{p.apellidos}, {p.nombre}</div>
+                          <div className="text-[11.5px] text-text-mute">DNI {p.dni}{p.codigo ? ` · Cód. ${p.codigo}` : ''}</div>
+                        </Link>
+                        <Btn
+                          variant="danger" size="sm"
+                          icon={<Trash size={13} />}
+                          disabled={quitando}
+                          onClick={() => quitarFoto(p)}
+                        >
+                          {quitando ? 'Quitando…' : 'Quitar foto'}
+                        </Btn>
                       </div>
-                    </Link>
-                  ))}
+                    )
+                  })}
                 </div>
               </div>
             ))}
