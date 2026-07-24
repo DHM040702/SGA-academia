@@ -7,6 +7,7 @@ import { Btn } from '@/components/ui/btn'
 import { Avatar } from '@/components/ui/avatar'
 import { RefreshCw, AlertTriangle, Check, Users, Teacher, ChevD, ChevR, Trash } from '@/components/icons'
 import { useFotosControl, useEliminarFotoControl, type ReporteFotos, type PersonaFoto } from '@/hooks/use-fotos-control'
+import { useAuth } from '@/contexts/auth-context'
 import { cn } from '@/lib/utils'
 
 type Tab = 'alumnos' | 'docentes'
@@ -46,6 +47,8 @@ function PersonaRow({ p, tab }: { p: PersonaFoto; tab: Tab }) {
 function ReporteTab({ r, tab }: { r: ReporteFotos; tab: Tab }) {
   const [verSinFoto, setVerSinFoto] = React.useState(false)
   const eliminar = useEliminarFotoControl()
+  const { user } = useAuth()
+  const puedeEditar = user?.rol === 'admin'
   const pct = r.total > 0 ? Math.round((r.conFoto / r.total) * 100) : 0
 
   async function quitarFoto(p: PersonaFoto) {
@@ -115,14 +118,16 @@ function ReporteTab({ r, tab }: { r: ReporteFotos; tab: Tab }) {
                           <div className="text-[13px] font-medium text-text truncate group-hover:text-primary transition-colors">{p.apellidos}, {p.nombre}</div>
                           <div className="text-[11.5px] text-text-mute">DNI {p.dni}{p.codigo ? ` · Cód. ${p.codigo}` : ''}</div>
                         </Link>
-                        <Btn
-                          variant="danger" size="sm"
-                          icon={<Trash size={13} />}
-                          disabled={quitando}
-                          onClick={() => quitarFoto(p)}
-                        >
-                          {quitando ? 'Quitando…' : 'Quitar foto'}
-                        </Btn>
+                        {puedeEditar && (
+                          <Btn
+                            variant="danger" size="sm"
+                            icon={<Trash size={13} />}
+                            disabled={quitando}
+                            onClick={() => quitarFoto(p)}
+                          >
+                            {quitando ? 'Quitando…' : 'Quitar foto'}
+                          </Btn>
+                        )}
                       </div>
                     )
                   })}
