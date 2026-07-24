@@ -635,15 +635,20 @@ export class AlumnosService {
         if (!dto.nuevo) throw new BadRequestException('Datos del nuevo apoderado requeridos');
         const { nombre, apellidos, dni, telefono_whatsapp, email, password } = dto.nuevo;
 
-        const emailAp = await tx.usuario.findFirst({ where: { email } });
-        if (emailAp) throw new BadRequestException('Ya existe un usuario con ese email');
+        // El email del apoderado es opcional: si no viene, se autogenera.
+        const emailAp = email && /^\S+@\S+\.\S+$/.test(email)
+          ? email
+          : `apo.${dni}@academia.edu`;
+
+        const emailEnUso = await tx.usuario.findFirst({ where: { email: emailAp } });
+        if (emailEnUso) throw new BadRequestException('Ya existe un usuario con ese email');
 
         const dniAp = await tx.apoderado.findFirst({ where: { dni } });
         if (dniAp) throw new BadRequestException('Ya existe un apoderado con ese DNI');
 
         const apHash = await bcrypt.hash(password, 12);
         const usuarioAp = await tx.usuario.create({
-          data: { email, passwordHash: apHash, rol: Rol.apoderado, dni },
+          data: { email: emailAp, passwordHash: apHash, rol: Rol.apoderado, dni },
         });
         const ap = await tx.apoderado.create({
           data: { usuarioId: usuarioAp.id, nombre, apellidos, dni, telefonoWhatsapp: telefono_whatsapp },
