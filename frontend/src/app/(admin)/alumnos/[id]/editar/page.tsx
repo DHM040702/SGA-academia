@@ -227,7 +227,7 @@ export default function EditarAlumnoPage() {
             <FotoUpload
               uploadUrl={`/alumnos/${id}/foto`}
               deleteUrl={`/alumnos/${id}/foto`}
-              currentUrl={alumno.foto_url}
+              currentUrl={alumno.fotoUrl ?? alumno.foto_url}
               name={`${alumno.nombres} ${alumno.apellidos}`}
               size={88}
               onSuccess={() => queryClient.invalidateQueries({ queryKey: ['alumnos', id] })}

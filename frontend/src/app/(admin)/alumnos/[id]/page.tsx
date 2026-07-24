@@ -167,7 +167,7 @@ export default function AlumnoDetallePage() {
           {/* Profile card */}
           <Card>
             <div className="flex flex-col items-center text-center px-5 pt-5 pb-4">
-              <Avatar name={`${nombre} ${apellidos}`} size={80} />
+              <Avatar name={`${nombre} ${apellidos}`} size={80} src={alumno.fotoUrl ?? alumno.foto_url ?? undefined} />
               <h3 className="font-serif text-[19px] font-semibold mt-3.5 mb-1 tracking-tight">
                 {nombre} {apellidos}
               </h3>

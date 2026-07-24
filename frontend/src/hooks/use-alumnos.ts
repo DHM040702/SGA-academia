@@ -12,6 +12,8 @@ export interface Alumno {
   dni: string
   telefono?: string | null
   fecha_nacimiento?: string | null
+  // La API la manda camelCase y presignada; `foto_url` queda por compat.
+  fotoUrl?: string | null
   foto_url?: string | null
   aula_id?: string | null
   carreraId?: string | null

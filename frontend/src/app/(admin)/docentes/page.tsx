@@ -243,7 +243,7 @@ export default function DocentesPage() {
                     >
                       <td className="px-3.5 py-3">
                         <div className="flex items-center gap-2.5">
-                          <Avatar name={name} size={32} />
+                          <Avatar name={name} size={32} src={d.fotoUrl ?? undefined} />
                           <div>
                             <div className="font-semibold text-[13px] leading-tight">{name}</div>
                             <div className="text-[11.5px] text-text-mute">{d.usuario?.email}</div>
