@@ -8,7 +8,7 @@ import { useAuth } from '@/contexts/auth-context'
 import {
   Home, Users, Teacher, Grid, Calendar, Check,
   Megaphone, Book, Chart, LogOut, Layers, ScanLine,
-  Clock, Shield, CreditCard, FileText, Award, UserCheck,
+  Clock, Shield, CreditCard, FileText, Award, UserCheck, Eye,
 } from '@/components/icons'
 
 /* ─── Tipos ────────────────────────────────────────────────── */
@@ -54,10 +54,11 @@ const GROUPS_ADMIN: NavGroup[] = [
   {
     label: 'Administración',
     items: [
-      { href: '/reportes',  icon: Chart,    label: 'Reportes' },
-      { href: '/turnos',    icon: Clock,    label: 'Turnos' },
-      { href: '/usuarios',  icon: Shield,   label: 'Usuarios' },
-      { href: '/auditoria', icon: FileText, label: 'Auditoría' },
+      { href: '/reportes',      icon: Chart,    label: 'Reportes' },
+      { href: '/control-fotos', icon: Eye,      label: 'Control de fotos' },
+      { href: '/turnos',        icon: Clock,    label: 'Turnos' },
+      { href: '/usuarios',      icon: Shield,   label: 'Usuarios' },
+      { href: '/auditoria',     icon: FileText, label: 'Auditoría' },
     ],
   },
 ]
@@ -95,9 +96,10 @@ const GROUPS_DIRECTOR: NavGroup[] = [
   {
     label: 'Administración',
     items: [
-      { href: '/reportes',  icon: Chart,    label: 'Reportes' },
-      { href: '/turnos',    icon: Clock,    label: 'Turnos' },
-      { href: '/auditoria', icon: FileText, label: 'Auditoría' },
+      { href: '/reportes',      icon: Chart,    label: 'Reportes' },
+      { href: '/control-fotos', icon: Eye,      label: 'Control de fotos' },
+      { href: '/turnos',        icon: Clock,    label: 'Turnos' },
+      { href: '/auditoria',     icon: FileText, label: 'Auditoría' },
     ],
   },
 ]

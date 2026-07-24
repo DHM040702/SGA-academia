@@ -24,6 +24,7 @@ import { TurnosModule } from './turnos/turnos.module';
 import { UsuariosModule } from './usuarios/usuarios.module';
 import { AuditoriaModule } from './auditoria/auditoria.module';
 import { SalidasModule } from './salidas/salidas.module';
+import { FotosControlModule } from './fotos-control/fotos-control.module';
 import { HealthModule } from './health/health.module';
 
 @Module({
@@ -49,6 +50,7 @@ import { HealthModule } from './health/health.module';
     ReportesModule,
     AuditoriaModule,
     SalidasModule,
+    FotosControlModule,
     HealthModule,
   ],
   controllers: [AppController],

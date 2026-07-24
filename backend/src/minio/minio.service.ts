@@ -126,6 +126,31 @@ export class MinioService implements OnModuleInit {
     } catch { /* silencioso */ }
   }
 
+  /**
+   * Lista los objetos del bucket de fotos bajo un prefijo, con su ETag (el MD5
+   * del contenido para subidas simples). ETags iguales ⇒ imágenes idénticas,
+   * lo que permite detectar fotos duplicadas entre personas distintas.
+   */
+  async listarObjetos(
+    prefix: string,
+  ): Promise<{ key: string; etag: string; size: number }[]> {
+    return new Promise((resolve, reject) => {
+      const out: { key: string; etag: string; size: number }[] = [];
+      const stream = this.client.listObjectsV2(FOTOS_BUCKET, prefix, true);
+      stream.on('data', (o) => {
+        if (o.name && !o.name.endsWith('/')) {
+          out.push({
+            key:  o.name,
+            etag: String((o as any).etag ?? '').replace(/"/g, ''),
+            size: o.size ?? 0,
+          });
+        }
+      });
+      stream.on('error', reject);
+      stream.on('end', () => resolve(out));
+    });
+  }
+
   /* ── API pública — biblioteca ──────────────────────────────── */
 
   async subirPdfBiblioteca(

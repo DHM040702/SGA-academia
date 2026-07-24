@@ -297,7 +297,7 @@ function SearchBox() {
 //  - Carreras: catálogo global. Carnets: elige el ciclo por trabajo de impresión.
 const CICLO_SELECTOR_OCULTO = [
   '/inicio', '/asistencia', '/inasistencias',
-  '/ciclos', '/carreras', '/carnets',
+  '/ciclos', '/carreras', '/carnets', '/control-fotos',
 ]
 
 function CicloSelector() {
