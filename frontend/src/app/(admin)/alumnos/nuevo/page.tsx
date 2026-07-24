@@ -7,7 +7,7 @@ import { Card } from '@/components/ui/card'
 import { Btn } from '@/components/ui/btn'
 import { Field } from '@/components/ui/field'
 import { Input } from '@/components/ui/input'
-import { Search, X } from '@/components/icons'
+import { Search, X, CreditCard, UserCheck, Lock, Layers, Users, Check } from '@/components/icons'
 import { useCreateAlumno, useUpdateAlumno } from '@/hooks/use-alumnos'
 import api from '@/lib/api'
 import { useCiclos, useAulas } from '@/hooks/use-ciclos'
@@ -17,18 +17,42 @@ import { useSearchApoderados, PARENTESCO_OPTS, type ApoderadoSearchResult } from
 const SELECT_CLS =
   'w-full px-3 py-2 text-[13px] border border-border rounded-2 bg-surface text-text focus:outline-none focus:ring-1 focus:ring-primary disabled:opacity-50'
 
+/** Título de sección con ícono (Card acepta ReactNode en title). */
+function SectionTitle({ icon, children }: { icon: React.ReactNode; children: React.ReactNode }) {
+  return (
+    <span className="flex items-center gap-2">
+      <span className="flex h-7 w-7 items-center justify-center rounded-2 bg-primary/10 text-primary">{icon}</span>
+      {children}
+    </span>
+  )
+}
+
 interface AlumnoFormValues {
   nombres: string
   apellidos: string
   dni: string
   codigo: string
+  genero: string
   email: string
   password: string
   fecha_nacimiento: string
   telefono: string
+  colegio: string
+  quinto: string
   ciclo_id: string
   aula_id: string
   carrera_id: string
+}
+
+/** Apoderado ya vinculado al alumno hallado por DNI. */
+interface ApoderadoVinculado {
+  id: string
+  nombre: string
+  apellidos: string
+  dni: string
+  email: string
+  parentesco: string
+  es_principal: boolean
 }
 
 /** Alumno hallado por DNI (para autocompletar). */
@@ -36,6 +60,7 @@ interface AlumnoExistente {
   id: string
   activo: boolean
   aula?: { nombre: string; ciclo?: { nombre: string } | null } | null
+  apoderados: ApoderadoVinculado[]
 }
 
 interface ApoderadoForm {
@@ -124,10 +149,16 @@ export default function NuevoAlumnoPage() {
       setValue('nombres', a.nombres || '')
       setValue('apellidos', a.apellidos || '')
       setValue('codigo', a.codigo || '')
+      setValue('genero', a.genero || '')
       setValue('telefono', a.telefono || '')
       setValue('email', a.email || '')
+      setValue('colegio', a.colegio || '')
+      setValue('quinto', a.quinto === true ? 'si' : a.quinto === false ? 'no' : '')
       setValue('fecha_nacimiento', a.fecha_nacimiento || '')
-      setExistente({ id: a.id, activo: data.activo, aula: a.aula })
+      setExistente({ id: a.id, activo: data.activo, aula: a.aula, apoderados: a.apoderados ?? [] })
+      // Al re-matricular partimos "sin apoderado": los actuales se muestran y solo
+      // se agrega uno si el usuario lo elige explícitamente.
+      setApModo('ninguno'); setApSeleccionado(null); setApSearch('')
     } catch (err: any) {
       alert(err?.response?.data?.message ?? 'No se pudo buscar el DNI.')
     } finally {
@@ -135,21 +166,64 @@ export default function NuevoAlumnoPage() {
     }
   }
 
+  /** Construye el bloque `apoderado` del payload (o null). Devuelve `false` si
+   *  el usuario eligió agregar uno pero faltan datos (se avisa y se aborta). */
+  function construirApoderado(): Record<string, unknown> | null | false {
+    if (apModo === 'nuevo') {
+      if (!apForm.nombre || !apForm.apellidos || !apForm.dni || !apForm.telefono_whatsapp) {
+        alert('Completa nombres, apellidos, DNI y teléfono del apoderado (el correo es opcional).')
+        return false
+      }
+      return {
+        accion: 'nuevo',
+        nuevo: {
+          nombre:            apForm.nombre,
+          apellidos:         apForm.apellidos,
+          dni:               apForm.dni,
+          telefono_whatsapp: apForm.telefono_whatsapp,
+          email:             apForm.email || undefined,
+          password:          apForm.dni, // contraseña temporal = DNI
+        },
+        parentesco:   apForm.parentesco,
+        es_principal: true,
+      }
+    }
+    if (apModo === 'existente') {
+      if (!apSeleccionado) {
+        alert('Selecciona un apoderado de la lista o elige "Sin apoderado".')
+        return false
+      }
+      return {
+        accion:       'existente',
+        apoderado_id: apSeleccionado.apoderado?.id,
+        parentesco:   apParentesco,
+        es_principal: true,
+      }
+    }
+    return null
+  }
+
   async function onSubmit(values: AlumnoFormValues) {
     const { ciclo_id, codigo, ...dto } = values
-    // La contraseña temporal = DNI (el backend la asigna automáticamente).
     const payload: Record<string, unknown> = {
       ...dto,
       codigo:           codigo || undefined,
-      password:         undefined,
+      password:         undefined, // la contraseña temporal la asigna el backend (= DNI)
+      email:            dto.email || undefined, // '' rompería @IsEmail; enviar undefined
+      genero:           dto.genero || undefined,
       fecha_nacimiento: dto.fecha_nacimiento || undefined,
-      telefono:         dto.telefono         || undefined,
-      aula_id:          dto.aula_id          || undefined,
-      carrera_id:       dto.carrera_id       || undefined,
+      colegio:          dto.colegio || undefined,
+      quinto:           dto.quinto === 'si' ? true : dto.quinto === 'no' ? false : undefined,
+      aula_id:          dto.aula_id    || undefined,
+      carrera_id:       dto.carrera_id || undefined,
     }
 
+    const apoderado = construirApoderado()
+    if (apoderado === false) return // faltan datos del apoderado
+    if (apoderado) payload.apoderado = apoderado
+
     // Si el DNI ya existía, se ACTUALIZA / re-matricula (evita duplicar y el
-    // choque de DNI único). No se tocan sus apoderados aquí.
+    // choque de DNI único). El apoderado se vincula si se agregó uno.
     if (existente) {
       try {
         await updateAlumno.mutateAsync({ id: existente.id, ...payload })
@@ -160,37 +234,6 @@ export default function NuevoAlumnoPage() {
       return
     }
 
-    if (apModo === 'nuevo') {
-      if (!apForm.nombre || !apForm.apellidos || !apForm.dni || !apForm.telefono_whatsapp || !apForm.email) {
-        alert('Completa todos los datos del apoderado o selecciona "Sin apoderado".')
-        return
-      }
-      payload.apoderado = {
-        accion: 'nuevo',
-        nuevo: {
-          nombre:            apForm.nombre,
-          apellidos:         apForm.apellidos,
-          dni:               apForm.dni,
-          telefono_whatsapp: apForm.telefono_whatsapp,
-          email:             apForm.email,
-          password:          apForm.dni, // contraseña temporal = DNI
-        },
-        parentesco:   apForm.parentesco,
-        es_principal: true,
-      }
-    } else if (apModo === 'existente') {
-      if (!apSeleccionado) {
-        alert('Selecciona un apoderado de la lista o elige "Sin apoderado".')
-        return
-      }
-      payload.apoderado = {
-        accion:       'existente',
-        apoderado_id: apSeleccionado.apoderado?.id,
-        parentesco:   apParentesco,
-        es_principal: true,
-      }
-    }
-
     try {
       await createAlumno.mutateAsync(payload as any)
       router.push('/alumnos')
@@ -199,21 +242,28 @@ export default function NuevoAlumnoPage() {
     }
   }
 
+  const guardando = createAlumno.isPending || updateAlumno.isPending
+
   return (
-    <div className="px-7 pt-[22px] pb-7 flex flex-col gap-4 max-w-[680px]">
+    <div className="px-7 pt-[22px] pb-7 flex flex-col gap-4 max-w-[820px]">
       <PageHeader
-        title="Nuevo alumno"
+        title={existente ? 'Actualizar alumno' : 'Nuevo alumno'}
         crumbs={[{ label: 'Alumnos', href: '/alumnos' }, { label: 'Nuevo' }]}
         action={<Btn variant="secondary" size="sm" onClick={() => router.back()}>Cancelar</Btn>}
       />
 
-      <form onSubmit={handleSubmit(onSubmit)}>
+      <p className="text-[12.5px] text-text-mute -mt-1">
+        Los campos con <span className="text-danger">*</span> son obligatorios. El correo es opcional
+        (si se omite, se genera uno interno automáticamente).
+      </p>
+
+      <form onSubmit={handleSubmit(onSubmit)} className="flex flex-col gap-4">
         {/* Identificación: DNI (con búsqueda) + código */}
         <Card
-          title="Identificación"
+          title={<SectionTitle icon={<CreditCard size={15} />}>Identificación</SectionTitle>}
           subtitle="Ingresa el DNI y pulsa Buscar: si el alumno ya existe, se cargan sus datos."
         >
-          <div className="grid grid-cols-1 sm:grid-cols-2 gap-4 p-1">
+          <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
             <Field label="DNI" required error={errors.dni?.message}>
               <div className="flex gap-2">
                 <Input
@@ -238,7 +288,7 @@ export default function NuevoAlumnoPage() {
                 </Btn>
               </div>
             </Field>
-            <Field label="Código" error={errors.codigo?.message}>
+            <Field label="Código" hint="Código de barras de 6 dígitos. Se autogenera si se deja vacío." error={errors.codigo?.message}>
               <Input
                 placeholder="Autogenerado si se deja vacío"
                 inputMode="numeric"
@@ -254,7 +304,7 @@ export default function NuevoAlumnoPage() {
           {existente && (
             <div
               className={[
-                'mx-1 mt-1 flex items-start gap-2.5 px-3.5 py-2.5 rounded-2 text-[12.5px] border',
+                'mt-3 flex items-start gap-2.5 px-3.5 py-2.5 rounded-2 text-[12.5px] border',
                 existente.activo
                   ? 'bg-warning-light/40 border-warning-light text-text'
                   : 'bg-primary/5 border-primary/20 text-text',
@@ -273,8 +323,8 @@ export default function NuevoAlumnoPage() {
         </Card>
 
         {/* Datos personales */}
-        <Card title="Datos personales" className="mt-4">
-          <div className="grid grid-cols-1 sm:grid-cols-2 gap-4 p-1">
+        <Card title={<SectionTitle icon={<UserCheck size={15} />}>Datos personales</SectionTitle>}>
+          <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
             <Field label="Nombres" required error={errors.nombres?.message}>
               <Input
                 placeholder="Lucía"
@@ -287,34 +337,66 @@ export default function NuevoAlumnoPage() {
                 {...register('apellidos', { required: 'Requerido', minLength: { value: 2, message: 'Mínimo 2 caracteres' } })}
               />
             </Field>
+            <Field label="Género" error={errors.genero?.message}>
+              <select {...register('genero')} className={SELECT_CLS}>
+                <option value="">Sin especificar</option>
+                <option value="masculino">Masculino</option>
+                <option value="femenino">Femenino</option>
+              </select>
+            </Field>
             <Field label="Fecha de nacimiento" error={errors.fecha_nacimiento?.message}>
               <Input type="date" {...register('fecha_nacimiento')} />
             </Field>
-            <Field label="Teléfono" error={errors.telefono?.message}>
-              <Input placeholder="+51 943 221 887" {...register('telefono')} />
+            <Field label="Teléfono" required error={errors.telefono?.message}>
+              <Input
+                placeholder="+51 943 221 887"
+                inputMode="tel"
+                {...register('telefono', {
+                  required: 'Requerido',
+                  minLength: { value: 6, message: 'Teléfono demasiado corto' },
+                })}
+              />
+            </Field>
+            <Field label="¿Culminó 5.º de secundaria?" error={errors.quinto?.message}>
+              <select {...register('quinto')} className={SELECT_CLS}>
+                <option value="">Sin especificar</option>
+                <option value="si">Sí</option>
+                <option value="no">No</option>
+              </select>
+            </Field>
+            <Field label="Colegio de procedencia" className="sm:col-span-2" error={errors.colegio?.message}>
+              <Input placeholder="I.E. José Carlos Mariátegui" {...register('colegio')} />
             </Field>
           </div>
         </Card>
 
         {/* Acceso */}
-        <Card title="Acceso al sistema" className="mt-4">
-          <div className="grid grid-cols-1 sm:grid-cols-2 gap-4 p-1">
-            <Field label="Correo institucional" required error={errors.email?.message}>
+        <Card title={<SectionTitle icon={<Lock size={15} />}>Acceso al sistema</SectionTitle>}>
+          <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
+            <Field
+              label="Correo institucional"
+              hint="Opcional. Si se deja vacío, se genera un correo interno automáticamente."
+              error={errors.email?.message}
+            >
               <Input
                 type="email"
                 placeholder="lucia.mendoza@cepreunasam.edu.pe"
-                {...register('email', { required: 'Requerido' })}
+                {...register('email', {
+                  pattern: { value: /^\S+@\S+\.\S+$/, message: 'Correo no válido' },
+                })}
               />
             </Field>
-            <p className="text-[11.5px] text-text-mute px-1">
-              La contraseña temporal será el <strong>DNI</strong> del alumno; deberá cambiarla al ingresar.
-            </p>
+            <div className="flex items-center">
+              <p className="text-[11.5px] text-text-mute rounded-2 bg-surface2 border border-border px-3 py-2.5">
+                La contraseña temporal será el <strong>DNI</strong> del alumno; deberá cambiarla al ingresar.
+              </p>
+            </div>
           </div>
         </Card>
 
         {/* Aula y carrera */}
-        <Card title="Aula y carrera" className="mt-4">
-          <div className="grid grid-cols-1 sm:grid-cols-2 gap-4 p-1">
+        <Card title={<SectionTitle icon={<Layers size={15} />}>Aula y carrera</SectionTitle>}>
+          <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
             <Field label="Ciclo">
               <select {...register('ciclo_id')} className={SELECT_CLS}>
                 <option value="">Sin asignar</option>
@@ -334,7 +416,7 @@ export default function NuevoAlumnoPage() {
                 </p>
               )}
             </Field>
-            <Field label="Carrera profesional" className="col-span-2">
+            <Field label="Carrera profesional" className="sm:col-span-2">
               <select {...register('carrera_id')} disabled={!areaActiva} className={SELECT_CLS}>
                 <option value="">{areaActiva ? 'Sin asignar' : 'Elige sección primero'}</option>
                 {carreras.map((c) => <option key={c.id} value={c.id}>{c.nombre}</option>)}
@@ -343,11 +425,45 @@ export default function NuevoAlumnoPage() {
           </div>
         </Card>
 
-        {/* ── Apoderado (solo al registrar un alumno nuevo) ── */}
-        {!existente && (
-        <Card title="Apoderado" className="mt-4">
+        {/* ── Apoderado ── */}
+        <Card title={<SectionTitle icon={<Users size={15} />}>Apoderado</SectionTitle>}>
+          {/* Apoderados ya vinculados (al buscar por DNI un alumno existente) */}
+          {existente && existente.apoderados.length > 0 && (
+            <div className="mb-4 flex flex-col gap-2">
+              <p className="text-[11.5px] font-medium text-text-mute uppercase tracking-wide">Apoderados vinculados</p>
+              {existente.apoderados.map((ap) => (
+                <div key={ap.id} className="flex items-center gap-3 px-3 py-2.5 rounded-2 border border-border bg-surface2">
+                  <span className="flex h-8 w-8 items-center justify-center rounded-full bg-primary/10 text-primary text-[12px] font-semibold">
+                    {(ap.nombre?.[0] ?? '') + (ap.apellidos?.[0] ?? '')}
+                  </span>
+                  <div className="min-w-0 flex-1">
+                    <p className="text-[13px] font-medium text-text truncate">
+                      {ap.nombre} {ap.apellidos}
+                      {ap.es_principal && (
+                        <span className="ml-2 inline-flex items-center gap-1 text-[10.5px] font-semibold text-success">
+                          <Check size={11} /> Principal
+                        </span>
+                      )}
+                    </p>
+                    <p className="text-[11.5px] text-text-mute truncate">
+                      {ap.parentesco}{ap.dni ? ` · DNI ${ap.dni}` : ''}
+                    </p>
+                  </div>
+                </div>
+              ))}
+            </div>
+          )}
+
+          {existente && (
+            <p className="mb-3 text-[12px] text-text-mute">
+              {existente.apoderados.length > 0
+                ? 'Puedes agregar otro apoderado a este alumno:'
+                : 'Este alumno no tiene apoderados. Puedes vincular uno:'}
+            </p>
+          )}
+
           {/* Selector de modo */}
-          <div className="flex gap-2 p-1 mb-4">
+          <div className="flex flex-wrap gap-2 mb-4">
             {(['ninguno', 'nuevo', 'existente'] as const).map((modo) => (
               <button
                 key={modo}
@@ -360,7 +476,7 @@ export default function NuevoAlumnoPage() {
                     : 'bg-surface border-border text-text-mute hover:text-text',
                 ].join(' ')}
               >
-                {modo === 'ninguno'   && 'Sin apoderado por ahora'}
+                {modo === 'ninguno'   && (existente ? 'No agregar' : 'Sin apoderado por ahora')}
                 {modo === 'nuevo'     && 'Crear nuevo apoderado'}
                 {modo === 'existente' && 'Apoderado ya registrado'}
               </button>
@@ -369,7 +485,7 @@ export default function NuevoAlumnoPage() {
 
           {/* Formulario nuevo apoderado */}
           {apModo === 'nuevo' && (
-            <div className="grid grid-cols-1 sm:grid-cols-2 gap-4 p-1">
+            <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
               <Field label="Nombres" required>
                 <Input
                   placeholder="Carlos"
@@ -396,11 +512,12 @@ export default function NuevoAlumnoPage() {
               <Field label="Teléfono WhatsApp" required>
                 <Input
                   placeholder="+51 943 221 887"
+                  inputMode="tel"
                   value={apForm.telefono_whatsapp}
                   onChange={(e) => apCampo('telefono_whatsapp', e.target.value)}
                 />
               </Field>
-              <Field label="Email de acceso" required>
+              <Field label="Email de acceso" hint="Opcional. Se genera uno interno si se deja vacío." className="sm:col-span-2">
                 <Input
                   type="email"
                   placeholder="carlos.garcia@gmail.com"
@@ -422,7 +539,7 @@ export default function NuevoAlumnoPage() {
 
           {/* Buscar apoderado existente */}
           {apModo === 'existente' && (
-            <div className="p-1 flex flex-col gap-3">
+            <div className="flex flex-col gap-3">
               {/* Seleccionado */}
               {apSeleccionado ? (
                 <div className="flex items-center justify-between p-3 bg-primary-light border border-primary/30 rounded-2">
@@ -432,7 +549,7 @@ export default function NuevoAlumnoPage() {
                       {apSeleccionado.apoderado?.apellidos ?? apSeleccionado.apellidos}
                     </p>
                     <p className="text-[11.5px] text-text-mute">
-                      DNI {apSeleccionado.apoderado ? apSeleccionado.dni : apSeleccionado.dni} · {apSeleccionado.email}
+                      DNI {apSeleccionado.dni} · {apSeleccionado.email}
                     </p>
                   </div>
                   <Btn
@@ -491,18 +608,17 @@ export default function NuevoAlumnoPage() {
             </div>
           )}
 
-          {apModo === 'ninguno' && (
-            <p className="px-1 pb-1 text-[12.5px] text-text-mute">
+          {apModo === 'ninguno' && !existente && (
+            <p className="text-[12.5px] text-text-mute">
               Podrás vincular un apoderado desde el perfil del alumno una vez creado.
             </p>
           )}
         </Card>
-        )}
 
-        <div className="flex justify-end gap-2.5 mt-5">
+        <div className="flex justify-end gap-2.5 mt-1">
           <Btn variant="secondary" type="button" onClick={() => router.back()}>Cancelar</Btn>
-          <Btn type="submit" disabled={isSubmitting || createAlumno.isPending || updateAlumno.isPending}>
-            {(createAlumno.isPending || updateAlumno.isPending)
+          <Btn type="submit" icon={<Check size={15} />} disabled={isSubmitting || guardando}>
+            {guardando
               ? 'Guardando…'
               : existente ? 'Actualizar alumno' : 'Crear alumno'}
           </Btn>

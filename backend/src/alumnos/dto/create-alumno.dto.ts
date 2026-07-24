@@ -1,6 +1,6 @@
 import { ApiProperty, ApiPropertyOptional } from '@nestjs/swagger';
 import {
-  IsDateString, IsEmail, IsOptional, IsString,
+  IsBoolean, IsDateString, IsEmail, IsIn, IsOptional, IsString,
   IsUUID, Length, Matches, ValidateNested,
 } from 'class-validator';
 import { Type } from 'class-transformer';
@@ -31,9 +31,13 @@ export class CreateAlumnoDto {
   @Length(2, 100)
   apellidos: string;
 
-  @ApiProperty({ example: 'lucia.mendoza@unasam.edu.pe' })
+  @ApiPropertyOptional({
+    description: 'Correo institucional. Opcional: si se omite se autogenera a partir del código.',
+    example: 'lucia.mendoza@unasam.edu.pe',
+  })
+  @IsOptional()
   @IsEmail()
-  email: string;
+  email?: string;
 
   @ApiPropertyOptional({ description: 'Opcional. Si se omite, la contraseña temporal es el DNI.' })
   @IsOptional()
@@ -41,15 +45,31 @@ export class CreateAlumnoDto {
   @Length(6, 100)
   password?: string;
 
+  @ApiPropertyOptional({ enum: ['masculino', 'femenino'], example: 'femenino' })
+  @IsOptional()
+  @IsIn(['masculino', 'femenino'])
+  genero?: string;
+
   @ApiPropertyOptional({ example: '2025-01-15' })
   @IsOptional()
   @IsDateString()
   fecha_nacimiento?: string;
 
-  @ApiPropertyOptional({ example: '+51943221887' })
+  @ApiProperty({ description: 'Teléfono de contacto (obligatorio).', example: '+51943221887' })
+  @IsString()
+  @Length(6, 20)
+  telefono: string;
+
+  @ApiPropertyOptional({ description: 'Colegio de procedencia.', example: 'I.E. San Marcos' })
   @IsOptional()
   @IsString()
-  telefono?: string;
+  @Length(1, 150)
+  colegio?: string;
+
+  @ApiPropertyOptional({ description: '¿Culminó 5.º de secundaria?', example: true })
+  @IsOptional()
+  @IsBoolean()
+  quinto?: boolean;
 
   @ApiPropertyOptional({ description: 'UUID del aula asignada' })
   @IsOptional()

@@ -54,6 +54,7 @@ model Alumno {
   fotoUrl         String?           @map("foto_url") @db.VarChar(500)
   aulaId          String?           @map("aula_id") @db.Uuid
   carreraId       String?           @map("carrera_id") @db.Uuid
+  genero            String?         @db.VarChar(20)
   // Datos del formato oficial de matrícula (import por semestre)
   colegio           String?         @db.VarChar(150)
   quinto            Boolean?

@@ -346,6 +346,11 @@ export class AlumnosService {
         usuario: { select: { email: true } },
         aula:    { select: { id: true, nombre: true, ciclo: { select: { id: true, nombre: true } } } },
         carrera: { select: { id: true, nombre: true } },
+        apoderados: {
+          where: { apoderado: { deletedAt: null } },
+          include: { apoderado: { include: { usuario: { select: { email: true } } } } },
+          orderBy: { esPrincipal: 'desc' },
+        },
       },
     });
     if (!alumno) return { encontrado: false as const };
@@ -358,11 +363,23 @@ export class AlumnosService {
         nombres:          alumno.nombre,
         apellidos:        alumno.apellidos,
         codigo:           alumno.codigoBarras,
+        genero:           alumno.genero ?? '',
         telefono:         alumno.telefono ?? '',
         email:            alumno.usuario?.email ?? '',
+        colegio:          alumno.colegio ?? '',
+        quinto:           alumno.quinto ?? null,
         fecha_nacimiento: alumno.fechaNacimiento ? alumno.fechaNacimiento.toISOString().slice(0, 10) : '',
         aula:             alumno.aula ?? null,
         carrera:          alumno.carrera ?? null,
+        apoderados: alumno.apoderados.map((v) => ({
+          id:          v.apoderado.id,
+          nombre:      v.apoderado.nombre,
+          apellidos:   v.apoderado.apellidos,
+          dni:         v.apoderado.dni ?? '',
+          email:       v.apoderado.usuario?.email ?? '',
+          parentesco:  v.parentesco,
+          es_principal: v.esPrincipal,
+        })),
       },
     };
   }
@@ -390,10 +407,16 @@ export class AlumnosService {
       codigoBarras = await nextCodigo(this.prisma);
     }
 
+    // El correo es opcional (no se reparten correos): si no viene, se genera a
+    // partir del código de barras, igual que en el import por semestre.
+    const email = dto.email && /^\S+@\S+\.\S+$/.test(dto.email)
+      ? dto.email
+      : `${codigoBarras}@academia.edu`;
+
     return this.prisma.$transaction(async (tx) => {
       const usuario = await tx.usuario.create({
         data: {
-          email:        dto.email,
+          email,
           passwordHash: hash,
           rol:          Rol.alumno,
           // El DNI del alumno también sirve como DNI de acceso al sistema
@@ -408,8 +431,11 @@ export class AlumnosService {
           apellidos:       dto.apellidos,
           dni:             dto.dni,
           codigoBarras,
+          genero:          dto.genero ?? null,
           fechaNacimiento: dto.fecha_nacimiento ? new Date(dto.fecha_nacimiento) : null,
           telefono:        dto.telefono,
+          colegio:         dto.colegio ?? null,
+          quinto:          dto.quinto ?? null,
           aulaId:          dto.aula_id,
           carreraId:       dto.carrera_id,
         },
@@ -422,56 +448,72 @@ export class AlumnosService {
 
       // ── Vincular/crear apoderado en la misma transacción ─────────
       if (dto.apoderado) {
-        const { accion, parentesco, es_principal = true } = dto.apoderado;
-        let apoderadoId: string;
-
-        if (accion === 'nuevo') {
-          if (!dto.apoderado.nuevo) throw new BadRequestException('Datos del nuevo apoderado requeridos');
-          const { nombre, apellidos, dni: apDni, telefono_whatsapp, email: apEmail, password: apPassword } = dto.apoderado.nuevo;
-
-          const emailAp = await tx.usuario.findFirst({ where: { email: apEmail } });
-          if (emailAp) throw new BadRequestException('Ya existe un usuario con ese email para el apoderado');
-
-          const dniAp = await tx.apoderado.findFirst({ where: { dni: apDni } });
-          if (dniAp) throw new BadRequestException('Ya existe un apoderado con ese DNI');
-
-          const apHash = await bcrypt.hash(apPassword, 12);
-          const usuarioAp = await tx.usuario.create({
-            data: { email: apEmail, passwordHash: apHash, rol: Rol.apoderado, dni: apDni },
-          });
-          const ap = await tx.apoderado.create({
-            data: { usuarioId: usuarioAp.id, nombre, apellidos, dni: apDni, telefonoWhatsapp: telefono_whatsapp },
-          });
-          apoderadoId = ap.id;
-
-        } else {
-          if (!dto.apoderado.apoderado_id) throw new BadRequestException('ID del apoderado requerido');
-          const ap = await tx.apoderado.findFirst({ where: { id: dto.apoderado.apoderado_id } });
-          if (!ap) throw new NotFoundException('Apoderado no encontrado');
-
-          // Verificar que no esté ya vinculado
-          const linkExistente = await tx.alumnoApoderado.findFirst({
-            where: { alumnoId: alumno.id, apoderadoId: dto.apoderado.apoderado_id },
-          });
-          if (linkExistente) throw new BadRequestException('El apoderado ya está vinculado a este alumno');
-
-          apoderadoId = dto.apoderado.apoderado_id;
-        }
-
-        // Si será el principal, quitar el flag de los demás
-        if (es_principal) {
-          await tx.alumnoApoderado.updateMany({
-            where: { alumnoId: alumno.id, esPrincipal: true },
-            data: { esPrincipal: false },
-          });
-        }
-
-        await tx.alumnoApoderado.create({
-          data: { alumnoId: alumno.id, apoderadoId, parentesco, esPrincipal: es_principal },
-        });
+        await this.vincularApoderadoEnTx(tx, alumno.id, dto.apoderado);
       }
 
       return alumno;
+    });
+  }
+
+  /**
+   * Crea (o reutiliza) y vincula un apoderado al alumno dentro de una
+   * transacción. Reutilizado por create() y update() para no duplicar lógica.
+   * El email del apoderado nuevo es opcional: si no viene, se autogenera.
+   */
+  private async vincularApoderadoEnTx(
+    tx: Prisma.TransactionClient,
+    alumnoId: string,
+    ap: VincularApoderadoDto,
+  ): Promise<void> {
+    const { accion, parentesco, es_principal = true } = ap;
+    let apoderadoId: string;
+
+    if (accion === 'nuevo') {
+      if (!ap.nuevo) throw new BadRequestException('Datos del nuevo apoderado requeridos');
+      const { nombre, apellidos, dni: apDni, telefono_whatsapp, email: apEmail, password: apPassword } = ap.nuevo;
+
+      const emailAp = apEmail && /^\S+@\S+\.\S+$/.test(apEmail)
+        ? apEmail
+        : `apo.${apDni}@academia.edu`;
+
+      const emailEnUso = await tx.usuario.findFirst({ where: { email: emailAp } });
+      if (emailEnUso) throw new BadRequestException('Ya existe un usuario con ese email para el apoderado');
+
+      const dniAp = await tx.apoderado.findFirst({ where: { dni: apDni } });
+      if (dniAp) throw new BadRequestException('Ya existe un apoderado con ese DNI');
+
+      const apHash = await bcrypt.hash(apPassword, 12);
+      const usuarioAp = await tx.usuario.create({
+        data: { email: emailAp, passwordHash: apHash, rol: Rol.apoderado, dni: apDni },
+      });
+      const creado = await tx.apoderado.create({
+        data: { usuarioId: usuarioAp.id, nombre, apellidos, dni: apDni, telefonoWhatsapp: telefono_whatsapp },
+      });
+      apoderadoId = creado.id;
+
+    } else {
+      if (!ap.apoderado_id) throw new BadRequestException('ID del apoderado requerido');
+      const existe = await tx.apoderado.findFirst({ where: { id: ap.apoderado_id } });
+      if (!existe) throw new NotFoundException('Apoderado no encontrado');
+
+      const linkExistente = await tx.alumnoApoderado.findFirst({
+        where: { alumnoId, apoderadoId: ap.apoderado_id },
+      });
+      if (linkExistente) throw new BadRequestException('El apoderado ya está vinculado a este alumno');
+
+      apoderadoId = ap.apoderado_id;
+    }
+
+    // Si será el principal, quitar el flag de los demás.
+    if (es_principal) {
+      await tx.alumnoApoderado.updateMany({
+        where: { alumnoId, esPrincipal: true },
+        data: { esPrincipal: false },
+      });
+    }
+
+    await tx.alumnoApoderado.create({
+      data: { alumnoId, apoderadoId, parentesco, esPrincipal: es_principal },
     });
   }
 
@@ -480,7 +522,7 @@ export class AlumnosService {
     // los dados de baja (re-matrícula desde el formulario de alta por DNI).
     const alumno = await this.prisma.alumno.findFirst({ where: { id } });
     if (!alumno) throw new NotFoundException('Alumno no encontrado');
-    const { password, email, codigo, ...rest } = dto as any;
+    const { password, email, codigo, apoderado, ...rest } = dto as any;
 
     // Código: si viene, validar unicidad excluyendo a este mismo alumno.
     let codigoBarras: string | undefined;
@@ -503,15 +545,18 @@ export class AlumnosService {
         await tx.usuario.update({ where: { id: alumno.usuarioId }, data: userUpdate });
       }
 
-      return tx.alumno.update({
+      const actualizado = await tx.alumno.update({
         where: { id },
         data: {
           ...(rest.nombres           && { nombre:          rest.nombres }),
           ...(rest.apellidos         && { apellidos:        rest.apellidos }),
           ...(rest.dni               && { dni:              rest.dni }),
           ...(codigoBarras           && { codigoBarras }),
+          ...(rest.genero    !== undefined && { genero:     rest.genero || null }),
           ...(rest.fecha_nacimiento  && { fechaNacimiento:  new Date(rest.fecha_nacimiento) }),
           ...(rest.telefono  !== undefined && { telefono:   rest.telefono }),
+          ...(rest.colegio   !== undefined && { colegio:    rest.colegio || null }),
+          ...(rest.quinto    !== undefined && { quinto:     rest.quinto }),
           ...(rest.aula_id   !== undefined && { aulaId:     rest.aula_id }),
           ...(rest.carrera_id !== undefined && { carreraId: rest.carrera_id }),
           ...(alumno.deletedAt ? { deletedAt: null } : {}),
@@ -522,6 +567,14 @@ export class AlumnosService {
           carrera: { select: { id: true, nombre: true, area: true } },
         },
       });
+
+      // Vincular/crear apoderado si el formulario lo envía (p. ej. al re-matricular
+      // desde el alta por DNI se puede agregar un apoderado al alumno hallado).
+      if (apoderado) {
+        await this.vincularApoderadoEnTx(tx, id, apoderado);
+      }
+
+      return actualizado;
     });
   }
 

@@ -22,9 +22,13 @@ export class NuevoApoderadoInlineDto {
   @MinLength(7)
   telefono_whatsapp: string;
 
-  @ApiProperty({ example: 'papa.garcia@gmail.com' })
+  @ApiPropertyOptional({
+    description: 'Email de acceso del apoderado. Opcional: si se omite se autogenera.',
+    example: 'papa.garcia@gmail.com',
+  })
+  @IsOptional()
   @IsEmail()
-  email: string;
+  email?: string;
 
   @ApiProperty({ example: 'Temporal1234!', minLength: 8 })
   @IsString()
