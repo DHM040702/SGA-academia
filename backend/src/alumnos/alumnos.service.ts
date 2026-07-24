@@ -331,6 +331,42 @@ export class AlumnosService {
     };
   }
 
+  /**
+   * Busca un alumno por DNI (incluye dados de baja) para autocompletar el
+   * formulario de alta. Devuelve `{ encontrado }` y, si existe, sus datos.
+   */
+  async buscarPorDni(dni: string) {
+    const limpio = String(dni ?? '').replace(/\D/g, '');
+    if (!/^\d{8}$/.test(limpio)) {
+      throw new BadRequestException('DNI inválido (se esperan 8 dígitos)');
+    }
+    const alumno = await this.prisma.alumno.findFirst({
+      where: { dni: limpio },
+      include: {
+        usuario: { select: { email: true } },
+        aula:    { select: { id: true, nombre: true, ciclo: { select: { id: true, nombre: true } } } },
+        carrera: { select: { id: true, nombre: true } },
+      },
+    });
+    if (!alumno) return { encontrado: false as const };
+    return {
+      encontrado: true as const,
+      activo:     !alumno.deletedAt, // false = dado de baja
+      alumno: {
+        id:               alumno.id,
+        dni:              alumno.dni,
+        nombres:          alumno.nombre,
+        apellidos:        alumno.apellidos,
+        codigo:           alumno.codigoBarras,
+        telefono:         alumno.telefono ?? '',
+        email:            alumno.usuario?.email ?? '',
+        fecha_nacimiento: alumno.fechaNacimiento ? alumno.fechaNacimiento.toISOString().slice(0, 10) : '',
+        aula:             alumno.aula ?? null,
+        carrera:          alumno.carrera ?? null,
+      },
+    };
+  }
+
   async create(dto: CreateAlumnoDto) {
     const existing = await this.prisma.alumno.findFirst({
       where: { dni: dto.dni, deletedAt: null },
@@ -339,7 +375,20 @@ export class AlumnosService {
 
     // Contraseña temporal = DNI (cambio obligatorio al primer ingreso)
     const hash = await bcrypt.hash(dto.password || dto.dni, 12);
-    const codigoBarras = await nextCodigo(this.prisma);
+
+    // Código de barras: el ingresado (validando unicidad) o autogenerado.
+    let codigoBarras: string;
+    if ((dto as any).codigo) {
+      const codigo = String((dto as any).codigo);
+      const choque = await this.prisma.alumno.findFirst({
+        where: { codigoBarras: codigo },
+        select: { dni: true },
+      });
+      if (choque) throw new BadRequestException(`El código ${codigo} ya lo usa el alumno con DNI ${choque.dni}`);
+      codigoBarras = codigo;
+    } else {
+      codigoBarras = await nextCodigo(this.prisma);
+    }
 
     return this.prisma.$transaction(async (tx) => {
       const usuario = await tx.usuario.create({
@@ -427,16 +476,31 @@ export class AlumnosService {
   }
 
   async update(id: string, dto: UpdateAlumnoDto) {
-    await this.findOne(id);
-    const { password, email, ...rest } = dto as any;
+    // Se usa findFirst (no findOne) para permitir actualizar/reactivar también a
+    // los dados de baja (re-matrícula desde el formulario de alta por DNI).
+    const alumno = await this.prisma.alumno.findFirst({ where: { id } });
+    if (!alumno) throw new NotFoundException('Alumno no encontrado');
+    const { password, email, codigo, ...rest } = dto as any;
+
+    // Código: si viene, validar unicidad excluyendo a este mismo alumno.
+    let codigoBarras: string | undefined;
+    if (codigo) {
+      const choque = await this.prisma.alumno.findFirst({
+        where: { codigoBarras: String(codigo), id: { not: id } },
+        select: { dni: true },
+      });
+      if (choque) throw new BadRequestException(`El código ${codigo} ya lo usa el alumno con DNI ${choque.dni}`);
+      codigoBarras = String(codigo);
+    }
 
     return this.prisma.$transaction(async (tx) => {
-      const alumno = await tx.alumno.findFirst({ where: { id } });
-      if (email || password) {
+      if (email || password || alumno.deletedAt) {
         const userUpdate: any = {};
         if (email) userUpdate.email = email;
         if (password) userUpdate.passwordHash = await bcrypt.hash(password, 12);
-        await tx.usuario.update({ where: { id: alumno!.usuarioId }, data: userUpdate });
+        // Reactivar la cuenta si el alumno estaba dado de baja.
+        if (alumno.deletedAt) { userUpdate.activo = true; userUpdate.deletedAt = null; }
+        await tx.usuario.update({ where: { id: alumno.usuarioId }, data: userUpdate });
       }
 
       return tx.alumno.update({
@@ -445,10 +509,12 @@ export class AlumnosService {
           ...(rest.nombres           && { nombre:          rest.nombres }),
           ...(rest.apellidos         && { apellidos:        rest.apellidos }),
           ...(rest.dni               && { dni:              rest.dni }),
+          ...(codigoBarras           && { codigoBarras }),
           ...(rest.fecha_nacimiento  && { fechaNacimiento:  new Date(rest.fecha_nacimiento) }),
           ...(rest.telefono  !== undefined && { telefono:   rest.telefono }),
           ...(rest.aula_id   !== undefined && { aulaId:     rest.aula_id }),
           ...(rest.carrera_id !== undefined && { carreraId: rest.carrera_id }),
+          ...(alumno.deletedAt ? { deletedAt: null } : {}),
         },
         include: {
           usuario: { select: { email: true } },

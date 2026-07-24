@@ -13,6 +13,14 @@ export class CreateAlumnoDto {
   @Matches(/^\d{8}$/, { message: 'El DNI debe tener exactamente 8 dígitos' })
   dni: string;
 
+  @ApiPropertyOptional({
+    description: 'Código de barras / inscripción (6 dígitos). Si se omite, se autogenera.',
+    example: '605265',
+  })
+  @IsOptional()
+  @Matches(/^\d{6}$/, { message: 'El código debe tener exactamente 6 dígitos' })
+  codigo?: string;
+
   @ApiProperty({ example: 'Lucía' })
   @IsString()
   @Length(2, 100)

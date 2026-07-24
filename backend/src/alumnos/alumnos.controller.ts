@@ -139,6 +139,15 @@ export class AlumnosController {
     return this.service.findAll(dto);
   }
 
+  // Buscar un alumno por DNI (para autocompletar al registrar). Se declara antes
+  // de `:id` para que la ruta estática no la capture el parámetro dinámico.
+  @Get('buscar-por-dni')
+  @Roles(Rol.admin, Rol.director, Rol.auxiliar)
+  @ApiOperation({ summary: 'Buscar un alumno existente por DNI (incluye dados de baja)' })
+  buscarPorDni(@Query('dni') dni: string) {
+    return this.service.buscarPorDni(dni);
+  }
+
   @Get(':id')
   @Roles(Rol.admin, Rol.director, Rol.auxiliar)
   @ApiOperation({ summary: 'Detalle de un alumno' })

@@ -8,7 +8,8 @@ import { Btn } from '@/components/ui/btn'
 import { Field } from '@/components/ui/field'
 import { Input } from '@/components/ui/input'
 import { Search, X } from '@/components/icons'
-import { useCreateAlumno } from '@/hooks/use-alumnos'
+import { useCreateAlumno, useUpdateAlumno } from '@/hooks/use-alumnos'
+import api from '@/lib/api'
 import { useCiclos, useAulas } from '@/hooks/use-ciclos'
 import { useCarreras, type AreaCarrera } from '@/hooks/use-carreras'
 import { useSearchApoderados, PARENTESCO_OPTS, type ApoderadoSearchResult } from '@/hooks/use-apoderados'
@@ -20,6 +21,7 @@ interface AlumnoFormValues {
   nombres: string
   apellidos: string
   dni: string
+  codigo: string
   email: string
   password: string
   fecha_nacimiento: string
@@ -27,6 +29,13 @@ interface AlumnoFormValues {
   ciclo_id: string
   aula_id: string
   carrera_id: string
+}
+
+/** Alumno hallado por DNI (para autocompletar). */
+interface AlumnoExistente {
+  id: string
+  activo: boolean
+  aula?: { nombre: string; ciclo?: { nombre: string } | null } | null
 }
 
 interface ApoderadoForm {
@@ -47,6 +56,11 @@ const APODERADO_FORM_INIT: ApoderadoForm = {
 export default function NuevoAlumnoPage() {
   const router = useRouter()
   const createAlumno = useCreateAlumno()
+  const updateAlumno = useUpdateAlumno()
+
+  // Alumno hallado por DNI (si existe, al guardar se ACTUALIZA en vez de crear).
+  const [existente, setExistente] = React.useState<AlumnoExistente | null>(null)
+  const [buscando, setBuscando] = React.useState(false)
 
   // Ciclo → sección → área
   const { data: ciclos = [] } = useCiclos()
@@ -90,16 +104,60 @@ export default function NuevoAlumnoPage() {
     setApForm((f) => ({ ...f, [campo]: valor }))
   }
 
+  // Al editar el DNI se limpia cualquier resultado previo de búsqueda.
+  const watchDni = watch('dni')
+  React.useEffect(() => { setExistente(null) }, [watchDni])
+
+  /** Busca el DNI; si el alumno existe, jala sus datos al formulario. */
+  async function buscarDni() {
+    const dni = (watchDni || '').replace(/\D/g, '')
+    if (dni.length !== 8) { alert('Ingresa un DNI de 8 dígitos para buscar.'); return }
+    setBuscando(true)
+    try {
+      const { data } = await api.get('/alumnos/buscar-por-dni', { params: { dni } })
+      if (!data?.encontrado) {
+        setExistente(null)
+        alert('DNI no registrado: es un alumno nuevo. Completa sus datos.')
+        return
+      }
+      const a = data.alumno
+      setValue('nombres', a.nombres || '')
+      setValue('apellidos', a.apellidos || '')
+      setValue('codigo', a.codigo || '')
+      setValue('telefono', a.telefono || '')
+      setValue('email', a.email || '')
+      setValue('fecha_nacimiento', a.fecha_nacimiento || '')
+      setExistente({ id: a.id, activo: data.activo, aula: a.aula })
+    } catch (err: any) {
+      alert(err?.response?.data?.message ?? 'No se pudo buscar el DNI.')
+    } finally {
+      setBuscando(false)
+    }
+  }
+
   async function onSubmit(values: AlumnoFormValues) {
-    const { ciclo_id, ...dto } = values
+    const { ciclo_id, codigo, ...dto } = values
     // La contraseña temporal = DNI (el backend la asigna automáticamente).
     const payload: Record<string, unknown> = {
       ...dto,
+      codigo:           codigo || undefined,
       password:         undefined,
       fecha_nacimiento: dto.fecha_nacimiento || undefined,
       telefono:         dto.telefono         || undefined,
       aula_id:          dto.aula_id          || undefined,
       carrera_id:       dto.carrera_id       || undefined,
+    }
+
+    // Si el DNI ya existía, se ACTUALIZA / re-matricula (evita duplicar y el
+    // choque de DNI único). No se tocan sus apoderados aquí.
+    if (existente) {
+      try {
+        await updateAlumno.mutateAsync({ id: existente.id, ...payload })
+        router.push('/alumnos')
+      } catch (err: any) {
+        alert(err?.response?.data?.message ?? 'Error al actualizar el alumno')
+      }
+      return
     }
 
     if (apModo === 'nuevo') {
@@ -150,8 +208,72 @@ export default function NuevoAlumnoPage() {
       />
 
       <form onSubmit={handleSubmit(onSubmit)}>
+        {/* Identificación: DNI (con búsqueda) + código */}
+        <Card
+          title="Identificación"
+          subtitle="Ingresa el DNI y pulsa Buscar: si el alumno ya existe, se cargan sus datos."
+        >
+          <div className="grid grid-cols-1 sm:grid-cols-2 gap-4 p-1">
+            <Field label="DNI" required error={errors.dni?.message}>
+              <div className="flex gap-2">
+                <Input
+                  placeholder="76543210"
+                  inputMode="numeric"
+                  maxLength={8}
+                  {...register('dni', {
+                    required: 'Requerido',
+                    pattern: { value: /^\d{8}$/, message: 'DNI debe tener 8 dígitos' },
+                    onChange: (e) => { e.target.value = e.target.value.replace(/\D/g, '') },
+                  })}
+                />
+                <Btn
+                  type="button"
+                  variant="secondary"
+                  size="sm"
+                  disabled={buscando}
+                  onClick={buscarDni}
+                  className="shrink-0"
+                >
+                  <Search size={14} />{buscando ? 'Buscando…' : 'Buscar'}
+                </Btn>
+              </div>
+            </Field>
+            <Field label="Código" error={errors.codigo?.message}>
+              <Input
+                placeholder="Autogenerado si se deja vacío"
+                inputMode="numeric"
+                maxLength={6}
+                {...register('codigo', {
+                  pattern: { value: /^\d{6}$/, message: 'El código debe tener 6 dígitos' },
+                  onChange: (e) => { e.target.value = e.target.value.replace(/\D/g, '') },
+                })}
+              />
+            </Field>
+          </div>
+
+          {existente && (
+            <div
+              className={[
+                'mx-1 mt-1 flex items-start gap-2.5 px-3.5 py-2.5 rounded-2 text-[12.5px] border',
+                existente.activo
+                  ? 'bg-warning-light/40 border-warning-light text-text'
+                  : 'bg-primary/5 border-primary/20 text-text',
+              ].join(' ')}
+            >
+              <Search size={14} className="mt-0.5 flex-shrink-0 text-primary" />
+              <div>
+                {existente.activo ? (
+                  <>Este alumno <strong>ya está registrado</strong>{existente.aula ? <> (aula {existente.aula.nombre}{existente.aula.ciclo ? ` · ${existente.aula.ciclo.nombre}` : ''})</> : ''}. Al guardar se <strong>actualizarán sus datos y su matrícula</strong> (no se crea un duplicado).</>
+                ) : (
+                  <>Este alumno fue <strong>dado de baja</strong>. Al guardar se <strong>reactivará y re-matriculará</strong> con los datos de este formulario.</>
+                )}
+              </div>
+            </div>
+          )}
+        </Card>
+
         {/* Datos personales */}
-        <Card title="Datos personales">
+        <Card title="Datos personales" className="mt-4">
           <div className="grid grid-cols-1 sm:grid-cols-2 gap-4 p-1">
             <Field label="Nombres" required error={errors.nombres?.message}>
               <Input
@@ -163,18 +285,6 @@ export default function NuevoAlumnoPage() {
               <Input
                 placeholder="Mendoza Quiroz"
                 {...register('apellidos', { required: 'Requerido', minLength: { value: 2, message: 'Mínimo 2 caracteres' } })}
-              />
-            </Field>
-            <Field label="DNI" required error={errors.dni?.message}>
-              <Input
-                placeholder="76543210"
-                inputMode="numeric"
-                maxLength={8}
-                {...register('dni', {
-                  required: 'Requerido',
-                  pattern: { value: /^\d{8}$/, message: 'DNI debe tener 8 dígitos' },
-                  onChange: (e) => { e.target.value = e.target.value.replace(/\D/g, '') },
-                })}
               />
             </Field>
             <Field label="Fecha de nacimiento" error={errors.fecha_nacimiento?.message}>
@@ -233,7 +343,8 @@ export default function NuevoAlumnoPage() {
           </div>
         </Card>
 
-        {/* ── Apoderado ──────────────────────────────────────────────── */}
+        {/* ── Apoderado (solo al registrar un alumno nuevo) ── */}
+        {!existente && (
         <Card title="Apoderado" className="mt-4">
           {/* Selector de modo */}
           <div className="flex gap-2 p-1 mb-4">
@@ -386,11 +497,14 @@ export default function NuevoAlumnoPage() {
             </p>
           )}
         </Card>
+        )}
 
         <div className="flex justify-end gap-2.5 mt-5">
           <Btn variant="secondary" type="button" onClick={() => router.back()}>Cancelar</Btn>
-          <Btn type="submit" disabled={isSubmitting || createAlumno.isPending}>
-            {createAlumno.isPending ? 'Guardando…' : 'Crear alumno'}
+          <Btn type="submit" disabled={isSubmitting || createAlumno.isPending || updateAlumno.isPending}>
+            {(createAlumno.isPending || updateAlumno.isPending)
+              ? 'Guardando…'
+              : existente ? 'Actualizar alumno' : 'Crear alumno'}
           </Btn>
         </div>
       </form>
