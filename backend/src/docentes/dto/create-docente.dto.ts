@@ -25,10 +25,13 @@ export class CreateDocenteDto {
   @IsNotEmpty()
   apellidos: string;
 
-  @ApiProperty({ example: 'jperez@academia.edu' })
+  @ApiPropertyOptional({
+    description: 'Correo institucional. Opcional: si se omite se autogenera a partir del DNI.',
+    example: 'jperez@academia.edu',
+  })
+  @IsOptional()
   @IsEmail({}, { message: 'El email no es válido' })
-  @IsNotEmpty()
-  email: string;
+  email?: string;
 
   @ApiPropertyOptional({ description: 'Opcional. Si se omite, la contraseña temporal es el DNI.' })
   @IsOptional()
@@ -36,10 +39,10 @@ export class CreateDocenteDto {
   @MinLength(6, { message: 'La contraseña debe tener al menos 6 caracteres' })
   password?: string;
 
-  @ApiPropertyOptional({ example: '987654321' })
-  @IsOptional()
+  @ApiProperty({ description: 'Teléfono de contacto (obligatorio).', example: '987654321' })
   @IsString()
-  telefono?: string;
+  @MinLength(6, { message: 'El teléfono debe tener al menos 6 caracteres' })
+  telefono: string;
 
   @ApiPropertyOptional({ example: 'Matemáticas' })
   @IsOptional()

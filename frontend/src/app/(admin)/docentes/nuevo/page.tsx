@@ -31,7 +31,7 @@ export default function NuevoDocentePage() {
       await createDocente.mutateAsync({
         ...values,
         password: undefined,
-        telefono: values.telefono || undefined,
+        email: values.email || undefined, // '' rompería @IsEmail; enviar undefined
         especialidad: values.especialidad || undefined,
       })
       router.push('/docentes')
@@ -80,8 +80,15 @@ export default function NuevoDocentePage() {
                 })}
               />
             </Field>
-            <Field label="Teléfono WhatsApp" error={errors.telefono?.message}>
-              <Input placeholder="+51 987 654 321" {...register('telefono')} />
+            <Field label="Teléfono WhatsApp" required error={errors.telefono?.message}>
+              <Input
+                placeholder="+51 987 654 321"
+                inputMode="tel"
+                {...register('telefono', {
+                  required: 'Requerido',
+                  minLength: { value: 6, message: 'Teléfono demasiado corto' },
+                })}
+              />
             </Field>
             <Field label="Especialidad" error={errors.especialidad?.message}>
               <Input placeholder="Matemáticas" {...register('especialidad')} />
@@ -91,11 +98,17 @@ export default function NuevoDocentePage() {
 
         <Card title="Acceso al sistema" className="mt-4">
           <div className="grid grid-cols-1 sm:grid-cols-2 gap-4 p-1">
-            <Field label="Correo institucional" required error={errors.email?.message}>
+            <Field
+              label="Correo institucional"
+              hint="Opcional. Si se deja vacío, se genera un correo interno automáticamente."
+              error={errors.email?.message}
+            >
               <Input
                 type="email"
                 placeholder="c.ramirez@cepreunasam.edu.pe"
-                {...register('email', { required: 'Requerido' })}
+                {...register('email', {
+                  pattern: { value: /^\S+@\S+\.\S+$/, message: 'Correo no válido' },
+                })}
               />
             </Field>
           </div>

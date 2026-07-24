@@ -17,6 +17,13 @@ import { useSearchApoderados, PARENTESCO_OPTS, type ApoderadoSearchResult } from
 const SELECT_CLS =
   'w-full px-3 py-2 text-[13px] border border-border rounded-2 bg-surface text-text focus:outline-none focus:ring-1 focus:ring-primary disabled:opacity-50'
 
+const AREA_LABEL: Record<string, string> = {
+  ciencias: 'Ciencias',
+  letras:   'Letras',
+  medicas:  'Médicas',
+}
+const AREAS: AreaCarrera[] = ['ciencias', 'letras', 'medicas']
+
 /** Título de sección con ícono (Card acepta ReactNode en title). */
 function SectionTitle({ icon, children }: { icon: React.ReactNode; children: React.ReactNode }) {
   return (
@@ -92,7 +99,20 @@ export default function NuevoAlumnoPage() {
   const [cicloId, setCicloId] = React.useState('')
   const [areaActiva, setAreaActiva] = React.useState<AreaCarrera | undefined>()
   const { data: secciones = [] } = useAulas(cicloId || undefined)
-  const { data: carreras = [] } = useCarreras(areaActiva)
+  // Se cargan TODAS las carreras y se agrupan por área en el selector: así el
+  // área del aula solo prioriza su grupo (no bloquea las demás áreas, p. ej.
+  // si un aula quedó guardada con el área equivocada).
+  const { data: carreras = [] } = useCarreras()
+
+  // Grupos de carreras por área, con el área del aula seleccionada primero.
+  const gruposCarreras = React.useMemo(() => {
+    const orden = areaActiva
+      ? [areaActiva, ...AREAS.filter((a) => a !== areaActiva)]
+      : AREAS
+    return orden
+      .map((a) => ({ area: a, items: carreras.filter((c) => c.area === a) }))
+      .filter((g) => g.items.length > 0)
+  }, [carreras, areaActiva])
 
   // Apoderado
   const [apModo, setApModo] = React.useState<'ninguno' | 'nuevo' | 'existente'>('ninguno')
@@ -407,19 +427,32 @@ export default function NuevoAlumnoPage() {
               <select {...register('aula_id')} disabled={!cicloId} className={SELECT_CLS}>
                 <option value="">{cicloId ? 'Sin asignar' : 'Elige ciclo primero'}</option>
                 {secciones.map((s) => (
-                  <option key={s.id} value={s.id}>{s.nombre} — {s.turno === 'manana' ? 'Mañana' : 'Tarde'}</option>
+                  <option key={s.id} value={s.id}>
+                    {s.nombre} · {AREA_LABEL[s.area] ?? s.area} — {s.turno === 'manana' ? 'Mañana' : 'Tarde'}
+                  </option>
                 ))}
               </select>
               {aulaSeleccionada && (
                 <p className="mt-1 text-[11.5px] text-text-mute">
-                  Turno: <strong>{aulaSeleccionada.turno === 'manana' ? 'Mañana' : 'Tarde'}</strong>
+                  Área: <strong>{AREA_LABEL[aulaSeleccionada.area] ?? aulaSeleccionada.area}</strong>
+                  {' · '}Turno: <strong>{aulaSeleccionada.turno === 'manana' ? 'Mañana' : 'Tarde'}</strong>
                 </p>
               )}
             </Field>
-            <Field label="Carrera profesional" className="sm:col-span-2">
-              <select {...register('carrera_id')} disabled={!areaActiva} className={SELECT_CLS}>
-                <option value="">{areaActiva ? 'Sin asignar' : 'Elige sección primero'}</option>
-                {carreras.map((c) => <option key={c.id} value={c.id}>{c.nombre}</option>)}
+            <Field
+              label="Carrera profesional"
+              hint={areaActiva
+                ? `Las carreras de ${AREA_LABEL[areaActiva] ?? areaActiva} (área del aula) aparecen primero.`
+                : undefined}
+              className="sm:col-span-2"
+            >
+              <select {...register('carrera_id')} disabled={carreras.length === 0} className={SELECT_CLS}>
+                <option value="">Sin asignar</option>
+                {gruposCarreras.map((g) => (
+                  <optgroup key={g.area} label={AREA_LABEL[g.area] ?? g.area}>
+                    {g.items.map((c) => <option key={c.id} value={c.id}>{c.nombre}</option>)}
+                  </optgroup>
+                ))}
               </select>
             </Field>
           </div>

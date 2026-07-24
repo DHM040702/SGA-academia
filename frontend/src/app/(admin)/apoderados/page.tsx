@@ -46,9 +46,18 @@ function CrearApoderadoModal({ onClose }: { onClose: () => void }) {
 
   async function guardar(e: React.FormEvent) {
     e.preventDefault()
-    if (!f.nombre || !f.apellidos || !f.dni || !f.email || !f.password) { setError('Completa todos los campos.'); return }
+    if (!f.nombre || !f.apellidos || !f.dni || !f.telefono_whatsapp) {
+      setError('Completa nombre, apellidos, DNI y WhatsApp (correo y contraseña son opcionales).')
+      return
+    }
     try {
-      await createMut.mutateAsync({ ...f })
+      // Correo/contraseña vacíos → undefined (el backend autogenera el correo
+      // y usa el DNI como contraseña inicial).
+      await createMut.mutateAsync({
+        ...f,
+        email:    f.email    || undefined,
+        password: f.password || undefined,
+      })
       onClose()
     } catch (err: any) { setError(errMsg(err, 'No se pudo crear el apoderado.')) }
   }
@@ -74,10 +83,10 @@ function CrearApoderadoModal({ onClose }: { onClose: () => void }) {
             <label className="flex flex-col gap-1"><span className="text-[12px] font-medium text-text-mute">WhatsApp</span>
               <input value={f.telefono_whatsapp} onChange={(e) => set('telefono_whatsapp', e.target.value)} className={input} required /></label>
           </div>
-          <label className="flex flex-col gap-1"><span className="text-[12px] font-medium text-text-mute">Correo de acceso</span>
-            <input type="email" value={f.email} onChange={(e) => set('email', e.target.value)} className={input} required /></label>
-          <label className="flex flex-col gap-1"><span className="text-[12px] font-medium text-text-mute">Contraseña inicial</span>
-            <input value={f.password} onChange={(e) => set('password', e.target.value)} className={input} placeholder="Mínimo 8 caracteres" required /></label>
+          <label className="flex flex-col gap-1"><span className="text-[12px] font-medium text-text-mute">Correo de acceso (opcional)</span>
+            <input type="email" value={f.email} onChange={(e) => set('email', e.target.value)} className={input} placeholder="Se genera uno interno si se deja vacío" /></label>
+          <label className="flex flex-col gap-1"><span className="text-[12px] font-medium text-text-mute">Contraseña inicial (opcional)</span>
+            <input value={f.password} onChange={(e) => set('password', e.target.value)} className={input} placeholder="Si se deja vacía, será el DNI" /></label>
           {error && <p className="text-[12px] text-danger bg-danger-light/40 px-3 py-2 rounded-2">{error}</p>}
           <div className="flex gap-2 pt-1">
             <Btn type="button" variant="secondary" className="flex-1" onClick={onClose}>Cancelar</Btn>
@@ -188,12 +197,13 @@ function ApoderadoModal({ id, onClose }: { id: string; onClose: () => void }) {
   async function guardar(e: React.FormEvent) {
     e.preventDefault()
     if (!nombre.trim() || !apellidos.trim()) { setError('Nombre y apellidos son obligatorios.'); return }
-    if (!email.trim()) { setError('El correo es obligatorio.'); return }
+    if (!whatsapp.trim()) { setError('El teléfono WhatsApp es obligatorio.'); return }
     try {
       await updateMut.mutateAsync({
         id,
         nombre: nombre.trim(), apellidos: apellidos.trim(), telefono_whatsapp: whatsapp.trim(),
-        email: email.trim(), activo,
+        // Correo vacío → no se toca el actual (es opcional).
+        email: email.trim() || undefined, activo,
       })
       setEdit(false); setError(''); setOkMsg('Datos actualizados.')
     } catch (err: any) { setError(errMsg(err, 'No se pudo guardar.')) }
@@ -244,8 +254,8 @@ function ApoderadoModal({ id, onClose }: { id: string; onClose: () => void }) {
             <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
               <label className="flex flex-col gap-1"><span className="text-[12px] font-medium text-text-mute">WhatsApp</span>
                 <input value={whatsapp} onChange={(e) => setWhatsapp(e.target.value)} className={input} /></label>
-              <label className="flex flex-col gap-1"><span className="text-[12px] font-medium text-text-mute">Correo de acceso</span>
-                <input type="email" value={email} onChange={(e) => setEmail(e.target.value)} className={input} required /></label>
+              <label className="flex flex-col gap-1"><span className="text-[12px] font-medium text-text-mute">Correo de acceso (opcional)</span>
+                <input type="email" value={email} onChange={(e) => setEmail(e.target.value)} className={input} /></label>
             </div>
             <label className="flex items-center justify-between py-1">
               <span className="text-[13px]">Cuenta activa</span>

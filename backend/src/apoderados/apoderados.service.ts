@@ -13,7 +13,13 @@ export class ApoderadosService {
 
   /** Crea la cuenta de usuario (rol apoderado) + el perfil del apoderado. */
   async create(dto: CreateApoderadoDto) {
-    const emailExists = await this.prisma.usuario.findFirst({ where: { email: dto.email } });
+    // El correo es opcional (no se reparten correos): si no viene, se genera a
+    // partir del DNI del apoderado (misma convención que el resto del sistema).
+    const email = dto.email && /^\S+@\S+\.\S+$/.test(dto.email)
+      ? dto.email
+      : `apo.${dto.dni}@academia.edu`;
+
+    const emailExists = await this.prisma.usuario.findFirst({ where: { email } });
     if (emailExists) {
       throw new BadRequestException(
         emailExists.deletedAt
@@ -29,7 +35,7 @@ export class ApoderadosService {
     const passwordHash = await bcrypt.hash(dto.password || dto.dni, 10);
     return this.prisma.$transaction(async (tx) => {
       const usuario = await tx.usuario.create({
-        data: { email: dto.email, passwordHash, rol: Rol.apoderado, activo: true, dni: dto.dni },
+        data: { email, passwordHash, rol: Rol.apoderado, activo: true, dni: dto.dni },
       });
       return tx.apoderado.create({
         data: {

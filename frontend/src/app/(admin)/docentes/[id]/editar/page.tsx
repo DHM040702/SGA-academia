@@ -118,8 +118,15 @@ export default function EditarDocentePage() {
                 })}
               />
             </Field>
-            <Field label="Teléfono WhatsApp" error={errors.telefono?.message}>
-              <Input placeholder="+51 987 654 321" {...register('telefono')} />
+            <Field label="Teléfono WhatsApp" required error={errors.telefono?.message}>
+              <Input
+                placeholder="+51 987 654 321"
+                inputMode="tel"
+                {...register('telefono', {
+                  required: 'Requerido',
+                  minLength: { value: 6, message: 'Teléfono demasiado corto' },
+                })}
+              />
             </Field>
             <Field label="Especialidad" error={errors.especialidad?.message}>
               <Input placeholder="Matemáticas" {...register('especialidad')} />

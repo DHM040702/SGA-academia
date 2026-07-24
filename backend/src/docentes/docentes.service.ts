@@ -104,8 +104,14 @@ export class DocentesService {
     });
     if (existingDni) throw new BadRequestException('Ya existe un docente con ese DNI');
 
+    // El correo es opcional (no se reparten correos): si no viene, se genera a
+    // partir del DNI, con la misma convención que alumnos/apoderados.
+    const email = dto.email && /^\S+@\S+\.\S+$/.test(dto.email)
+      ? dto.email
+      : `doc.${dto.dni}@academia.edu`;
+
     const existingEmail = await this.prisma.usuario.findFirst({
-      where: { email: dto.email, deletedAt: null },
+      where: { email, deletedAt: null },
     });
     if (existingEmail) throw new BadRequestException('Ya existe un usuario con ese email');
 
@@ -115,7 +121,7 @@ export class DocentesService {
     return this.prisma.$transaction(async (tx) => {
       const usuario = await tx.usuario.create({
         data: {
-          email: dto.email,
+          email,
           passwordHash: hash,
           rol: Rol.docente,
           // El DNI del docente también sirve como DNI de acceso al sistema

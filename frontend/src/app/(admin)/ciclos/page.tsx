@@ -239,6 +239,16 @@ function NuevaAulaModal({
   const [nombre,   setNombre]   = useState(aula?.nombre    ?? '')
   const [turno,    setTurno]    = useState(aula?.turno     ?? 'manana')
   const [area,     setArea]     = useState(aula?.area      ?? 'ciencias')
+
+  /** Al escribir el nombre, deriva el área del prefijo (C=Ciencias, L=Letras,
+   *  M=Médicas). Evita aulas L-001/M-001 guardadas con el área por defecto
+   *  (Ciencias), que luego filtraban mal las carreras. Sigue siendo editable. */
+  function cambiarNombre(v: string) {
+    setNombre(v)
+    const pref = v.trim().charAt(0).toUpperCase()
+    const derivada = ({ C: 'ciencias', L: 'letras', M: 'medicas' } as const)[pref as 'C' | 'L' | 'M']
+    if (derivada) setArea(derivada)
+  }
   const [cupo,     setCupo]     = useState(String(aula?.cupoMaximo ?? 50))
   const [cicloId,  setCicloId]  = useState(aula?.cicloId   ?? defaultCicloId ?? ciclos[0]?.id ?? '')
   const [error,    setError]    = useState('')
@@ -273,8 +283,8 @@ function NuevaAulaModal({
             </span>
             <input
               value={nombre}
-              onChange={(e) => setNombre(e.target.value)}
-              required placeholder="Ej: A, B-Bio, C-Letras"
+              onChange={(e) => cambiarNombre(e.target.value)}
+              required placeholder="Ej: C-001, L-001, M-001"
               className="px-3 py-2 text-[13px] border border-border rounded-2 bg-surface focus:outline-none focus:ring-1 focus:ring-primary"
             />
           </label>

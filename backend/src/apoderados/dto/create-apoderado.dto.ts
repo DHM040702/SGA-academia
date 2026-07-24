@@ -1,5 +1,5 @@
-import { ApiProperty } from '@nestjs/swagger';
-import { IsEmail, IsNotEmpty, IsString, Matches, MaxLength, MinLength } from 'class-validator';
+import { ApiProperty, ApiPropertyOptional } from '@nestjs/swagger';
+import { IsEmail, IsNotEmpty, IsOptional, IsString, Matches, MaxLength, MinLength } from 'class-validator';
 
 export class CreateApoderadoDto {
   @ApiProperty({ example: 'María' })
@@ -18,11 +18,16 @@ export class CreateApoderadoDto {
   @IsString() @MinLength(6) @MaxLength(20)
   telefono_whatsapp: string;
 
-  @ApiProperty({ example: 'apoderado@correo.com' })
+  @ApiPropertyOptional({
+    description: 'Correo de acceso. Opcional: si se omite se autogenera a partir del DNI.',
+    example: 'apoderado@correo.com',
+  })
+  @IsOptional()
   @IsEmail()
-  email: string;
+  email?: string;
 
-  @ApiProperty({ example: 'Temporal1234', minLength: 8, description: 'Si se omite, se usa el DNI como contraseña inicial' })
+  @ApiPropertyOptional({ minLength: 8, description: 'Opcional: si se omite, la contraseña inicial es el DNI' })
+  @IsOptional()
   @IsString() @MinLength(8) @MaxLength(72)
-  password: string;
+  password?: string;
 }
